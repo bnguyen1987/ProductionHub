@@ -3,6 +3,22 @@
 // Typical board caliper per piece, inches. Placeholder values — edit on screen if your board runs different.
 export const CALIPER = { E: 0.0625, B: 0.125, C: 0.156, BC: 0.281 };
 
+// Typical caliper (in) and combined board weight (lb/MSF) by flute + grade.
+// ESTIMATES built from common liner/medium combos (e.g. 200# = 42/26/42, 275# = 69/26/69) with flute take-up
+// B 1.35, C 1.44, E 1.24 plus starch. Edit on screen if your mill's numbers differ.
+export const GRADES = ['200', '250', '275', '350', '600'];
+export const BOARD = {
+  E:  { '200': [0.0625, 120], '250': [0.064, 140], '275': [0.066, 170], '350': [0.068, 210], '600': [0.072, 260] },
+  B:  { '200': [0.125, 125], '250': [0.127, 150], '275': [0.130, 180], '350': [0.134, 220], '600': [0.140, 270] },
+  C:  { '200': [0.160, 128], '250': [0.162, 155], '275': [0.166, 182], '350': [0.170, 225], '600': [0.176, 275] },
+  BC: { '200': [0.270, 205], '250': [0.273, 230], '275': [0.280, 255], '350': [0.285, 290], '600': [0.300, 360] },
+};
+export function boardSpec(flute, grade) {
+  const row = BOARD[flute] || BOARD.C;
+  const v = row[grade] || row['200'];
+  return { caliper: v[0], lbsMsf: v[1] };
+}
+
 // Pallet sizes written Width x Length (inches), the way they're ordered.
 export const STANDARD_PALLETS = [
   [30, 30], [36, 36], [40, 40], [42, 42], [44, 44], [48, 48],
@@ -13,9 +29,10 @@ export const STANDARD_PALLETS = [
 // RSC/HSC/FOL ship glued and folded flat: length = L + W, width = D + flaps.
 // Each folded box is 2 layers of board thick; a sheet/blank is 1 layer.
 export function flatPiece({ style, L, W, D, sheetW, sheetL, caliper }) {
-  if (style === 'SHEET') return { a: sheetL, b: sheetW, h: caliper, layers: 1 };
+  if (style === 'SHEET') return { a: sheetL, b: sheetW, h: caliper, layers: 1, areaSqIn: sheetL * sheetW };
   const flaps = style === 'HSC' ? W / 2 : style === 'FOL' ? 2 * W : W; // RSC: two half-width flaps
-  return { a: L + W, b: D + flaps, h: caliper * 2, layers: 2 };
+  // board area ≈ the unfolded blank: (2L + 2W + 1.25" joint) × (D + flaps)
+  return { a: L + W, b: D + flaps, h: caliper * 2, layers: 2, areaSqIn: (2 * L + 2 * W + 1.25) * (D + flaps) };
 }
 
 const fit = (space, size) => (size > 0 ? Math.floor((space + 1e-9) / size) : 0);
