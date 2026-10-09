@@ -139,14 +139,27 @@ export function palletsNeeded(qty, perPallet) {
   return { pallets, lastPallet: qty - (pallets - 1) * perPallet };
 }
 
+// Two of the same pallet pushed together. join 'width' = side by side across the width (2W × L),
+// join 'length' = end to end (W × 2L). Returns the better of the two joins (more pieces, then less overhang).
+export function loadTwo({ piece, pallet, overhang = 0, maxStack, bundle, mode = 'auto' }) {
+  const opts = [
+    { join: 'width', base: { w: pallet.w * 2, l: pallet.l } },
+    { join: 'length', base: { w: pallet.w, l: pallet.l * 2 } },
+  ].map((o) => ({ ...o, load: loadFor({ piece, pallet: o.base, overhang, maxStack, bundle, mode }) }));
+  opts.sort((x, y) => y.load.perPallet - x.load.perPallet || y.load.footprintUse - x.load.footprintUse);
+  return opts[0];
+}
+
 // Rank standard sizes: fewest pallets, then smallest pallet (less wood, less overhang risk), then best footprint use.
-export function recommend({ piece, qty, overhang, maxStack, bundle, mode = 'auto', sizes = STANDARD_PALLETS }) {
+export function recommend({ piece, qty, overhang, maxStack, bundle, mode = 'auto', two = false, sizes = STANDARD_PALLETS }) {
   const rows = [];
   for (const [w, l] of sizes) {
-    const ld = loadFor({ piece, pallet: { w, l }, overhang, maxStack, bundle, mode });
+    let ld, extra = {};
+    if (two) { const t = loadTwo({ piece, pallet: { w, l }, overhang, maxStack, bundle, mode }); ld = t.load; extra = { join: t.join, base: t.base }; }
+    else ld = loadFor({ piece, pallet: { w, l }, overhang, maxStack, bundle, mode });
     if (!ld.perPallet) continue;
-    const { pallets } = palletsNeeded(qty || ld.perPallet, ld.perPallet);
-    rows.push({ w, l, ...ld, pallets });
+    const { pallets: units } = palletsNeeded(qty || ld.perPallet, ld.perPallet);
+    rows.push({ w, l, ...ld, ...extra, units, pallets: two ? units * 2 : units });
   }
   if (qty > 0) rows.sort((p, q) => p.pallets - q.pallets || p.w * p.l - q.w * q.l || q.footprintUse - p.footprintUse);
   else rows.sort((p, q) => q.footprintUse - p.footprintUse || q.perPallet - p.perPallet);

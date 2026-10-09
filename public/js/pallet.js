@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { $, $$, esc, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
-import { CALIPER, GRADES, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, palletsNeeded, recommend } from './palletcalc.js';
+import { CALIPER, GRADES, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
 
 const PALLET_H = 5; // typical wood pallet height, inches
 let state, three = null, last = null;
 
-const DEFAULTS = { pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200', caliper: String(boardSpec('C', '200').caliper), lbsMsf: String(boardSpec('C', '200').lbsMsf), bundle: '25', qty: '', maxStack: '48', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
+const DEFAULTS = { two: '1', pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200', caliper: String(boardSpec('C', '200').caliper), lbsMsf: String(boardSpec('C', '200').lbsMsf), bundle: '25', qty: '', maxStack: '48', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
 
 export function render(view) {
   state = { ...DEFAULTS, ...(loadForm('pallet') || {}) };
@@ -50,6 +50,11 @@ export function render(view) {
               <select id="pPal" data-f="pallet"><option value="auto">Best fit (recommended)</option>${STANDARD_PALLETS.map(([w, l]) => `<option value="${w}x${l}">${w} × ${l}</option>`).join('')}<option value="custom">Custom size…</option></select></div>
             <div class="field" id="customWrap"><label>Custom W × L (in)</label><div style="display:flex;gap:6px"><input data-f="customW" id="pCW" type="text" inputmode="decimal" placeholder="W"><input data-f="customL" id="pCL" type="text" inputmode="decimal" placeholder="L"></div></div>
           </div>
+          <div class="lbl" style="margin:2px 0 6px">Pallets under each load</div>
+          <div class="seg" id="twoSeg" style="margin-bottom:12px">
+            <button type="button" data-k="1">1 pallet</button>
+            <button type="button" data-k="2">2 side by side<small>same size, pushed together</small></button>
+          </div>
           <div class="lbl" style="margin:2px 0 6px">Stacking pattern</div>
           <div class="seg" id="patSeg">
             <button type="button" data-k="auto">Most pieces<small>picks the best</small></button>
@@ -92,6 +97,7 @@ export function render(view) {
   $$('#fluteSeg button').forEach((b) => b.addEventListener('click', () => { state.flute = b.dataset.k; applyBoard(); }));
   $$('#gradeSeg button').forEach((b) => b.addEventListener('click', () => { state.grade = b.dataset.k; applyBoard(); }));
   $$('#patSeg button').forEach((b) => b.addEventListener('click', () => { state.pattern = b.dataset.k; update(); }));
+  $$('#twoSeg button').forEach((b) => b.addEventListener('click', () => { state.two = b.dataset.k; update(); }));
   $$('#showSeg button').forEach((b) => b.addEventListener('click', () => { state.show = b.dataset.k; update(); }));
   $$('#viewer [data-cam]').forEach((b) => b.addEventListener('click', () => setCam(b.dataset.cam)));
   $('#boardBtn').addEventListener('click', () => { state.board = state.board === 'kraft' ? 'white' : 'kraft'; update(); });
@@ -129,7 +135,8 @@ function compute() {
   if (need.length) return { need };
 
   const piece = flatPiece({ style: state.style, ...dims, caliper });
-  const recs = recommend({ piece, qty, overhang, maxStack, bundle, mode: state.pattern });
+  const two = state.two === '2';
+  const recs = recommend({ piece, qty, overhang, maxStack, bundle, mode: state.pattern, two });
   let pallet, load;
   if (state.pallet === 'auto') {
     if (!recs.length) return { piece, recs, qty, noFit: true };
@@ -142,9 +149,11 @@ function compute() {
     const [w, l] = state.pallet.split('x').map(Number);
     pallet = { w, l };
   }
-  load = loadFor({ piece, pallet, overhang, maxStack, bundle, mode: state.pattern });
-  const pn = palletsNeeded(qty, load.perPallet);
-  return { piece, recs, pallet, load, qty, bundle, overhang, ...pn };
+  let base = { ...pallet, join: null };
+  if (two) { const t = loadTwo({ piece, pallet, overhang, maxStack, bundle, mode: state.pattern }); load = t.load; base = { ...t.base, join: t.join }; }
+  else load = loadFor({ piece, pallet, overhang, maxStack, bundle, mode: state.pattern });
+  const pn = palletsNeeded(qty, load.perPallet); // per load (one or two pallets)
+  return { piece, recs, pallet, base, two, load, qty, bundle, overhang, loads: pn.pallets, lastPallet: pn.lastPallet, pallets: two ? pn.pallets * 2 : pn.pallets };
 }
 
 function update() {
@@ -153,6 +162,7 @@ function update() {
   $$('#fluteSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.flute)));
   $$('#gradeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.grade)));
   $$('#patSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.pattern)));
+  $$('#twoSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.two)));
   $$('#showSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.show)));
   $('#boxDims').classList.toggle('hidden', state.style === 'SHEET');
   $('#sheetDims').classList.toggle('hidden', state.style !== 'SHEET');
@@ -169,7 +179,7 @@ function update() {
   }
   const flat = `${fmtIn(r.piece.b)} × ${fmtIn(r.piece.a)}`;
   if (r.noFit || !r.load.perPallet) {
-    res.innerHTML = `<h2>Result</h2><div class="alert err">The piece (${flat} flat) does not fit ${r.noFit ? 'any standard pallet' : 'this pallet'} at this height and overhang. Try a bigger pallet, more overhang, or fewer pieces per bundle.${state.pattern === 'chimney' ? ' A chimney needs room for four pieces turning around the center, so it also helps to try Straight columns.' : ''}</div>`;
+    res.innerHTML = `<h2>Result</h2><div class="alert err">The piece (${flat} flat) does not fit ${r.noFit ? 'any standard pallet' : 'this pallet'} at this height and overhang. Try a bigger pallet, more overhang, ${state.two === '2' ? '' : '<b>2 side by side</b>, '}or fewer pieces per bundle.${state.pattern === 'chimney' ? ' A chimney needs room for four pieces turning around the center, so it also helps to try Straight columns.' : ''}</div>`;
     recBox.innerHTML = '';
     drawScene(null); $('#topView').innerHTML = '';
     return;
@@ -181,10 +191,10 @@ function update() {
   const shownPieces = showLast ? r.lastPallet : load.perPallet;
 
   res.innerHTML = `
-    <h2>Result · ${fmtNum(pallet.w, pallet.w % 1 ? 2 : 0)} × ${fmtNum(pallet.l, pallet.l % 1 ? 2 : 0)} pallet</h2>
+    <h2>Result · ${palletLabel(r)}</h2>
     <div class="big-nums">
       ${r.qty ? `<div class="stat hero"><div class="v">${fmtNum(r.pallets)}</div><div class="l">Pallet${r.pallets === 1 ? '' : 's'} for ${fmtNum(r.qty)} pcs</div></div>` : ''}
-      <div class="stat ${r.qty ? '' : 'hero'}"><div class="v">${fmtNum(load.perPallet)}</div><div class="l">Pieces per full pallet</div></div>
+      <div class="stat ${r.qty ? '' : 'hero'}"><div class="v">${fmtNum(load.perPallet)}</div><div class="l">${r.two ? 'Pieces per load (2 pallets)' : 'Pieces per full pallet'}</div></div>
       <div class="stat"><div class="v">${fmtIn(totalH)}</div><div class="l">Load height incl. pallet</div></div>
     </div>
     <dl class="kv" style="margin-top:12px">
@@ -193,24 +203,25 @@ function update() {
       <dt>Stacking pattern</dt><dd>${patternText(load)}</dd>
       <dt>Stacks per layer</dt><dd>${load.cols}</dd>
       ${r.bundle ? `<dt>Bundles high</dt><dd>${load.tiers} × ${r.bundle} pcs (${fmtIn(load.tierHeight)} each)</dd>` : `<dt>Pieces per stack</dt><dd>${fmtNum(load.perStack)}</dd>`}
-      <dt>Bundles per pallet</dt><dd>${r.bundle ? fmtNum(load.cols * load.tiers) : '–'}</dd>
+      ${r.two ? `<dt>Loads</dt><dd>${r.qty ? `${fmtNum(r.loads)} × 2 pallets` : '2 pallets each'}</dd>` : ''}
+      <dt>Bundles per ${r.two ? 'load' : 'pallet'}</dt><dd>${r.bundle ? fmtNum(load.cols * load.tiers) : '–'}</dd>
       <dt>Footprint used</dt><dd>${fmtNum(load.footprintUse * 100)}%</dd>
-      ${wt ? `<dt>Weight per full pallet (est.)</dt><dd>≈ ${fmtNum(wt.pallet)} lb</dd><dt>Weight per piece (est.)</dt><dd>${fmtNum(wt.piece, 2)} lb</dd>` : ''}
+      ${wt ? `<dt>Weight per full ${r.two ? 'load' : 'pallet'} (est.)</dt><dd>≈ ${fmtNum(wt.pallet)} lb</dd><dt>Weight per piece (est.)</dt><dd>${fmtNum(wt.piece, 2)} lb</dd>` : ''}
       ${load.overhangX || load.overhangY ? `<dt>Overhang</dt><dd>${fmtIn(Math.max(load.overhangX, load.overhangY))} per side</dd>` : ''}
-      ${r.qty && r.pallets > 1 ? `<dt>Last pallet</dt><dd>${fmtNum(r.lastPallet)} pcs</dd>` : ''}
+      ${r.qty && r.loads > 1 ? `<dt>Last ${r.two ? 'load' : 'pallet'}</dt><dd>${fmtNum(r.lastPallet)} pcs</dd>` : ''}
     </dl>
     ${load.footprintUse < 0.7 ? '<p class="note" style="margin:12px 0 0">Less than 70% of the deck is covered. Check another pallet size, or confirm the customer is OK with this pattern.</p>' : ''}`;
 
   recBox.innerHTML = `<h2>Pallet options ${r.qty ? '· fewest pallets first' : '· best coverage first'}</h2>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pallet</th><th>Pcs/pallet</th>${r.qty ? '<th>Pallets</th>' : ''}<th>Coverage</th><th></th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pallet</th><th>${r.two ? 'Pcs/load' : 'Pcs/pallet'}</th>${r.qty ? '<th>Pallets</th>' : ''}<th>Coverage</th><th></th></tr></thead><tbody>
     ${r.recs.slice(0, 6).map((p, i) => {
       const sel = pallet.w === p.w && pallet.l === p.l;
-      return `<tr class="${sel ? 'best' : ''}"><td style="white-space:nowrap">${p.w} × ${p.l}${i === 0 ? ' <span class="pill star">Best</span>' : ''}</td><td>${fmtNum(p.perPallet)}</td>${r.qty ? `<td>${p.pallets}</td>` : ''}<td>${fmtNum(p.footprintUse * 100)}%</td><td><button class="btn small" type="button" data-pick="${p.w}x${p.l}" ${sel ? 'disabled' : ''}>Use</button></td></tr>`;
+      return `<tr class="${sel ? 'best' : ''}"><td style="white-space:nowrap">${r.two ? '2 × ' : ''}${p.w} × ${p.l}${i === 0 ? ' <span class="pill star">Best</span>' : ''}${r.two && p.base ? `<br><span class="hint">${p.base.w} × ${p.base.l} base</span>` : ''}</td><td>${fmtNum(p.perPallet)}</td>${r.qty ? `<td>${p.pallets}</td>` : ''}<td>${fmtNum(p.footprintUse * 100)}%</td><td><button class="btn small" type="button" data-pick="${p.w}x${p.l}" ${sel ? 'disabled' : ''}>Use</button></td></tr>`;
     }).join('')}</tbody></table></div>`;
   $$('#palRecs [data-pick]').forEach((b) => b.addEventListener('click', () => { state.pallet = b.dataset.pick; $('#pPal').value = state.pallet; update(); }));
 
-  $('#topView').innerHTML = topViewSvg(pallet, load);
-  drawScene({ pallet, load, piece: r.piece, pieces: shownPieces, board: state.board });
+  $('#topView').innerHTML = topViewSvg(r.base, load);
+  drawScene({ pallet: r.base, load, piece: r.piece, pieces: shownPieces, board: state.board });
 }
 
 // ---------- top view ----------
@@ -223,6 +234,8 @@ function topViewSvg(pallet, load) {
   const fs = Math.max(1.6, Math.min(W, H) / 22);
   return `<svg class="topview" viewBox="0 0 ${W} ${H}" role="img" aria-label="Top view of one layer">
     <rect x="${tx(0)}" y="${ty(0)}" width="${pallet.l}" height="${pallet.w}" fill="#a57c4c" opacity=".35" stroke="#7a5a33" stroke-width=".4"/>
+    ${pallet.join === 'width' ? `<line x1="${tx(0)}" y1="${ty(pallet.w / 2)}" x2="${tx(pallet.l)}" y2="${ty(pallet.w / 2)}" stroke="#7a5a33" stroke-width=".6" stroke-dasharray="2 1"/>` : ''}
+    ${pallet.join === 'length' ? `<line x1="${tx(pallet.l / 2)}" y1="${ty(0)}" x2="${tx(pallet.l / 2)}" y2="${ty(pallet.w)}" stroke="#7a5a33" stroke-width=".6" stroke-dasharray="2 1"/>` : ''}
     ${load.rects.map((r, i) => `<rect x="${tx(r.x) + 0.15}" y="${ty(r.y) + 0.15}" width="${r.w - 0.3}" height="${r.l - 0.3}" fill="#d9b88a" stroke="#6b4e2c" stroke-width=".35"/>
       <text x="${tx(r.x + r.w / 2)}" y="${ty(r.y + r.l / 2) + fs * 0.35}" font-size="${fs}" text-anchor="middle" fill="#4a3519" font-family="sans-serif">${i + 1}</text>`).join('')}
     ${load.chimney && load.chimney.w > 0.01 && load.chimney.l > 0.01 ? `<rect x="${tx(load.chimney.x)}" y="${ty(load.chimney.y)}" width="${load.chimney.w}" height="${load.chimney.l}" fill="none" stroke="#c4651a" stroke-width=".5" stroke-dasharray="1.2 .8"/>` : ''}
@@ -278,19 +291,23 @@ function drawScene(data) {
   if (!three) return;
   disposeGroup(three.group);
   if (!data) return;
-  const { pallet, load, piece, pieces, board } = data;
+  const { pallet, load, piece, pieces, board } = data; // pallet = the base under the load (one or two pallets)
   const g = three.group;
   const L = pallet.l, W = pallet.w;
 
-  // Pallet: 3 runners, top deck boards, bottom boards.
+  // Pallet(s): 3 stringers, top deck boards, bottom boards. Two pallets are drawn pushed together.
   const wood = new THREE.MeshStandardMaterial({ color: 0xb48a57, roughness: 0.9 });
   const woodDark = new THREE.MeshStandardMaterial({ color: 0x8f6a3e, roughness: 0.9 });
   const deckT = 0.75, runnerH = PALLET_H - deckT * 2;
-  for (const zf of [-0.5, 0, 0.5]) g.add(box(L, runnerH, 3.5, 0, deckT + runnerH / 2, zf * (W - 3.5), woodDark));
-  // stringers run the length; deck boards run across the width
-  const nTop = Math.max(5, Math.round(L / 6.5));
-  for (let i = 0; i < nTop; i++) g.add(box(5.5, deckT, W, -L / 2 + 2.75 + i * ((L - 5.5) / (nTop - 1)), PALLET_H - deckT / 2, 0, wood));
-  for (const xf of [-0.5, 0, 0.5]) g.add(box(5.5, deckT, W, xf * (L - 5.5), deckT / 2, 0, wood));
+  const one = (pl, pw, cx, cz) => {
+    for (const zf of [-0.5, 0, 0.5]) g.add(box(pl, runnerH, 3.5, cx, deckT + runnerH / 2, cz + zf * (pw - 3.5), woodDark));
+    const nTop = Math.max(5, Math.round(pl / 6.5));
+    for (let i = 0; i < nTop; i++) g.add(box(5.5, deckT, pw, cx - pl / 2 + 2.75 + i * ((pl - 5.5) / (nTop - 1)), PALLET_H - deckT / 2, cz, wood));
+    for (const xf of [-0.5, 0, 0.5]) g.add(box(5.5, deckT, pw, cx + xf * (pl - 5.5), deckT / 2, cz, wood));
+  };
+  if (pallet.join === 'width') { one(L, W / 2 - 0.15, 0, -W / 4); one(L, W / 2 - 0.15, 0, W / 4); }
+  else if (pallet.join === 'length') { one(L / 2 - 0.15, W, -L / 4, 0); one(L / 2 - 0.15, W, L / 4, 0); }
+  else one(L, W, 0, 0);
 
   // Product: fill tier by tier, stack by stack, up to "pieces".
   const slots = [];
@@ -381,24 +398,24 @@ function printSheet() {
       <table class="ps-kv">
         <caption>Pallet</caption>
         ${row('Stacking pattern', patternText(load))}
-        ${row('Pallet size (W × L)', `${fmtNum(pallet.w, pallet.w % 1 ? 2 : 0)} × ${fmtNum(pallet.l, pallet.l % 1 ? 2 : 0)}`)}
+        ${row('Pallet size (W × L)', palletLabel(r))}
         ${row('Overhang allowed', `${esc(state.overhang)}" per side`)}
         ${row('Max product height', `${esc(state.maxStack)}"`)}
         ${row('Load height incl. pallet', fmtIn(PALLET_H + load.stackHeight))}
         ${row('Footprint used', `${fmtNum(load.footprintUse * 100)}%`)}
-        ${weights(r) ? row('Weight per full pallet', `≈ ${fmtNum(weights(r).pallet)} lb (estimate)`) : ''}
+        ${weights(r) ? row(r.two ? 'Weight per full load' : 'Weight per full pallet', `≈ ${fmtNum(weights(r).pallet)} lb (estimate)`) : ''}
       </table>
     </div>
     <div class="ps-big">
-      <div><b>${fmtNum(load.perPallet)}</b><span>pcs per full pallet</span></div>
+      <div><b>${fmtNum(load.perPallet)}</b><span>pcs per full ${r.two ? 'load (2 pallets)' : 'pallet'}</span></div>
       <div><b>${load.cols}</b><span>stacks per layer</span></div>
       <div><b>${r.bundle ? `${load.tiers} × ${r.bundle}` : fmtNum(load.perStack)}</b><span>${r.bundle ? 'bundles high × pcs' : 'pcs per stack'}</span></div>
       ${r.qty ? `<div><b>${fmtNum(r.pallets)}</b><span>pallets for ${fmtNum(r.qty)} pcs</span></div>` : ''}
-      ${r.qty && r.pallets > 1 ? `<div><b>${fmtNum(r.lastPallet)}</b><span>pcs on last pallet</span></div>` : ''}
+      ${r.qty && r.loads > 1 ? `<div><b>${fmtNum(r.lastPallet)}</b><span>pcs on last ${r.two ? 'load' : 'pallet'}</span></div>` : ''}
     </div>
     <div class="ps-pics">
       ${img ? `<figure><img src="${img}" alt="3D view of the load"><figcaption>${showLast ? 'Last pallet' : 'Full pallet'}</figcaption></figure>` : ''}
-      <figure>${topViewSvg(pallet, load)}<figcaption>Layer pattern (top view), ${load.cols} stacks, ${load.kind === 'chimney' ? 'chimney' : 'straight'}</figcaption></figure>
+      <figure>${topViewSvg(r.base, load)}<figcaption>Layer pattern (top view), ${load.cols} stacks, ${load.kind === 'chimney' ? 'chimney' : 'straight'}</figcaption></figure>
     </div>
     ${state.notes ? `<div class="ps-notes"><b>Notes:</b> ${esc(state.notes)}</div>` : ''}
     <div class="ps-sign"><span>Built by: ______________________</span><span>Checked by: ______________________</span></div>`;
@@ -416,11 +433,18 @@ function weights(r) {
   const lbs = parseFloat(state.lbsMsf);
   if (!(lbs > 0) || !r.piece || !r.load) return null;
   const piece = (r.piece.areaSqIn / 144) * (lbs / 1000);
-  return { piece, pallet: piece * r.load.perPallet + 45 };
+  return { piece, pallet: piece * r.load.perPallet + (r.two ? 90 : 45) };
 }
 
 function patternText(load) {
   if (load.kind !== 'chimney') return 'Straight columns';
   const h = load.chimney;
   return h && h.w > 0.01 && h.l > 0.01 ? `Chimney (${fmtIn(h.w)} × ${fmtIn(h.l)} open center)` : 'Chimney (pinwheel)';
+}
+
+function palletLabel(r) {
+  const n = (x) => fmtNum(x, x % 1 ? 2 : 0);
+  if (!r.two) return `${n(r.pallet.w)} × ${n(r.pallet.l)} pallet`;
+  const how = r.base.join === 'width' ? 'side by side' : 'end to end';
+  return `2 × ${n(r.pallet.w)} × ${n(r.pallet.l)} pallets ${how} (${n(r.base.w)} × ${n(r.base.l)} base)`;
 }
