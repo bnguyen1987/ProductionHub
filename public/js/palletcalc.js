@@ -46,6 +46,54 @@ function grid(x0, y0, w, l, a, b) {
 
 // Best single-layer pattern of a×b pieces in an X×Y area: straight grid, rotated grid,
 // or a two-block pattern (part straight, part turned 90°). Rotation allowed for all styles.
+// Chimney (pinwheel) pattern: four blocks turning around an open center "chimney".
+//   A (top-left, a×b)  | B (right, turned)
+//   D (left, turned)   | C (bottom-right, a×b)
+// Each block can hold more than one piece. Tries both spin directions and every block size.
+export function chimneyPattern(X, Y, a, b) {
+  let best = null;
+  for (const [p, q] of [[a, b], [b, a]]) {
+    const maxAx = fit(X, p), maxAy = fit(Y, q), maxBy = fit(Y, p), maxDx = fit(X, q);
+    for (let nAx = 1; nAx <= maxAx; nAx++) for (let nAy = 1; nAy <= maxAy; nAy++) {
+      const xA = nAx * p, yA = nAy * q;
+      const nBx = fit(X - xA, q), nDy = fit(Y - yA, p);
+      if (!nBx || !nDy) continue;
+      for (let nBy = 1; nBy <= maxBy; nBy++) {
+        const yB = nBy * p;
+        for (let nDx = 1; nDx <= maxDx; nDx++) {
+          const xD = nDx * q;
+          // blocks must not collide: the pinwheel has to spin one way or the other
+          if (!((xD <= xA + 1e-9 && yB >= yA - 1e-9) || (xD >= xA - 1e-9 && yB <= yA + 1e-9))) continue;
+          const nCx = fit(X - xD, p), nCy = fit(Y - yB, q);
+          if (!nCx || !nCy) continue;
+          const count = nAx * nAy + nBx * nBy + nDx * nDy + nCx * nCy;
+          if (!best || count > best.count) best = { count, p, q, nAx, nAy, nBx, nBy, nDx, nDy, nCx, nCy, xA, yA, yB, xD };
+        }
+      }
+    }
+  }
+  if (!best) return { rects: [], count: 0, usedX: 0, usedY: 0, chimney: null };
+  const { p, q, xA, yA, yB, xD } = best;
+  const rects = [
+    ...grid(0, 0, xA, yA, p, q),                       // A
+    ...grid(xA, 0, best.nBx * q, yB, q, p),            // B
+    ...grid(0, yA, xD, best.nDy * p, q, p),            // D
+    ...grid(xD, yB, best.nCx * p, best.nCy * q, p, q), // C
+  ];
+  const usedX = Math.max(...rects.map((r) => r.x + r.w)), usedY = Math.max(...rects.map((r) => r.y + r.l));
+  const hole = { x: Math.min(xA, xD), y: Math.min(yA, yB), w: Math.abs(xA - xD), l: Math.abs(yB - yA) };
+  return { rects, count: rects.length, usedX, usedY, chimney: hole };
+}
+
+// mode: 'auto' (most pieces of any pattern), 'straight' (straight / two-block columns), 'chimney'
+export function patternFor(X, Y, a, b, mode = 'auto') {
+  if (mode === 'chimney') return { ...chimneyPattern(X, Y, a, b), kind: 'chimney' };
+  const straight = { ...bestPattern(X, Y, a, b), kind: 'straight' };
+  if (mode === 'straight') return straight;
+  const ch = chimneyPattern(X, Y, a, b);
+  return ch.count > straight.count ? { ...ch, kind: 'chimney' } : straight;
+}
+
 export function bestPattern(X, Y, a, b) {
   const cands = [];
   for (const [p, q] of [[a, b], [b, a]]) {
@@ -64,9 +112,9 @@ export function bestPattern(X, Y, a, b) {
 
 // Full load for one pallet size.
 // pallet: { w, l } (inches), overhang per side, maxStack = product height limit (no pallet).
-export function loadFor({ piece, pallet, overhang = 0, maxStack, bundle }) {
+export function loadFor({ piece, pallet, overhang = 0, maxStack, bundle, mode = 'auto' }) {
   const X = pallet.l + 2 * overhang, Y = pallet.w + 2 * overhang;
-  const pat = bestPattern(X, Y, piece.a, piece.b);
+  const pat = patternFor(X, Y, piece.a, piece.b, mode);
   // center the pattern on the pallet (x along pallet length, y along width; origin = pallet corner)
   const offX = (pallet.l - pat.usedX) / 2, offY = (pallet.w - pat.usedY) / 2;
   const rects = pat.rects.map((r) => ({ ...r, x: r.x + offX, y: r.y + offY }));
@@ -77,7 +125,7 @@ export function loadFor({ piece, pallet, overhang = 0, maxStack, bundle }) {
   const perStack = tierPieces * tiers;
   const perPallet = pat.count * perStack;
   return {
-    rects, cols: pat.count, tiers, tierPieces, perStack, perPallet,
+    rects, cols: pat.count, kind: pat.kind, chimney: pat.chimney ? { ...pat.chimney, x: pat.chimney.x + offX, y: pat.chimney.y + offY } : null, tiers, tierPieces, perStack, perPallet,
     tierHeight: tierPieces * piece.h,
     stackHeight: perStack * piece.h,
     footprintUse: pat.count ? (pat.count * piece.a * piece.b) / (pallet.l * pallet.w) : 0,
@@ -92,10 +140,10 @@ export function palletsNeeded(qty, perPallet) {
 }
 
 // Rank standard sizes: fewest pallets, then smallest pallet (less wood, less overhang risk), then best footprint use.
-export function recommend({ piece, qty, overhang, maxStack, bundle, sizes = STANDARD_PALLETS }) {
+export function recommend({ piece, qty, overhang, maxStack, bundle, mode = 'auto', sizes = STANDARD_PALLETS }) {
   const rows = [];
   for (const [w, l] of sizes) {
-    const ld = loadFor({ piece, pallet: { w, l }, overhang, maxStack, bundle });
+    const ld = loadFor({ piece, pallet: { w, l }, overhang, maxStack, bundle, mode });
     if (!ld.perPallet) continue;
     const { pallets } = palletsNeeded(qty || ld.perPallet, ld.perPallet);
     rows.push({ w, l, ...ld, pallets });

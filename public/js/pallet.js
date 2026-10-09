@@ -6,7 +6,7 @@ import { CALIPER, GRADES, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, palle
 const PALLET_H = 5; // typical wood pallet height, inches
 let state, three = null, last = null;
 
-const DEFAULTS = { customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200', caliper: String(boardSpec('C', '200').caliper), lbsMsf: String(boardSpec('C', '200').lbsMsf), bundle: '25', qty: '', maxStack: '48', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
+const DEFAULTS = { pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200', caliper: String(boardSpec('C', '200').caliper), lbsMsf: String(boardSpec('C', '200').lbsMsf), bundle: '25', qty: '', maxStack: '48', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
 
 export function render(view) {
   state = { ...DEFAULTS, ...(loadForm('pallet') || {}) };
@@ -50,6 +50,12 @@ export function render(view) {
               <select id="pPal" data-f="pallet"><option value="auto">Best fit (recommended)</option>${STANDARD_PALLETS.map(([w, l]) => `<option value="${w}x${l}">${w} × ${l}</option>`).join('')}<option value="custom">Custom size…</option></select></div>
             <div class="field" id="customWrap"><label>Custom W × L (in)</label><div style="display:flex;gap:6px"><input data-f="customW" id="pCW" type="text" inputmode="decimal" placeholder="W"><input data-f="customL" id="pCL" type="text" inputmode="decimal" placeholder="L"></div></div>
           </div>
+          <div class="lbl" style="margin:2px 0 6px">Stacking pattern</div>
+          <div class="seg" id="patSeg">
+            <button type="button" data-k="auto">Most pieces<small>picks the best</small></button>
+            <button type="button" data-k="straight">Straight columns</button>
+            <button type="button" data-k="chimney">Chimney<small>pinwheel, open center</small></button>
+          </div>
         </section>
         <section class="card no-print">
           <h2><span class="n">3</span>Print load sheet</h2>
@@ -85,6 +91,7 @@ export function render(view) {
   const applyBoard = () => { const b = boardSpec(state.flute, state.grade); state.caliper = String(b.caliper); state.lbsMsf = String(b.lbsMsf); $('#pCal').value = state.caliper; $('#pWt').value = state.lbsMsf; update(); };
   $$('#fluteSeg button').forEach((b) => b.addEventListener('click', () => { state.flute = b.dataset.k; applyBoard(); }));
   $$('#gradeSeg button').forEach((b) => b.addEventListener('click', () => { state.grade = b.dataset.k; applyBoard(); }));
+  $$('#patSeg button').forEach((b) => b.addEventListener('click', () => { state.pattern = b.dataset.k; update(); }));
   $$('#showSeg button').forEach((b) => b.addEventListener('click', () => { state.show = b.dataset.k; update(); }));
   $$('#viewer [data-cam]').forEach((b) => b.addEventListener('click', () => setCam(b.dataset.cam)));
   $('#boardBtn').addEventListener('click', () => { state.board = state.board === 'kraft' ? 'white' : 'kraft'; update(); });
@@ -122,7 +129,7 @@ function compute() {
   if (need.length) return { need };
 
   const piece = flatPiece({ style: state.style, ...dims, caliper });
-  const recs = recommend({ piece, qty, overhang, maxStack, bundle });
+  const recs = recommend({ piece, qty, overhang, maxStack, bundle, mode: state.pattern });
   let pallet, load;
   if (state.pallet === 'auto') {
     if (!recs.length) return { piece, recs, qty, noFit: true };
@@ -135,7 +142,7 @@ function compute() {
     const [w, l] = state.pallet.split('x').map(Number);
     pallet = { w, l };
   }
-  load = loadFor({ piece, pallet, overhang, maxStack, bundle });
+  load = loadFor({ piece, pallet, overhang, maxStack, bundle, mode: state.pattern });
   const pn = palletsNeeded(qty, load.perPallet);
   return { piece, recs, pallet, load, qty, bundle, overhang, ...pn };
 }
@@ -145,6 +152,7 @@ function update() {
   $$('#styleSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.style)));
   $$('#fluteSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.flute)));
   $$('#gradeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.grade)));
+  $$('#patSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.pattern)));
   $$('#showSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.show)));
   $('#boxDims').classList.toggle('hidden', state.style === 'SHEET');
   $('#sheetDims').classList.toggle('hidden', state.style !== 'SHEET');
@@ -161,7 +169,7 @@ function update() {
   }
   const flat = `${fmtIn(r.piece.b)} × ${fmtIn(r.piece.a)}`;
   if (r.noFit || !r.load.perPallet) {
-    res.innerHTML = `<h2>Result</h2><div class="alert err">The piece (${flat} flat) does not fit ${r.noFit ? 'any standard pallet' : 'this pallet'} at this height and overhang. Try a bigger pallet, more overhang, or fewer pieces per bundle.</div>`;
+    res.innerHTML = `<h2>Result</h2><div class="alert err">The piece (${flat} flat) does not fit ${r.noFit ? 'any standard pallet' : 'this pallet'} at this height and overhang. Try a bigger pallet, more overhang, or fewer pieces per bundle.${state.pattern === 'chimney' ? ' A chimney needs room for four pieces turning around the center, so it also helps to try Straight columns.' : ''}</div>`;
     recBox.innerHTML = '';
     drawScene(null); $('#topView').innerHTML = '';
     return;
@@ -182,6 +190,7 @@ function update() {
     <dl class="kv" style="margin-top:12px">
       <dt>Board</dt><dd>${esc(state.grade)} ${esc(state.flute)} · ${esc(state.caliper)}" caliper</dd>
       <dt>Flat piece size</dt><dd>${flat}</dd>
+      <dt>Stacking pattern</dt><dd>${patternText(load)}</dd>
       <dt>Stacks per layer</dt><dd>${load.cols}</dd>
       ${r.bundle ? `<dt>Bundles high</dt><dd>${load.tiers} × ${r.bundle} pcs (${fmtIn(load.tierHeight)} each)</dd>` : `<dt>Pieces per stack</dt><dd>${fmtNum(load.perStack)}</dd>`}
       <dt>Bundles per pallet</dt><dd>${r.bundle ? fmtNum(load.cols * load.tiers) : '–'}</dd>
@@ -216,6 +225,7 @@ function topViewSvg(pallet, load) {
     <rect x="${tx(0)}" y="${ty(0)}" width="${pallet.l}" height="${pallet.w}" fill="#a57c4c" opacity=".35" stroke="#7a5a33" stroke-width=".4"/>
     ${load.rects.map((r, i) => `<rect x="${tx(r.x) + 0.15}" y="${ty(r.y) + 0.15}" width="${r.w - 0.3}" height="${r.l - 0.3}" fill="#d9b88a" stroke="#6b4e2c" stroke-width=".35"/>
       <text x="${tx(r.x + r.w / 2)}" y="${ty(r.y + r.l / 2) + fs * 0.35}" font-size="${fs}" text-anchor="middle" fill="#4a3519" font-family="sans-serif">${i + 1}</text>`).join('')}
+    ${load.chimney && load.chimney.w > 0.01 && load.chimney.l > 0.01 ? `<rect x="${tx(load.chimney.x)}" y="${ty(load.chimney.y)}" width="${load.chimney.w}" height="${load.chimney.l}" fill="none" stroke="#c4651a" stroke-width=".5" stroke-dasharray="1.2 .8"/>` : ''}
     <text x="${tx(pallet.l / 2)}" y="${H - 1}" font-size="${fs * 0.9}" text-anchor="middle" fill="currentColor" font-family="sans-serif" opacity=".7">${fmtNum(pallet.l, pallet.l % 1 ? 2 : 0)}" length</text>
   </svg>`;
 }
@@ -370,6 +380,7 @@ function printSheet() {
       </table>
       <table class="ps-kv">
         <caption>Pallet</caption>
+        ${row('Stacking pattern', patternText(load))}
         ${row('Pallet size (W × L)', `${fmtNum(pallet.w, pallet.w % 1 ? 2 : 0)} × ${fmtNum(pallet.l, pallet.l % 1 ? 2 : 0)}`)}
         ${row('Overhang allowed', `${esc(state.overhang)}" per side`)}
         ${row('Max product height', `${esc(state.maxStack)}"`)}
@@ -387,7 +398,7 @@ function printSheet() {
     </div>
     <div class="ps-pics">
       ${img ? `<figure><img src="${img}" alt="3D view of the load"><figcaption>${showLast ? 'Last pallet' : 'Full pallet'}</figcaption></figure>` : ''}
-      <figure>${topViewSvg(pallet, load)}<figcaption>Layer pattern (top view), ${load.cols} stacks</figcaption></figure>
+      <figure>${topViewSvg(pallet, load)}<figcaption>Layer pattern (top view), ${load.cols} stacks, ${load.kind === 'chimney' ? 'chimney' : 'straight'}</figcaption></figure>
     </div>
     ${state.notes ? `<div class="ps-notes"><b>Notes:</b> ${esc(state.notes)}</div>` : ''}
     <div class="ps-sign"><span>Built by: ______________________</span><span>Checked by: ______________________</span></div>`;
@@ -406,4 +417,10 @@ function weights(r) {
   if (!(lbs > 0) || !r.piece || !r.load) return null;
   const piece = (r.piece.areaSqIn / 144) * (lbs / 1000);
   return { piece, pallet: piece * r.load.perPallet + 45 };
+}
+
+function patternText(load) {
+  if (load.kind !== 'chimney') return 'Straight columns';
+  const h = load.chimney;
+  return h && h.w > 0.01 && h.l > 0.01 ? `Chimney (${fmtIn(h.w)} × ${fmtIn(h.l)} open center)` : 'Chimney (pinwheel)';
 }
