@@ -145,3 +145,40 @@ export function rankStock({ items, orderW, orderL, qty = 0, grade = '', flute = 
   }
   return { list, exactCount: exact.length, subCount: subs.length, hiddenSubs: allSubs.length - subs.length, lowerSkipped, shortAfterAll: need, rec, exactShort };
 }
+
+// ---------- One mill sheet size for several blanks ----------
+// Try every sheet size in the range (in `step` increments) and rank by the total inches of trim
+// across all blanks (width trim + length trim for each blank), same method as the MULTI-ORDER MILL SIZE tab.
+// A size only counts if every blank fits on it. No turning: width to width, length to length.
+export function bestMillSizes({ orders, minW = 50, maxW = 75, minL = 50, maxL = 100, step = 1, top = 10 }) {
+  const valid = orders.filter((o) => o.w > 0 && o.l > 0);
+  if (!valid.length || !(step > 0) || maxW < minW || maxL < minL) return [];
+  const best = [];
+  const nW = Math.round((maxW - minW) / step), nL = Math.round((maxL - minL) / step);
+  for (let i = 0; i <= nW; i++) {
+    const W = minW + i * step;
+    for (let j = 0; j <= nL; j++) {
+      const L = minL + j * step;
+      let total = 0, pctSum = 0, ok = true;
+      const per = [];
+      for (const o of valid) {
+        const c = cutStock({ stockW: W, stockL: L, orderW: o.w, orderL: o.l, qty: o.qty || 0 });
+        if (!c.fits) { ok = false; break; }
+        total += c.wasteIn; pctSum += c.wastePct;
+        per.push(c);
+      }
+      if (!ok) continue;
+      const cand = { w: W, l: L, totalWaste: Math.round(total * 1e6) / 1e6, avgPct: pctSum / valid.length, per };
+      // keep the best `top` (small list, simple insert)
+      let k = best.length;
+      while (k > 0 && better(cand, best[k - 1])) k--;
+      if (k < top) { best.splice(k, 0, cand); if (best.length > top) best.pop(); }
+    }
+  }
+  return best;
+}
+function better(a, b) {
+  if (a.totalWaste !== b.totalWaste) return a.totalWaste < b.totalWaste;
+  if (Math.abs(a.avgPct - b.avgPct) > 1e-9) return a.avgPct < b.avgPct;
+  return a.w * a.l < b.w * b.l;
+}

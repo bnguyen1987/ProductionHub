@@ -1,5 +1,6 @@
 import { $, $$, esc, api, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
 import { cutStock, millSizes, parseExportRows, rankStock } from './stockcalc.js';
+import { renderMulti } from './millmulti.js';
 
 const DEFAULT_GRADES = ['200', '250', '275', '350', '600'];
 const FLUTES = ['E', 'B', 'C', 'BC'];
@@ -15,8 +16,13 @@ export function render(view) {
   try { const c = JSON.parse(localStorage.getItem('gwprod_stock_cache') || 'null'); if (c && c.items) stock = c; } catch {}
 
   view.innerHTML = `
-    <div class="page-head"><h1>Stock Sheet Calculator</h1><p>Enter the order, upload the stock Export file, and it ranks the stock sheets you have by least trim waste. Width cuts to width and length to length (no turning).</p></div>
-    <div class="layout stock-layout">
+    <div class="page-head"><h1>Stock Sheet Calculator</h1><p>Find the stock sheet with the least trim waste, or work out one mill sheet size to order for several blanks. Width cuts to width and length to length (no turning).</p></div>
+    <div class="seg no-print" id="stockTabs" style="margin-bottom:16px">
+      <button type="button" data-t="compare">Compare stock on hand</button>
+      <button type="button" data-t="multi">Mill size for multiple blanks</button>
+    </div>
+    <div id="multiView" class="hidden"></div>
+    <div class="layout stock-layout" id="compareView">
       <div class="stack">
         <section class="card">
           <h2><span class="n">1</span>Order</h2>
@@ -62,6 +68,16 @@ export function render(view) {
   $('#addStock').addEventListener('click', () => { state.rows.push(blankRow()); paintRows(); calc(); });
   setupDrop($('#sDrop'), uploadExport);
   paintRows(); paintStatus(); calc();
+  renderMulti($('#multiView'));
+  const showTab = (t) => {
+    $$('#stockTabs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === t)));
+    $('#compareView').classList.toggle('hidden', t !== 'compare');
+    $('#multiView').classList.toggle('hidden', t !== 'multi');
+    try { localStorage.setItem('gwprod_stock_tab', t); } catch {}
+  };
+  $$('#stockTabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.t)));
+  let startTab = 'compare'; try { startTab = localStorage.getItem('gwprod_stock_tab') || 'compare'; } catch {}
+  showTab(startTab);
 
   // pull the shared list (someone else may have uploaded a newer one)
   api('/api/stock').then((d) => {
