@@ -49,8 +49,8 @@ function paintRows() {
   $('#mmRows', box).innerHTML = st.rows.map((r, i) => `
     <div class="rep" data-i="${i}">
       ${st.rows.length > 1 ? `<button class="x" type="button" data-del aria-label="Remove blank">×</button>` : ''}
+      <div class="lbl" style="margin-bottom:6px">Blank ${i + 1}</div>
       <div class="row">
-        <div class="field"><label>Blank ${i + 1} name / job</label><input type="text" data-r="label" value="${esc(r.label)}" placeholder="optional"></div>
         <div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-r="w" value="${esc(r.w)}" placeholder="22"></div>
         <div class="field"><label>Length (in)</label><input type="text" inputmode="decimal" data-r="l" value="${esc(r.l)}" placeholder="11"></div>
         <div class="field"><label>Qty (blanks)</label><input type="number" min="0" step="1" data-r="qty" value="${esc(r.qty)}" placeholder="optional"></div>
@@ -70,7 +70,7 @@ function schedule() { clearTimeout(timer); timer = setTimeout(run, 150); }
 function run() {
   saveForm('millmulti', st);
   $$('#mmStep button', box).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === st.step)));
-  const orders = st.rows.map((r, i) => ({ name: r.label.trim() || `Blank ${i + 1}`, w: parseInches(r.w), l: parseInches(r.l), qty: Math.floor(parseFloat(r.qty) || 0) }))
+  const orders = st.rows.map((r, i) => ({ name: `Blank ${i + 1}`, w: parseInches(r.w), l: parseInches(r.l), qty: Math.floor(parseFloat(r.qty) || 0) }))
     .filter((o) => o.w > 0 && o.l > 0);
   const minW = parseInches(st.minW), maxW = parseInches(st.maxW), minL = parseInches(st.minL), maxL = parseInches(st.maxL);
   const res = $('#mmResult', box), det = $('#mmDetail', box);
