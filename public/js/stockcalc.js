@@ -79,38 +79,69 @@ export function parseExportRows(rows) {
   return { items, skipped };
 }
 
-// Rank stock items for an order.
-// Exact = same grade, flute and color. Substitute = same flute and color, different grade
-// (shown only when it saves at least `subSave` inches of waste over the best exact match, or when no exact match fits).
-// Without grade/flute/color, every item is compared.
+const gradeNum = (g) => { const n = parseFloat(String(g).replace(/[^\d.]/g, '')); return isFinite(n) ? n : NaN; };
+
+// Rank stock items for an order. qty here = blanks needed.
+// Exact = same grade, flute and color.
+// Substitute = same flute and color, HIGHER grade only (never downgrade). A substitute is offered when:
+//   no exact grade sheet fits, the exact grade sheets can't cover the quantity, or it saves at least `subSave` inches of waste.
+// Without a grade, every item matching flute/color is compared.
 export function rankStock({ items, orderW, orderL, qty = 0, grade = '', flute = '', color = '', subSave = 5 }) {
   const g = String(grade).trim().toUpperCase(), f = normFlute(flute), c = normColor(color);
+  const gN = gradeNum(g);
   const rows = [];
+  let lowerSkipped = 0;
   for (const it of items) {
     if (!it.manual && f && it.flute !== f) continue;
     if (!it.manual && c && it.color !== c) continue;
     const cut = cutStock({ stockW: it.w, stockL: it.l, orderW, orderL, qty });
     if (!cut.fits) continue;
-    const match = it.manual ? 'MANUAL' : !g ? 'ANY' : String(it.grade).toUpperCase() === g ? 'EXACT' : 'SUB';
+    let match = it.manual ? 'MANUAL' : !g ? 'ANY' : String(it.grade).toUpperCase() === g ? 'EXACT' : 'SUB';
+    if (match === 'SUB') {
+      const iN = gradeNum(it.grade);
+      if (!(isFinite(iN) && isFinite(gN) && iN > gN)) { lowerSkipped++; continue; } // higher grade only
+    }
     rows.push({ ...it, ...cut, match });
   }
-  rows.sort((a, b) => a.wasteIn - b.wasteIn || a.wastePct - b.wastePct);
-  const exact = rows.filter((r) => r.match !== 'SUB');
-  const bestExact = exact.length ? exact[0].wasteIn : Infinity;
-  const subs = rows.filter((r) => r.match === 'SUB' && (r.wasteIn <= bestExact - subSave || !exact.length));
-  const list = [...exact, ...subs].sort((a, b) => a.wasteIn - b.wasteIn || (a.match === 'SUB') - (b.match === 'SUB'));
+  const byWaste = (a, b) => a.wasteIn - b.wasteIn || a.wastePct - b.wastePct;
+  const exact = rows.filter((r) => r.match !== 'SUB').sort(byWaste);
+  const allSubs = rows.filter((r) => r.match === 'SUB').sort((a, b) => gradeNum(a.grade) - gradeNum(b.grade) || byWaste(a, b));
 
-  // Combined fulfillment: walk the ranked list, best waste first, until the quantity is covered.
+  // How much of the order can the exact grade cover from available stock?
+  let exactCover = 0;
+  if (qty > 0) {
+    let need = qty;
+    for (const r of exact) { if (r.avail > 0 && need > 0) { const use = Math.min(r.avail, Math.ceil(need / r.perSheet)); exactCover += use * r.perSheet; need -= use * r.perSheet; } }
+    exactCover = Math.min(exactCover, qty);
+  }
+  const exactShort = qty > 0 && exact.length > 0 && exactCover < qty && exact.every((r) => r.avail !== null && r.avail !== undefined);
+  const bestExact = exact.length ? exact[0].wasteIn : Infinity;
+  const subs = allSubs.filter((r) => !exact.length || exactShort || r.wasteIn <= bestExact - subSave);
+
+  // Combined fulfillment: exact grade first (least waste first), then the lowest higher grade.
+  const cascade = [...exact, ...subs];
   let need = qty > 0 ? qty : 0;
-  for (const r of list) {
+  for (const r of cascade) {
     r.useSheets = 0;
     if (need > 0 && r.perSheet > 0) {
       const have = Math.max(0, r.avail ?? 0);
-      const sheetsNeeded = Math.ceil(need / r.perSheet);
-      r.useSheets = Math.min(have, sheetsNeeded);
+      r.useSheets = Math.min(have, Math.ceil(need / r.perSheet));
       need = Math.max(0, need - r.useSheets * r.perSheet);
     }
     r.enough = qty > 0 && r.avail !== null && r.avail !== undefined ? r.avail >= r.sheets : null;
   }
-  return { list, exactCount: exact.length, subCount: subs.length, hiddenSubs: rows.filter((r) => r.match === 'SUB').length - subs.length, shortAfterAll: need };
+  const list = [...cascade].sort(byWaste);
+
+  // Grade recommendation (plain words for the floor)
+  let rec = null;
+  if (g && (f || c)) {
+    const pick = subs.find((r) => qty <= 0 || (r.avail ?? 0) > 0) || subs[0];
+    const label = (r) => `${r.grade} ${r.flute} ${r.color}`;
+    if (!exact.length && pick) rec = { kind: 'none-exact', sub: pick, text: `No ${g} sheet fits this blank. Recommended upgrade: ${label(pick)}` };
+    else if (!exact.length) rec = { kind: 'nothing', text: `No ${g} or higher grade sheet fits this blank. Order from the mill.` };
+    else if (exactShort && subs.length) rec = { kind: 'short', sub: pick, covered: exactCover, text: `${g} on hand covers ${exactCover} of ${qty} blanks. Make up the rest with ${label(pick)}` };
+    else if (exactShort) rec = { kind: 'short-none', covered: exactCover, text: `${g} on hand covers ${exactCover} of ${qty} blanks, and no higher grade sheet fits. Order the rest from the mill.` };
+    else if (subs.length) { const s = [...subs].sort(byWaste)[0]; rec = { kind: 'saves', sub: s, text: `Optional upgrade: ${label(s)} cuts ${(bestExact - s.wasteIn).toFixed(2).replace(/\.?0+$/, '')}" less waste than the best ${g} sheet` }; }
+  }
+  return { list, exactCount: exact.length, subCount: subs.length, hiddenSubs: allSubs.length - subs.length, lowerSkipped, shortAfterAll: need, rec, exactShort };
 }

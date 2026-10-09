@@ -10,13 +10,13 @@ let state, stock = { items: [], fileName: null, uploadedAt: null }, skipped = []
 const blankRow = () => ({ label: '', w: '', l: '', onHand: '' });
 
 export function render(view) {
-  state = { orderW: '', orderL: '', qty: '', grade: '', flute: '', color: '', rows: [], ...(loadForm('stock') || {}) };
+  state = { orderW: '', orderL: '', qty: '', outs: '1', grade: '', flute: '', color: '', rows: [], ...(loadForm('stock') || {}) };
   if (!Array.isArray(state.rows)) state.rows = [];
   try { const c = JSON.parse(localStorage.getItem('gwprod_stock_cache') || 'null'); if (c && c.items) stock = c; } catch {}
 
   view.innerHTML = `
     <div class="page-head"><h1>Stock Sheet Calculator</h1><p>Enter the order, upload the stock Export file, and it ranks the stock sheets you have by least trim waste. Width cuts to width and length to length (no turning).</p></div>
-    <div class="layout wide-left">
+    <div class="layout stock-layout">
       <div class="stack">
         <section class="card">
           <h2><span class="n">1</span>Order</h2>
@@ -28,9 +28,13 @@ export function render(view) {
           <div class="row">
             <div class="field"><label for="sOW">Blank width (in)</label><input id="sOW" data-f="orderW" type="text" inputmode="decimal" placeholder="e.g. 17 or 17 1/2"></div>
             <div class="field"><label for="sOL">Blank length (in)</label><input id="sOL" data-f="orderL" type="text" inputmode="decimal" placeholder="e.g. 33"></div>
-            <div class="field"><label for="sQ">Quantity (pcs)</label><input id="sQ" data-f="qty" type="number" min="0" step="1" placeholder="1000"></div>
           </div>
-          <p class="hint" style="margin:0">Fractions are fine: 33 1/2, 33-1/2, or 33\`08 (sixteenths). A different grade is only suggested when it has the same flute and color and saves at least ${SUB_SAVE}" of waste.</p>
+          <div class="row">
+            <div class="field"><label for="sQ">Quantity (boxes)</label><input id="sQ" data-f="qty" type="number" min="0" step="1" placeholder="1000"></div>
+            <div class="field"><label for="sOuts">Outs per blank</label><input id="sOuts" data-f="outs" type="number" min="1" step="1" placeholder="1"></div>
+            <div class="field"><label>Blanks needed</label><div id="sBlanks" class="stat" style="padding:8px 10px;min-height:42px;display:flex;align-items:center;font-weight:700">–</div></div>
+          </div>
+          <p class="hint" style="margin:0">Fractions are fine: 33 1/2, 33-1/2, or 33\`08 (sixteenths). Other grades: only a <b>higher</b> grade with the same flute and color is suggested, when your grade isn't in stock, is short, or the upgrade saves ${SUB_SAVE}"+ of waste.</p>
         </section>
         <section class="card">
           <h2><span class="n">2</span>Stock sheets</h2>
@@ -127,13 +131,17 @@ function paintRows() {
   $$('#stockRows [data-del]').forEach((b) => b.addEventListener('click', () => { state.rows.splice(+b.dataset.del, 1); paintRows(); calc(); }));
 }
 
-const MATCH_PILL = { EXACT: '<span class="pill ok">Exact</span>', SUB: '<span class="pill warn">Sub grade</span>', MANUAL: '<span class="pill info">Typed in</span>', ANY: '' };
+const MATCH_PILL = { EXACT: '<span class="pill ok">Exact</span>', SUB: '<span class="pill warn">Upgrade</span>', MANUAL: '<span class="pill info">Typed in</span>', ANY: '' };
 
 function calc() {
   saveForm('stock', state);
   $$('#sFlute button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.flute)));
   $$('#sColor button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.color)));
-  const oW = parseInches(state.orderW), oL = parseInches(state.orderL), qty = Math.floor(parseFloat(state.qty) || 0);
+  const oW = parseInches(state.orderW), oL = parseInches(state.orderL), boxes = Math.floor(parseFloat(state.qty) || 0);
+  const outs = Math.max(1, Math.floor(parseFloat(state.outs) || 1));
+  const qty = boxes ? Math.ceil(boxes / outs) : 0; // blanks to cut
+  const qtyTxt = boxes ? (outs > 1 ? `${fmtNum(boxes)} boxes (${fmtNum(qty)} blanks)` : `${fmtNum(qty)} blanks`) : '';
+  $('#sBlanks').textContent = boxes ? fmtNum(qty) : '–';
   const res = $('#stockResult'), mill = $('#millBox');
   if (!(oW > 0 && oL > 0)) {
     res.innerHTML = '<h2>Results</h2><p class="hint" style="margin:0">Enter the blank width and length.</p>';
@@ -154,28 +162,30 @@ function calc() {
     const needSpec = !state.flute || !state.color || !state.grade.trim();
     const shown = r.list.slice(0, 15);
     res.innerHTML = `<h2>Results · ${spec ? esc(spec) + ' · ' : ''}${fmtIn(oW)} × ${fmtIn(oL)}</h2>
+      ${recHtml(r, qty)}
       ${needSpec ? `<div class="alert warn" style="margin-bottom:10px">Pick the ${[!state.grade.trim() && 'grade', !state.flute && 'flute', !state.color && 'color'].filter(Boolean).join(', ')} to only see sheets that match the order.</div>` : ''}
       ${best ? `<div class="big-nums" style="margin-bottom:12px">
           <div class="stat hero"><div class="v">${best.perSheet}</div><div class="l">Pcs/sheet on ${esc(best.itemNo ? '#' + best.itemNo : best.desc)}</div></div>
-          ${qty ? `<div class="stat"><div class="v">${fmtNum(best.sheets)}</div><div class="l">Sheets needed for ${fmtNum(qty)}</div></div>` : ''}
+          ${qty ? `<div class="stat"><div class="v">${fmtNum(best.sheets)}</div><div class="l">Sheets needed for ${qtyTxt}</div></div>` : ''}
           <div class="stat"><div class="v">${fmtIn(best.wasteIn)}</div><div class="l">Trim waste (${fmtNum(best.wastePct * 100, 1)}%)</div></div>
         </div>
         ${qty && best.enough === false ? (r.shortAfterAll > 0
-          ? `<div class="alert err" style="margin-bottom:10px">Not enough stock on hand. Even using every match below you are short about ${fmtNum(r.shortAfterAll)} pcs. Check the mill sizes.</div>`
-          : `<div class="alert warn" style="margin-bottom:10px">The best sheet doesn't have enough on hand. The <b>Use</b> column shows how to combine items to cover ${fmtNum(qty)} pcs.</div>`) : ''}
-        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Sheet</th><th>Outs</th><th>Pcs</th><th>Waste</th>${qty ? '<th>Need</th>' : ''}<th>Avail</th>${qty ? '<th>Use</th>' : ''}</tr></thead><tbody>
+          ? `<div class="alert err" style="margin-bottom:10px">Not enough stock on hand. Even using every sheet below you are short about ${fmtNum(r.shortAfterAll)} blanks. Check the mill sizes.</div>`
+          : `<div class="alert warn" style="margin-bottom:10px">The best sheet doesn't have enough on hand. The <b>Pull</b> column shows how many sheets of each to pull to cover ${qtyTxt}.</div>`) : ''}
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Sheet</th><th>Pcs/sht</th><th>Waste</th>${qty ? '<th>Need</th>' : ''}<th>Avail</th>${qty ? '<th>Pull</th>' : ''}</tr></thead><tbody>
           ${shown.map((x, i) => `<tr class="${i === 0 ? 'best' : ''}">
-            <td>${x.itemNo ? `<b>#${esc(x.itemNo)}</b><br>` : ''}<span class="hint">${esc(x.manual ? x.desc : `${x.grade} ${x.flute} ${x.color}`)}</span> ${MATCH_PILL[x.match] || ''}</td>
+            <td style="white-space:nowrap">${x.itemNo ? `<b>#${esc(x.itemNo)}</b> ` : ''}${MATCH_PILL[x.match] || ''}<br><span class="hint">${esc(x.manual ? x.desc : `${x.grade} ${x.flute} ${x.color}`)}</span></td>
             <td style="white-space:nowrap">${fmtIn(x.w)} × ${fmtIn(x.l)}</td>
-            <td>${x.outsW}×${x.outsL}</td><td>${x.perSheet}</td>
+            <td><b>${x.perSheet}</b><br><span class="hint">${x.outsW}×${x.outsL}</span></td>
             <td style="white-space:nowrap">${fmtIn(x.wasteIn)}<br><span class="hint">${fmtNum(x.wastePct * 100, 1)}%</span></td>
             ${qty ? `<td>${fmtNum(x.sheets)}</td>` : ''}
-            <td>${x.avail === null || x.avail === undefined ? '–' : `${fmtNum(x.avail)}${x.enough === false ? ' <span class="pill bad">short</span>' : x.enough ? ' <span class="pill ok">OK</span>' : ''}`}</td>
+            <td>${x.avail === null || x.avail === undefined ? '–' : `<span style="font-weight:700;color:${x.enough === false ? 'var(--bad)' : x.enough ? 'var(--good)' : 'inherit'}" title="${x.enough === false ? 'Not enough for the whole order' : ''}">${fmtNum(x.avail)}</span>`}</td>
             ${qty ? `<td>${x.useSheets ? `<b>${fmtNum(x.useSheets)}</b>` : ''}</td>` : ''}
           </tr>`).join('')}
         </tbody></table></div>
+        ${qty ? '<p class="hint" style="margin:8px 0 0">Avail in red = not enough of that sheet for the whole order on its own. <b>Pull</b> = sheets to use, exact grade first.</p>' : ''}
         ${r.list.length > shown.length ? `<p class="hint" style="margin:8px 0 0">Showing the best ${shown.length} of ${r.list.length}.</p>` : ''}
-        ${r.hiddenSubs ? `<p class="hint" style="margin:8px 0 0">${r.hiddenSubs} other-grade sheet${r.hiddenSubs > 1 ? 's' : ''} hidden because ${r.hiddenSubs > 1 ? 'they don\'t' : 'it doesn\'t'} save at least ${SUB_SAVE}" over the exact grade.</p>` : ''}
+        ${r.hiddenSubs ? `<p class="hint" style="margin:8px 0 0">${r.hiddenSubs} higher-grade sheet${r.hiddenSubs > 1 ? 's' : ''} not shown: your grade has enough and the upgrade doesn't save ${SUB_SAVE}"+ of waste.</p>` : ''}
         ${cutDiagram(best, oW, oL)}`
       : `<div class="alert err">No ${spec ? esc(spec) + ' ' : ''}stock sheet is big enough for a ${fmtIn(oW)} × ${fmtIn(oL)} blank. See the mill sizes below.</div>`}`;
   }
@@ -197,9 +207,18 @@ function cutDiagram(r, oW, oL) {
     cells += `<rect x="${pad + i * oL + 0.2}" y="${pad + j * oW + 0.2}" width="${oL - 0.4}" height="${oW - 0.4}" fill="#d9b88a" stroke="#6b4e2c" stroke-width="${fs * 0.06}"/>`;
   }
   return `<h2 style="margin:16px 0 8px">Cut layout · ${esc(r.itemNo ? '#' + r.itemNo : r.desc)}</h2>
-    <svg class="topview" viewBox="0 0 ${W + pad * 2} ${H + pad * 2 + fs * 1.6}" role="img" aria-label="Cut layout">
+    <svg class="topview cutview" viewBox="0 0 ${W + pad * 2} ${H + pad * 2 + fs * 1.6}" role="img" aria-label="Cut layout">
       <rect x="${pad}" y="${pad}" width="${W}" height="${H}" fill="#e9c9c4" stroke="#8a5a52" stroke-width="${fs * 0.08}"/>
       ${cells}
       <text x="${pad + W / 2}" y="${H + pad * 2 + fs * 1.1}" font-size="${fs}" text-anchor="middle" fill="currentColor" font-family="sans-serif" opacity=".7">${fmtIn(r.w)} wide × ${fmtIn(r.l)} long · pink = trim</text>
     </svg>`;
+}
+
+function recHtml(r, qty) {
+  const rec = r.rec;
+  if (!rec) return '';
+  const cls = { 'none-exact': 'warn', nothing: 'err', short: 'warn', 'short-none': 'err', saves: 'info' }[rec.kind] || 'info';
+  const sub = rec.sub;
+  const detail = sub ? ` <b>#${esc(sub.itemNo || sub.desc)}</b> (${fmtIn(sub.w)} × ${fmtIn(sub.l)}, ${sub.perSheet} per sheet, ${fmtIn(sub.wasteIn)} waste${sub.avail !== null && sub.avail !== undefined ? `, ${fmtNum(sub.avail)} available` : ''}${qty && sub.useSheets ? `; pull ${fmtNum(sub.useSheets)} sheets` : ''}).` : '';
+  return `<div class="alert ${cls}" style="margin-bottom:10px"><b>Grade recommendation:</b> ${esc(rec.text)}${sub ? '' : ''}${detail}${sub ? ' Confirm the upgrade with the customer/CSR if needed.' : ''}</div>`;
 }
