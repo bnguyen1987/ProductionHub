@@ -1,0 +1,124 @@
+import { ICONS, $, esc, getCode, setCode, clearCode, api } from './common.js';
+
+const PAGES = [
+  { id: 'ink', title: 'Ink Calculator', short: 'Ink', desc: 'Snap a photo of the printed sample and get buckets to order.', load: () => import('./ink.js') },
+  { id: 'pallet', title: 'Pallet Calculator', short: 'Pallet', desc: 'Pieces per pallet, best pallet size, and a 3D view of the load.', load: () => import('./pallet.js') },
+  { id: 'stock', title: 'Stock Sheet Calculator', short: 'Stock Sheet', desc: 'Outs, trim waste and sheets needed for a stock size.', load: () => import('./stock.js') },
+  { id: 'handoff', title: 'Shift Handoff Log', short: 'Handoff', desc: 'Machine status, open jobs, quality/safety and maintenance notes for the next shift.', load: () => import('./handoff.js') },
+  { id: 'order', title: 'New Order Checker', short: 'Order Check', desc: 'Upload a quote and see which machines can run it.', load: () => import('./order.js') },
+];
+
+const app = $('#app');
+let current = null;
+
+function themeToggle() {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem('gwprod_theme', root.dataset.theme); } catch {}
+}
+try { const t = localStorage.getItem('gwprod_theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+
+function renderLogin(msg = '') {
+  app.innerHTML = `
+    <div class="login">
+      <div class="brand-mark">${ICONS.logo}</div>
+      <h1>Production Hub</h1>
+      <p>GoldenWest Packaging · Ontario</p>
+      <form id="loginForm">
+        <input type="password" id="code" placeholder="Access code" autocomplete="current-password" aria-label="Access code" required>
+        <button class="btn primary" type="submit">Open</button>
+        <div id="loginMsg" class="${msg ? 'alert err' : ''}">${esc(msg)}</div>
+      </form>
+    </div>`;
+  $('#code').focus();
+  $('#loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+    setCode($('#code').value.trim());
+    try {
+      const r = await fetch('/api/handoff?limit=1', { headers: { 'x-access-code': getCode() } });
+      if (r.status === 401) { clearCode(); renderLogin('That code is not right.'); return; }
+      renderShell();
+    } catch {
+      renderShell(); // offline: let calculators work anyway
+    }
+  });
+}
+
+function renderShell() {
+  app.innerHTML = `
+    <header class="topbar no-print">
+      <div class="topbar-inner">
+        <a class="brand" href="#home"><span class="brand-mark">${ICONS.logo}</span>
+          <span class="brand-text">Production Hub<small>GoldenWest · Ontario</small></span></a>
+        <span class="spacer"></span>
+        <button class="icon-btn" id="themeBtn" title="Light / dark" aria-label="Switch light or dark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+        <button class="icon-btn" id="logoutBtn" title="Sign out">Sign out</button>
+      </div>
+      <nav class="tabs" aria-label="Tools">
+        <a class="tab" href="#home" data-id="home">${ICONS.home}Home</a>
+        ${PAGES.map((p) => `<a class="tab" href="#${p.id}" data-id="${p.id}">${ICONS[p.id]}${p.short}</a>`).join('')}
+      </nav>
+    </header>
+    <main id="view"></main>`;
+  $('#themeBtn').onclick = themeToggle;
+  $('#logoutBtn').onclick = () => { clearCode(); location.hash = ''; renderLogin(); };
+  route();
+}
+
+async function route() {
+  const view = $('#view');
+  if (!view) return;
+  const id = (location.hash || '#home').slice(1);
+  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-current', t.dataset.id === id ? 'page' : 'false'));
+  if (current && current.destroy) { try { current.destroy(); } catch {} }
+  current = null;
+  window.scrollTo(0, 0);
+
+  const page = PAGES.find((p) => p.id === id);
+  if (!page) { renderHome(view); document.title = 'Production Hub'; return; }
+  document.title = `${page.title} · Production Hub`;
+  view.innerHTML = '<div class="hint"><span class="spinner"></span> Loading…</div>';
+  try {
+    const mod = await page.load();
+    if ((location.hash || '#home').slice(1) !== id) return; // user navigated away while loading
+    view.innerHTML = '';
+    current = mod;
+    mod.render(view);
+  } catch (e) {
+    view.innerHTML = `<div class="alert err">Could not load this tool. Check your connection and refresh.</div>`;
+    console.error(e);
+  }
+}
+
+function renderHome(view) {
+  view.innerHTML = `
+    <div class="page-head"><h1>Production tools</h1><p>Everything for the floor in one place. Pick a tool to get started.</p></div>
+    <div class="home-grid">
+      ${PAGES.map((p) => `<a class="home-card" href="#${p.id}"><span class="ic">${ICONS[p.id]}</span><h3>${p.title}</h3><p>${p.desc}</p></a>`).join('')}
+    </div>
+    <div class="latest card" id="latestHandoff"><h2>Latest shift handoff</h2><div class="hint"><span class="spinner"></span> Loading…</div></div>`;
+  api('/api/handoff?limit=1').then(({ entries }) => {
+    const box = $('#latestHandoff');
+    if (!box) return;
+    const e = entries && entries[0];
+    if (!e) { box.innerHTML = '<h2>Latest shift handoff</h2><p class="hint">No handoffs logged yet.</p><a class="btn small" href="#handoff">Start one</a>'; return; }
+    const down = (e.machines || []).filter((m) => m.status === 'Down' || m.status === 'Issue');
+    box.innerHTML = `<h2>Latest shift handoff</h2>
+      <p style="margin:0 0 8px"><b>${esc(e.date)} · ${esc(e.shift)} shift</b> <span class="hint">by ${esc(e.supervisor)}</span></p>
+      <div class="chips" style="margin-bottom:10px">
+        ${down.length ? down.map((m) => `<span class="pill ${m.status === 'Down' ? 'bad' : 'warn'}">${esc(m.machine)}: ${esc(m.status)}</span>`).join('') : '<span class="pill ok">All machines OK</span>'}
+        ${(e.jobs || []).length ? `<span class="pill info">${e.jobs.length} job${e.jobs.length > 1 ? 's' : ''} in progress</span>` : ''}
+        ${(e.maintenance || []).length ? `<span class="pill warn">${e.maintenance.length} maintenance request${e.maintenance.length > 1 ? 's' : ''}</span>` : ''}
+      </div>
+      <a class="btn small" href="#handoff">Open handoff log</a>`;
+  }).catch(() => {
+    const box = $('#latestHandoff');
+    if (box) box.innerHTML = '<h2>Latest shift handoff</h2><p class="hint">Could not load right now.</p>';
+  });
+}
+
+window.addEventListener('hashchange', route);
+if (getCode()) renderShell(); else renderLogin();
