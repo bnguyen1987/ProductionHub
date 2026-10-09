@@ -40,6 +40,7 @@ function renderLogin(msg = '') {
     try {
       const r = await fetch('/api/handoff?limit=1', { headers: { 'x-access-code': getCode() } });
       if (r.status === 401) { clearCode(); renderLogin('That code is not right.'); return; }
+      if (r.status === 503) { clearCode(); renderLogin('The access code is not set up on the server yet.'); return; }
       renderShell();
     } catch {
       renderShell(); // offline: let calculators work anyway

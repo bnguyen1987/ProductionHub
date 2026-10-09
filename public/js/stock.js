@@ -1,29 +1,50 @@
-import { $, $$, esc, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
-import { cutStock, millSizes } from './stockcalc.js';
+import { $, $$, esc, api, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
+import { cutStock, millSizes, parseExportRows, rankStock } from './stockcalc.js';
 
-let state;
+const DEFAULT_GRADES = ['200', '250', '275', '350', '600'];
+const FLUTES = ['E', 'B', 'C', 'BC'];
+const COLORS = [['KRAFT', 'Kraft'], ['MW', 'Mottled white']];
+const SUB_SAVE = 5; // a substitute grade must save at least this many inches of waste (same rule as LeastWaste.xlsx)
+
+let state, stock = { items: [], fileName: null, uploadedAt: null }, skipped = [];
 const blankRow = () => ({ label: '', w: '', l: '', onHand: '' });
 
 export function render(view) {
-  state = loadForm('stock') || { orderW: '', orderL: '', qty: '', rows: [blankRow(), blankRow()] };
-  if (!state.rows?.length) state.rows = [blankRow()];
+  state = { orderW: '', orderL: '', qty: '', grade: '', flute: '', color: '', rows: [], ...(loadForm('stock') || {}) };
+  if (!Array.isArray(state.rows)) state.rows = [];
+  try { const c = JSON.parse(localStorage.getItem('gwprod_stock_cache') || 'null'); if (c && c.items) stock = c; } catch {}
+
   view.innerHTML = `
-    <div class="page-head"><h1>Stock Sheet Calculator</h1><p>Type the order blank size and one or more stock sheet sizes. It shows outs, trim waste and sheets needed, best first. Width cuts to width and length to length (no turning).</p></div>
+    <div class="page-head"><h1>Stock Sheet Calculator</h1><p>Enter the order, upload the stock Export file, and it ranks the stock sheets you have by least trim waste. Width cuts to width and length to length (no turning).</p></div>
     <div class="layout wide-left">
       <div class="stack">
         <section class="card">
           <h2><span class="n">1</span>Order</h2>
           <div class="row">
+            <div class="field"><label for="sGrade">Grade</label><input id="sGrade" data-f="grade" type="text" list="gradeList" placeholder="e.g. 275" autocomplete="off"><datalist id="gradeList"></datalist></div>
+            <div class="field"><label>Flute</label><div class="seg" id="sFlute">${FLUTES.map((f) => `<button type="button" data-k="${f}">${f}</button>`).join('')}</div></div>
+          </div>
+          <div class="field" style="margin-bottom:10px"><label>Color</label><div class="seg" id="sColor">${COLORS.map(([k, t]) => `<button type="button" data-k="${k}">${t}</button>`).join('')}</div></div>
+          <div class="row">
             <div class="field"><label for="sOW">Blank width (in)</label><input id="sOW" data-f="orderW" type="text" inputmode="decimal" placeholder="e.g. 17 or 17 1/2"></div>
             <div class="field"><label for="sOL">Blank length (in)</label><input id="sOL" data-f="orderL" type="text" inputmode="decimal" placeholder="e.g. 33"></div>
             <div class="field"><label for="sQ">Quantity (pcs)</label><input id="sQ" data-f="qty" type="number" min="0" step="1" placeholder="1000"></div>
           </div>
-          <p class="hint" style="margin:0">Fractions are fine: 33 1/2, 33-1/2, or spec style 33\`08 (sixteenths).</p>
+          <p class="hint" style="margin:0">Fractions are fine: 33 1/2, 33-1/2, or 33\`08 (sixteenths). A different grade is only suggested when it has the same flute and color and saves at least ${SUB_SAVE}" of waste.</p>
         </section>
         <section class="card">
-          <h2><span class="n">2</span>Stock sheets to compare</h2>
-          <div id="stockRows"></div>
-          <button class="btn small" id="addStock" type="button" style="margin-top:10px">+ Add stock size</button>
+          <h2><span class="n">2</span>Stock sheets</h2>
+          <label class="drop" id="sDrop">
+            <input type="file" accept=".xlsx,.xls,.xlsm,.csv" aria-label="Upload stock export">
+            <div class="big">Upload the stock Export (.xlsx)</div>
+            <div class="hint">Same file as Export.xlsx: Item Description, Item No, Available Quantity. Everyone sees the latest upload.</div>
+          </label>
+          <div id="sStockStatus" style="margin-top:10px"></div>
+          <details style="margin-top:12px" ${state.rows.length ? 'open' : ''}>
+            <summary class="lbl" style="cursor:pointer">Add other sizes by hand (optional)</summary>
+            <div id="stockRows" style="margin-top:10px"></div>
+            <button class="btn small" id="addStock" type="button" style="margin-top:8px">+ Add size</button>
+          </details>
         </section>
       </div>
       <div class="stack">
@@ -32,21 +53,73 @@ export function render(view) {
       </div>
     </div>`;
   $$('[data-f]', view).forEach((el) => { el.value = state[el.dataset.f]; el.addEventListener('input', () => { state[el.dataset.f] = el.value; calc(); }); });
+  $$('#sFlute button').forEach((b) => b.addEventListener('click', () => { state.flute = state.flute === b.dataset.k ? '' : b.dataset.k; calc(); }));
+  $$('#sColor button').forEach((b) => b.addEventListener('click', () => { state.color = state.color === b.dataset.k ? '' : b.dataset.k; calc(); }));
   $('#addStock').addEventListener('click', () => { state.rows.push(blankRow()); paintRows(); calc(); });
-  paintRows(); calc();
+  setupDrop($('#sDrop'), uploadExport);
+  paintRows(); paintStatus(); calc();
+
+  // pull the shared list (someone else may have uploaded a newer one)
+  api('/api/stock').then((d) => {
+    if (d && Array.isArray(d.items) && (d.uploadedAt || '') >= (stock.uploadedAt || '')) { stock = d; cacheStock(); paintStatus(); calc(); }
+  }).catch(() => {});
+}
+
+function cacheStock() { try { localStorage.setItem('gwprod_stock_cache', JSON.stringify(stock)); } catch {} }
+
+function paintStatus(msg = '') {
+  const box = $('#sStockStatus');
+  if (!box) return;
+  const grades = [...new Set([...DEFAULT_GRADES, ...stock.items.map((i) => i.grade)])].sort((a, b) => (parseFloat(a) || 0) - (parseFloat(b) || 0));
+  $('#gradeList').innerHTML = grades.map((g) => `<option value="${esc(g)}">`).join('');
+  const when = stock.uploadedAt ? new Date(stock.uploadedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  box.innerHTML = `${msg}${stock.items.length
+    ? `<div class="alert info"><b>${stock.items.length} stock items</b> loaded${stock.fileName ? ` from ${esc(stock.fileName)}` : ''}${when ? ` · ${esc(when)}` : ''}.</div>`
+    : '<p class="hint" style="margin:0">No stock file loaded yet.</p>'}
+    ${skipped.length ? `<p class="hint" style="margin:8px 0 0">Skipped ${skipped.length} line${skipped.length > 1 ? 's' : ''} that didn't look like a stock sheet: ${skipped.slice(0, 4).map(esc).join('; ')}${skipped.length > 4 ? '…' : ''}</p>` : ''}`;
+}
+
+async function loadXlsx() {
+  if (window.XLSX) return window.XLSX;
+  await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'vendor/xlsx.full.min.js'; s.onload = res; s.onerror = () => rej(new Error('Could not load the Excel reader')); document.head.appendChild(s); });
+  return window.XLSX;
+}
+
+async function uploadExport(file) {
+  paintStatus('<div class="alert info" style="margin-bottom:8px"><span class="spinner"></span> Reading the file…</div>');
+  try {
+    const XLSX = await loadXlsx();
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+    const parsed = parseExportRows(rows);
+    skipped = parsed.skipped;
+    if (!parsed.items.length) throw new Error('No stock sheets found in that file.');
+    stock = { items: parsed.items, fileName: file.name, uploadedAt: new Date().toISOString() };
+    cacheStock(); calc();
+    try {
+      stock = await api('/api/stock', { method: 'PUT', body: JSON.stringify({ items: parsed.items, fileName: file.name }) });
+      cacheStock();
+      paintStatus('<div class="alert ok" style="margin-bottom:8px">Stock list updated for everyone.</div>');
+    } catch (e) {
+      paintStatus(`<div class="alert warn" style="margin-bottom:8px">Loaded on this device, but could not share it: ${esc(e.message)}</div>`);
+    }
+  } catch (e) {
+    paintStatus(`<div class="alert err" style="margin-bottom:8px">${esc(e.message)}</div>`);
+  }
 }
 
 function paintRows() {
-  $('#stockRows').innerHTML = state.rows.map((r, i) => `
+  $('#stockRows').innerHTML = state.rows.length ? state.rows.map((r, i) => `
     <div class="rep" data-i="${i}">
-      ${state.rows.length > 1 ? `<button class="x" type="button" data-del="${i}" aria-label="Remove">×</button>` : ''}
+      <button class="x" type="button" data-del="${i}" aria-label="Remove">×</button>
       <div class="row">
-        <div class="field"><label>Name / grade</label><input type="text" data-r="label" value="${esc(r.label)}" placeholder="Stock ${i + 1}"></div>
+        <div class="field"><label>Name</label><input type="text" data-r="label" value="${esc(r.label)}" placeholder="Size ${i + 1}"></div>
         <div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-r="w" value="${esc(r.w)}" placeholder="54"></div>
         <div class="field"><label>Length (in)</label><input type="text" inputmode="decimal" data-r="l" value="${esc(r.l)}" placeholder="100"></div>
-        <div class="field"><label>On hand (sheets)</label><input type="number" min="0" data-r="onHand" value="${esc(r.onHand)}" placeholder="optional"></div>
+        <div class="field"><label>On hand</label><input type="number" min="0" data-r="onHand" value="${esc(r.onHand)}" placeholder="optional"></div>
       </div>
-    </div>`).join('');
+    </div>`).join('') : '<p class="hint" style="margin:0">Useful for sizes that aren\'t in the export yet.</p>';
   $$('#stockRows .rep').forEach((row) => {
     const i = +row.dataset.i;
     $$('[data-r]', row).forEach((inp) => inp.addEventListener('input', () => { state.rows[i][inp.dataset.r] = inp.value; calc(); }));
@@ -54,8 +127,12 @@ function paintRows() {
   $$('#stockRows [data-del]').forEach((b) => b.addEventListener('click', () => { state.rows.splice(+b.dataset.del, 1); paintRows(); calc(); }));
 }
 
+const MATCH_PILL = { EXACT: '<span class="pill ok">Exact</span>', SUB: '<span class="pill warn">Sub grade</span>', MANUAL: '<span class="pill info">Typed in</span>', ANY: '' };
+
 function calc() {
   saveForm('stock', state);
+  $$('#sFlute button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.flute)));
+  $$('#sColor button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.color)));
   const oW = parseInches(state.orderW), oL = parseInches(state.orderL), qty = Math.floor(parseFloat(state.qty) || 0);
   const res = $('#stockResult'), mill = $('#millBox');
   if (!(oW > 0 && oL > 0)) {
@@ -63,31 +140,44 @@ function calc() {
     mill.innerHTML = '';
     return;
   }
-  const rows = state.rows.map((r, i) => {
-    const w = parseInches(r.w), l = parseInches(r.l);
-    if (!(w > 0 && l > 0)) return null;
-    return { name: r.label || `Stock ${i + 1}`, w, l, onHand: r.onHand === '' ? null : +r.onHand, ...cutStock({ stockW: w, stockL: l, orderW: oW, orderL: oL, qty }) };
-  }).filter(Boolean);
 
-  const fits = rows.filter((r) => r.fits).sort((a, b) => a.wasteIn - b.wasteIn || a.wastePct - b.wastePct);
-  const nofit = rows.filter((r) => !r.fits);
-  if (!rows.length) {
-    res.innerHTML = '<h2>Results</h2><p class="hint" style="margin:0">Add at least one stock sheet size.</p>';
+  const manual = state.rows.map((r, i) => ({ manual: true, desc: r.label || `Size ${i + 1}`, itemNo: '', grade: '', flute: '', color: '', w: parseInches(r.w), l: parseInches(r.l), avail: r.onHand === '' ? null : +r.onHand }))
+    .filter((r) => r.w > 0 && r.l > 0);
+  const items = [...stock.items, ...manual];
+  const spec = [state.grade, state.flute, COLORS.find((c) => c[0] === state.color)?.[1]].filter(Boolean).join(' ');
+
+  if (!items.length) {
+    res.innerHTML = '<h2>Results</h2><p class="hint" style="margin:0">Upload the stock Export file, or add a size by hand.</p>';
   } else {
-    const best = fits[0];
-    res.innerHTML = `<h2>Results · ${fmtIn(oW)} × ${fmtIn(oL)} blank</h2>
+    const r = rankStock({ items, orderW: oW, orderL: oL, qty, grade: state.grade, flute: state.flute, color: state.color, subSave: SUB_SAVE });
+    const best = r.list[0];
+    const needSpec = !state.flute || !state.color || !state.grade.trim();
+    const shown = r.list.slice(0, 15);
+    res.innerHTML = `<h2>Results · ${spec ? esc(spec) + ' · ' : ''}${fmtIn(oW)} × ${fmtIn(oL)}</h2>
+      ${needSpec ? `<div class="alert warn" style="margin-bottom:10px">Pick the ${[!state.grade.trim() && 'grade', !state.flute && 'flute', !state.color && 'color'].filter(Boolean).join(', ')} to only see sheets that match the order.</div>` : ''}
       ${best ? `<div class="big-nums" style="margin-bottom:12px">
-        <div class="stat hero"><div class="v">${best.perSheet}</div><div class="l">Pieces per sheet on ${esc(best.name)}</div></div>
-        ${qty ? `<div class="stat"><div class="v">${fmtNum(best.sheets)}</div><div class="l">Sheets needed for ${fmtNum(qty)}</div></div>` : ''}
-        <div class="stat"><div class="v">${fmtNum(best.wastePct * 100, 1)}%</div><div class="l">Trim waste</div></div>
-      </div>` : '<div class="alert err" style="margin-bottom:12px">The blank is bigger than every stock size entered.</div>'}
-      ${fits.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Stock</th><th>Size</th><th>Outs W×L</th><th>Pcs/sht</th><th>Waste W / L</th><th>Waste</th>${qty ? '<th>Sheets</th>' : ''}</tr></thead><tbody>
-        ${fits.map((r, i) => {
-          const short = qty && r.onHand !== null && r.onHand < r.sheets;
-          return `<tr class="${i === 0 ? 'best' : ''}"><td>${esc(r.name)}${i === 0 ? ' <span class="pill star">Best</span>' : ''}</td><td>${fmtIn(r.w)} × ${fmtIn(r.l)}</td><td>${r.outsW} × ${r.outsL}</td><td>${r.perSheet}</td><td>${fmtIn(r.wasteW)} / ${fmtIn(r.wasteL)}</td><td>${fmtNum(r.wastePct * 100, 1)}%</td>${qty ? `<td>${fmtNum(r.sheets)}${short ? ` <span class="pill bad">only ${fmtNum(r.onHand)}</span>` : r.onHand !== null ? ' <span class="pill ok">OK</span>' : ''}</td>` : ''}</tr>`;
-        }).join('')}</tbody></table></div>` : ''}
-      ${nofit.length ? `<p class="hint" style="margin:10px 0 0">Too small for this blank: ${nofit.map((r) => esc(r.name)).join(', ')}.</p>` : ''}
-      ${best ? cutDiagram(best, oW, oL) : ''}`;
+          <div class="stat hero"><div class="v">${best.perSheet}</div><div class="l">Pcs/sheet on ${esc(best.itemNo ? '#' + best.itemNo : best.desc)}</div></div>
+          ${qty ? `<div class="stat"><div class="v">${fmtNum(best.sheets)}</div><div class="l">Sheets needed for ${fmtNum(qty)}</div></div>` : ''}
+          <div class="stat"><div class="v">${fmtIn(best.wasteIn)}</div><div class="l">Trim waste (${fmtNum(best.wastePct * 100, 1)}%)</div></div>
+        </div>
+        ${qty && best.enough === false ? (r.shortAfterAll > 0
+          ? `<div class="alert err" style="margin-bottom:10px">Not enough stock on hand. Even using every match below you are short about ${fmtNum(r.shortAfterAll)} pcs. Check the mill sizes.</div>`
+          : `<div class="alert warn" style="margin-bottom:10px">The best sheet doesn't have enough on hand. The <b>Use</b> column shows how to combine items to cover ${fmtNum(qty)} pcs.</div>`) : ''}
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Sheet</th><th>Outs</th><th>Pcs</th><th>Waste</th>${qty ? '<th>Need</th>' : ''}<th>Avail</th>${qty ? '<th>Use</th>' : ''}</tr></thead><tbody>
+          ${shown.map((x, i) => `<tr class="${i === 0 ? 'best' : ''}">
+            <td>${x.itemNo ? `<b>#${esc(x.itemNo)}</b><br>` : ''}<span class="hint">${esc(x.manual ? x.desc : `${x.grade} ${x.flute} ${x.color}`)}</span> ${MATCH_PILL[x.match] || ''}</td>
+            <td style="white-space:nowrap">${fmtIn(x.w)} × ${fmtIn(x.l)}</td>
+            <td>${x.outsW}×${x.outsL}</td><td>${x.perSheet}</td>
+            <td style="white-space:nowrap">${fmtIn(x.wasteIn)}<br><span class="hint">${fmtNum(x.wastePct * 100, 1)}%</span></td>
+            ${qty ? `<td>${fmtNum(x.sheets)}</td>` : ''}
+            <td>${x.avail === null || x.avail === undefined ? '–' : `${fmtNum(x.avail)}${x.enough === false ? ' <span class="pill bad">short</span>' : x.enough ? ' <span class="pill ok">OK</span>' : ''}`}</td>
+            ${qty ? `<td>${x.useSheets ? `<b>${fmtNum(x.useSheets)}</b>` : ''}</td>` : ''}
+          </tr>`).join('')}
+        </tbody></table></div>
+        ${r.list.length > shown.length ? `<p class="hint" style="margin:8px 0 0">Showing the best ${shown.length} of ${r.list.length}.</p>` : ''}
+        ${r.hiddenSubs ? `<p class="hint" style="margin:8px 0 0">${r.hiddenSubs} other-grade sheet${r.hiddenSubs > 1 ? 's' : ''} hidden because ${r.hiddenSubs > 1 ? 'they don\'t' : 'it doesn\'t'} save at least ${SUB_SAVE}" over the exact grade.</p>` : ''}
+        ${cutDiagram(best, oW, oL)}`
+      : `<div class="alert err">No ${spec ? esc(spec) + ' ' : ''}stock sheet is big enough for a ${fmtIn(oW)} × ${fmtIn(oL)} blank. See the mill sizes below.</div>`}`;
   }
 
   const sizes = millSizes({ orderW: oW, orderL: oL });
@@ -106,10 +196,10 @@ function cutDiagram(r, oW, oL) {
   for (let i = 0; i < r.outsL; i++) for (let j = 0; j < r.outsW; j++) {
     cells += `<rect x="${pad + i * oL + 0.2}" y="${pad + j * oW + 0.2}" width="${oL - 0.4}" height="${oW - 0.4}" fill="#d9b88a" stroke="#6b4e2c" stroke-width="${fs * 0.06}"/>`;
   }
-  return `<h2 style="margin:16px 0 8px">Cut layout · ${esc(r.name)}</h2>
+  return `<h2 style="margin:16px 0 8px">Cut layout · ${esc(r.itemNo ? '#' + r.itemNo : r.desc)}</h2>
     <svg class="topview" viewBox="0 0 ${W + pad * 2} ${H + pad * 2 + fs * 1.6}" role="img" aria-label="Cut layout">
       <rect x="${pad}" y="${pad}" width="${W}" height="${H}" fill="#e9c9c4" stroke="#8a5a52" stroke-width="${fs * 0.08}"/>
       ${cells}
-      <text x="${pad + W / 2}" y="${H + pad * 2 + fs * 1.1}" font-size="${fs}" text-anchor="middle" fill="currentColor" font-family="sans-serif" opacity=".7">Length ${fmtIn(r.l)} · pink = trim</text>
+      <text x="${pad + W / 2}" y="${H + pad * 2 + fs * 1.1}" font-size="${fs}" text-anchor="middle" fill="currentColor" font-family="sans-serif" opacity=".7">${fmtIn(r.w)} wide × ${fmtIn(r.l)} long · pink = trim</text>
     </svg>`;
 }
