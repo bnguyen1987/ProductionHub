@@ -204,3 +204,32 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeri
   .stat .v{font-size:24px}
   .brand-text small{display:none}
 }
+
+/* Printable pallet load sheet */
+#printSheet{display:none}
+@media print{
+  body.printing #app{display:none !important}
+  body.printing #printSheet{display:block}
+  @page{size:letter portrait;margin:0.45in}
+}
+#printSheet{color:#000;background:#fff;font-family:var(--sans);font-size:12.5px;line-height:1.35}
+#printSheet .ps-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #c4651a;padding-bottom:6px;margin-bottom:10px}
+#printSheet h1{font-size:22px;margin:0}
+#printSheet .ps-sub,#printSheet .ps-date{color:#555;font-size:12px}
+#printSheet .ps-kv{border-collapse:collapse;width:100%}
+#printSheet .ps-kv caption{text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:11px;color:#555;padding:0 0 4px}
+#printSheet .ps-kv th,#printSheet .ps-kv td{border:1px solid #bbb;padding:4px 7px;text-align:left;vertical-align:top}
+#printSheet .ps-kv th{background:#f3f1ec;width:42%;font-weight:600}
+#printSheet .ps-top{margin-bottom:10px}
+#printSheet .ps-top td{height:22px}
+#printSheet .ps-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px}
+#printSheet .ps-big{display:flex;gap:8px;margin-bottom:10px}
+#printSheet .ps-big div{flex:1;border:2px solid #c4651a;border-radius:6px;padding:6px 8px;text-align:center}
+#printSheet .ps-big b{display:block;font-size:22px;line-height:1.1}
+#printSheet .ps-big span{font-size:11px;color:#444}
+#printSheet .ps-pics{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+#printSheet figure{margin:0;border:1px solid #bbb;border-radius:6px;padding:6px;text-align:center;break-inside:avoid}
+#printSheet figure img,#printSheet figure svg{width:100%;height:auto;max-height:3.4in;object-fit:contain;display:block;margin:0 auto}
+#printSheet figcaption{font-size:11px;color:#555;margin-top:4px}
+#printSheet .ps-notes{margin-top:10px;border:1px solid #bbb;border-radius:6px;padding:6px 8px}
+#printSheet .ps-sign{display:flex;justify-content:space-between;margin-top:22px;font-size:12px}

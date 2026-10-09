@@ -4,9 +4,9 @@ import { $, $$, esc, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './co
 import { CALIPER, STANDARD_PALLETS, flatPiece, loadFor, palletsNeeded, recommend } from './palletcalc.js';
 
 const PALLET_H = 5; // typical wood pallet height, inches
-let state, three = null;
+let state, three = null, last = null;
 
-const DEFAULTS = { style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', caliper: String(CALIPER.C), bundle: '25', qty: '', maxStack: '48', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
+const DEFAULTS = { customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', caliper: String(CALIPER.C), bundle: '25', qty: '', maxStack: '48', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
 
 export function render(view) {
   state = { ...DEFAULTS, ...(loadForm('pallet') || {}) };
@@ -48,6 +48,16 @@ export function render(view) {
             <div class="field" id="customWrap"><label>Custom W × L (in)</label><div style="display:flex;gap:6px"><input data-f="customW" id="pCW" type="text" inputmode="decimal" placeholder="W"><input data-f="customL" id="pCL" type="text" inputmode="decimal" placeholder="L"></div></div>
           </div>
         </section>
+        <section class="card no-print">
+          <h2><span class="n">3</span>Print load sheet</h2>
+          <div class="row">
+            <div class="field"><label for="pCust">Customer</label><input id="pCust" data-f="customer" type="text" placeholder="optional"></div>
+            <div class="field"><label for="pJob">Job / order #</label><input id="pJob" data-f="job" type="text" placeholder="optional"></div>
+          </div>
+          <div class="field" style="margin-bottom:10px"><label for="pNotes">Notes for the floor</label><input id="pNotes" data-f="notes" type="text" placeholder="e.g. stretch wrap, corner boards, label 2 sides"></div>
+          <button class="btn primary" type="button" id="palPrint">Print load sheet</button>
+          <p class="hint" style="margin:8px 0 0">Prints one page with the specs, results, 3D picture and layer pattern. Choose "Save as PDF" in the print window to email it.</p>
+        </section>
       </div>
       <div class="stack">
         <section class="card" id="palResult" aria-live="polite"></section>
@@ -73,6 +83,8 @@ export function render(view) {
   $$('#showSeg button').forEach((b) => b.addEventListener('click', () => { state.show = b.dataset.k; update(); }));
   $$('#viewer [data-cam]').forEach((b) => b.addEventListener('click', () => setCam(b.dataset.cam)));
   $('#boardBtn').addEventListener('click', () => { state.board = state.board === 'kraft' ? 'white' : 'kraft'; update(); });
+
+  $('#palPrint').addEventListener('click', printSheet);
 
   initThree($('#viewer'));
   update();
@@ -133,6 +145,7 @@ function update() {
   $('#customWrap').classList.toggle('hidden', state.pallet !== 'custom');
 
   const r = compute();
+  last = r;
   const res = $('#palResult'), recBox = $('#palRecs');
   if (r.need) {
     res.innerHTML = `<h2>Result</h2><p class="hint" style="margin:0">Still need: ${r.need.join(', ')}.</p>`;
@@ -306,4 +319,72 @@ function drawScene(data) {
   three.controls.target.copy(target);
   three.size = size;
   if (changed) { setCam('iso'); three.framed = true; }
+}
+
+
+// ---------- print ----------
+function snapshot3D() {
+  if (!three) return '';
+  const c = three.camera, t = three.controls.target;
+  const saved = c.position.clone();
+  setCam('iso');
+  three.renderer.render(three.scene, c);
+  const url = three.renderer.domElement.toDataURL('image/png');
+  c.position.copy(saved); c.lookAt(t); three.controls.update();
+  return url;
+}
+
+function printSheet() {
+  const r = last;
+  if (!r || r.need || r.noFit || !r.load || !r.load.perPallet) { alert('Fill in the piece size first so there is a load to print.'); return; }
+  const { load, pallet, piece } = r;
+  const img = snapshot3D();
+  const styleName = { RSC: 'RSC', HSC: 'HSC', FOL: 'FOL', SHEET: 'Sheet / blank' }[state.style];
+  const dims = state.style === 'SHEET' ? `${fmtIn(parseInches(state.sheetW))} × ${fmtIn(parseInches(state.sheetL))} sheet` : `${fmtIn(parseInches(state.L))} × ${fmtIn(parseInches(state.W))} × ${fmtIn(parseInches(state.D))} (L × W × D)`;
+  const showLast = state.show === 'last' && r.qty > 0;
+  const now = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
+  let sheet = document.getElementById('printSheet');
+  if (!sheet) { sheet = document.createElement('div'); sheet.id = 'printSheet'; document.body.appendChild(sheet); }
+  sheet.innerHTML = `
+    <div class="ps-head"><div><h1>Pallet Load Sheet</h1><div class="ps-sub">GoldenWest Packaging · Ontario</div></div><div class="ps-date">${esc(now)}</div></div>
+    <table class="ps-kv ps-top">${row('Customer', esc(state.customer) || '&nbsp;')}${row('Job / order #', esc(state.job) || '&nbsp;')}</table>
+    <div class="ps-grid">
+      <table class="ps-kv">
+        <caption>Piece</caption>
+        ${row('Style', esc(styleName))}
+        ${row('Size', dims)}
+        ${row('Flat size on pallet', `${fmtIn(piece.b)} × ${fmtIn(piece.a)}`)}
+        ${row('Flute / caliper', `${esc(state.flute)} · ${esc(state.caliper)}"`)}
+        ${row('Pieces per bundle', r.bundle ? fmtNum(r.bundle) : 'Loose')}
+      </table>
+      <table class="ps-kv">
+        <caption>Pallet</caption>
+        ${row('Pallet size (W × L)', `${fmtNum(pallet.w, pallet.w % 1 ? 2 : 0)} × ${fmtNum(pallet.l, pallet.l % 1 ? 2 : 0)}`)}
+        ${row('Overhang allowed', `${esc(state.overhang)}" per side`)}
+        ${row('Max product height', `${esc(state.maxStack)}"`)}
+        ${row('Load height incl. pallet', fmtIn(PALLET_H + load.stackHeight))}
+        ${row('Footprint used', `${fmtNum(load.footprintUse * 100)}%`)}
+      </table>
+    </div>
+    <div class="ps-big">
+      <div><b>${fmtNum(load.perPallet)}</b><span>pcs per full pallet</span></div>
+      <div><b>${load.cols}</b><span>stacks per layer</span></div>
+      <div><b>${r.bundle ? `${load.tiers} × ${r.bundle}` : fmtNum(load.perStack)}</b><span>${r.bundle ? 'bundles high × pcs' : 'pcs per stack'}</span></div>
+      ${r.qty ? `<div><b>${fmtNum(r.pallets)}</b><span>pallets for ${fmtNum(r.qty)} pcs</span></div>` : ''}
+      ${r.qty && r.pallets > 1 ? `<div><b>${fmtNum(r.lastPallet)}</b><span>pcs on last pallet</span></div>` : ''}
+    </div>
+    <div class="ps-pics">
+      ${img ? `<figure><img src="${img}" alt="3D view of the load"><figcaption>${showLast ? 'Last pallet' : 'Full pallet'}</figcaption></figure>` : ''}
+      <figure>${topViewSvg(pallet, load)}<figcaption>Layer pattern (top view), ${load.cols} stacks</figcaption></figure>
+    </div>
+    ${state.notes ? `<div class="ps-notes"><b>Notes:</b> ${esc(state.notes)}</div>` : ''}
+    <div class="ps-sign"><span>Built by: ______________________</span><span>Checked by: ______________________</span></div>`;
+  document.body.classList.add('printing');
+  const done = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  // let the image decode before the print dialog opens
+  const im = sheet.querySelector('img');
+  const go = () => setTimeout(() => window.print(), 50);
+  if (im && !im.complete) { im.onload = go; im.onerror = go; } else go();
 }
