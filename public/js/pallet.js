@@ -3,10 +3,10 @@ import { OrbitControls } from '../vendor/OrbitControls.js';
 import { $, $$, esc, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
 import { CALIPER, GRADES_BY_FLUTE, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
 
-const PALLET_H = 5; // typical wood pallet height, inches
+let PALLET_H = 5; // wood pallet height (in), set from the form
 let state, three = null, last = null;
 
-const DEFAULTS = { two: '1', pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200C', caliper: String(boardSpec('C', '200C').caliper), lbsMsf: String(boardSpec('C', '200C').lbsMsf), bundle: '25', qty: '', maxStack: '48', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
+const DEFAULTS = { two: '1', pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200C', caliper: String(boardSpec('C', '200C').caliper), lbsMsf: String(boardSpec('C', '200C').lbsMsf), bundle: '25', qty: '', maxTotal: '52', palletH: '5', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
 
 export function render(view) {
   state = { ...DEFAULTS, ...(loadForm('pallet') || {}) };
@@ -41,7 +41,8 @@ export function render(view) {
           <h2><span class="n">2</span>Order &amp; pallet</h2>
           <div class="row">
             <div class="field"><label for="pQty">Order quantity</label><input id="pQty" data-f="qty" type="number" min="0" step="1" placeholder="5000"></div>
-            <div class="field"><label for="pMax">Max product height (in)</label><input id="pMax" data-f="maxStack" type="number" min="1" step="1"><span class="hint">Not counting the ${PALLET_H}" pallet</span></div>
+            <div class="field"><label for="pMax">Max height incl. pallet (in)</label><input id="pMax" data-f="maxTotal" type="number" min="1" step="0.5"><span class="hint">Floor to top of the load</span></div>
+            <div class="field"><label for="pPH">Pallet height (in)</label><input id="pPH" data-f="palletH" type="number" min="0" step="0.25"></div>
             <div class="field"><label for="pOver">Overhang allowed</label><select id="pOver" data-f="overhang">${[0, 1, 2, 3].map((n) => `<option value="${n}">${n}" per side</option>`).join('')}</select></div>
           </div>
           <div class="row">
@@ -129,7 +130,9 @@ function compute() {
   const caliper = parseFloat(state.caliper);
   const bundle = Math.max(0, Math.floor(parseFloat(state.bundle) || 0));
   const qty = Math.floor(parseFloat(state.qty) || 0);
-  const maxStack = parseFloat(state.maxStack);
+  PALLET_H = parseFloat(state.palletH);
+  if (!(PALLET_H >= 0)) PALLET_H = 5;
+  const maxStack = parseFloat(state.maxTotal) - PALLET_H; // product height available above the pallet
   const overhang = parseFloat(state.overhang) || 0;
   const dims = state.style === 'SHEET'
     ? { sheetW: parseInches(state.sheetW), sheetL: parseInches(state.sheetL) }
@@ -138,7 +141,7 @@ function compute() {
   if (state.style === 'SHEET') { if (!(dims.sheetW > 0)) need.push('sheet width'); if (!(dims.sheetL > 0)) need.push('sheet length'); }
   else { if (!(dims.L > 0)) need.push('length'); if (!(dims.W > 0)) need.push('width'); if (!(dims.D > 0)) need.push('depth'); }
   if (!(caliper > 0)) need.push('caliper');
-  if (!(maxStack > 0)) need.push('max height');
+  if (!(maxStack > 0)) need.push('max height (must be taller than the pallet)');
   if (need.length) return { need };
 
   const piece = flatPiece({ style: state.style, ...dims, caliper });
@@ -406,7 +409,7 @@ function printSheet() {
         ${row('Stacking pattern', patternText(load))}
         ${row('Pallet size (W × L)', palletLabel(r))}
         ${row('Overhang allowed', `${esc(state.overhang)}" per side`)}
-        ${row('Max product height', `${esc(state.maxStack)}"`)}
+        ${row('Max height incl. pallet', `${esc(state.maxTotal)}" (${esc(state.palletH)}" pallet)`)}
         ${row('Load height incl. pallet', fmtIn(PALLET_H + load.stackHeight))}
         ${row('Footprint used', `${fmtNum(load.footprintUse * 100)}%`)}
         ${weights(r) ? row(r.two ? 'Weight per full load' : 'Weight per full pallet', `≈ ${fmtNum(weights(r).pallet)} lb (estimate)`) : ''}
