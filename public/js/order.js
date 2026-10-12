@@ -3,7 +3,7 @@ import { checkAll, estimateBlank, runHours, slitterCheck, SPEC_REV } from './ord
 
 const STYLES = ['RSC', 'HSC', 'FOL', 'Die Cut', 'Sheet', 'Other'];
 const FLUTES = ['E', 'B', 'C', 'BC', 'A', 'SF'];
-const EMPTY = { customer: '', part: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '', colors: '0', qty: '', up: '1', notes: '' };
+const EMPTY = { customer: '', part: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '', colors: '0', qty: '', up: '1', rule: '', notes: '' };
 let o;
 
 export function render(view) {
@@ -48,7 +48,10 @@ export function render(view) {
             <div class="field"><label>Number up</label><input type="number" min="1" step="1" data-f="up"></div>
             <div class="field"><label>Quantity</label><input type="number" min="0" step="1" data-f="qty"></div>
           </div>
-          <div class="field"><label>Notes</label><input type="text" data-f="notes" placeholder="anything special"></div>
+          <div class="row">
+            <div class="field"><label>Inches of rule (die)</label><input type="number" min="0" step="any" data-f="rule" placeholder="from die line, e.g. 866.82"></div>
+            <div class="field" style="flex:2"><label>Notes</label><input type="text" data-f="notes" placeholder="anything special"></div>
+          </div>
           <div class="btn-row" style="margin-top:12px"><button class="btn ghost" type="button" id="oReset">Start new order</button></div>
         </section>
       </div>
@@ -86,7 +89,7 @@ function run() {
     return;
   }
   const up = Math.max(1, parseInt(o.up, 10) || 1), qty = Math.max(0, Math.floor(+o.qty || 0));
-  const order = { sheetW, sheetL, flute: o.flute, colors: +o.colors || 0, L: L > 0 ? L : 0, W: W > 0 ? W : 0, D: D > 0 ? D : 0, style: o.style, up, qty };
+  const order = { sheetW, sheetL, flute: o.flute, colors: +o.colors || 0, L: L > 0 ? L : 0, W: W > 0 ? W : 0, D: D > 0 ? D : 0, style: o.style, up, qty, rule: Math.max(0, parseFloat(String(o.rule).replace(/,/g, '')) || 0) };
   const results = checkAll(order);
   const slit = slitterCheck(order);
   const pass = results.filter((r) => r.status === 'pass');
@@ -124,7 +127,7 @@ function run() {
         </ul>
       </div>`;
     }).join('')}
-    <p class="note" style="margin:12px 0 0">Checks sheet size, flute, print colors, panel sizes, number-up and machine minimums against the machine spec sheets (${SPEC_REV}). It does not check die board size, rule length, tooling on hand, or schedule capacity. Hours = quantity at the DPR standard speed plus standard setup (setup times are estimates).</p>`;
+    <p class="note" style="margin:12px 0 0">Checks sheet size, flute, print colors, panel sizes, inches of rule, number-up and machine minimums against the machine spec sheets (${SPEC_REV}). It does not check die board size, tooling on hand, or schedule capacity. Hours = quantity at the DPR standard speed plus standard setup (setup times are estimates).</p>`;
 }
 
 async function readQuote(file) {
@@ -144,7 +147,7 @@ async function readQuote(file) {
       sheetW: num(r.sheet_width_in), sheetL: num(r.sheet_length_in),
       flute: FLUTES.includes(r.flute) ? r.flute : (r.flute === 'DW' ? 'BC' : 'C'),
       grade: r.grade || '', colors: String(Math.min(4, Math.max(0, parseInt(r.colors, 10) || 0))),
-      qty: num(r.quantity), up: String(Math.max(1, parseInt(r.number_up, 10) || 1)), notes: r.notes || '',
+      qty: num(r.quantity), up: String(Math.max(1, parseInt(r.number_up, 10) || 1)), rule: num(r.rule_in), notes: r.notes || '',
     };
     $$('[data-f]').forEach((el) => (el.value = o[el.dataset.f]));
     run();

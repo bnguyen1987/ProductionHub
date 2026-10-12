@@ -47,6 +47,7 @@ export function estimateBlank({ style, L, W, D }) {
 }
 
 const inRange = (v, lo, hi) => v >= lo - 1e-9 && v <= hi + 1e-9;
+const fmtRule = (x) => (Math.round(x * 100) / 100).toLocaleString('en-US');
 const fmt = (x) => `${Math.round(x * 100) / 100}"`;
 
 // Order square footage (sheets × sheet area). qty is boxes; number-up boxes come off one sheet.
@@ -107,6 +108,12 @@ export function checkMachine(m, o) {
       else oks.push(`Panels OK (L + W ${fmt(pair)}, within 11 13/16"–47 1/4")`);
     }
     if (o.D > 0 && o.D <= 3) oks.push('Depth 3" or less: extended glue tab recommended');
+  }
+
+  // Inches of rule on the cutting die (die cutters only)
+  if (o.rule > 0 && m.maxRule && (m.dieCut === 'flat' || m.dieCut === 'rotary')) {
+    if (o.rule > m.maxRule + 1e-9) fails.push(`Die has ${fmtRule(o.rule)}" of rule; max on this machine is ${fmtRule(m.maxRule)}". See the production department`);
+    else oks.push(`Rule ${fmtRule(o.rule)}" OK (max ${fmtRule(m.maxRule)}")`);
   }
 
   // Number up

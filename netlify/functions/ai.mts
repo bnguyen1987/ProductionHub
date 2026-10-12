@@ -17,12 +17,14 @@ const QUOTE_PROMPT = `You are reading a customer quote / RFQ / PO / spec sheet f
 Extract the order details. Dimensions in inches as decimals. Spec sheets often write sixteenths with a backtick or dash, e.g. 33\`08 or 33-8 means 33 8/16 = 33.5.
 "Sheet" or "blank" size is the flat board size before folding (often written Width x Length, or "Finished WxL", or "Blank size").
 Box dimensions are inside Length x Width x Depth.
+Die line drawings (e.g. Esko/ArtiosCAD, ".ARD") list "Blank width" x "Blank height": use those as sheet width x length. "Pieces Per: 4 OUT" is number_up.
+"Rules per inches", "Rule inches", "Total rule" or "Knife length" is the inches of cutting rule on the die: put it in rule_in. A die line with no box style given is "Die Cut".
 Return strict JSON only, no markdown fences, no commentary:
 {"customer":string|null,"part_or_design":string|null,"style":"RSC|HSC|FOL|Die Cut|Sheet|Other"|null,
 "box_length_in":number|null,"box_width_in":number|null,"box_depth_in":number|null,
 "sheet_width_in":number|null,"sheet_length_in":number|null,
 "flute":"E|B|C|BC|A|SF"|null,"grade":string|null,"colors":number|null,"quantity":number|null,"number_up":number|null,
-"notes":"one or two short sentences: anything unusual (glue, stitching, special print, tight tolerances)"}
+"rule_in":number|null,"notes":"one or two short sentences: anything unusual (glue, stitching, special print, tight tolerances)"}
 For flute: use BC for any double wall (BC, DW, 2-wall). Use SF for single face. If something is not in the document use null.`;
 
 export default async (req: Request) => {
