@@ -112,7 +112,8 @@ export function checkMachine(m, o) {
 
   // Inches of rule on the cutting die (die cutters only)
   if (o.rule > 0 && m.maxRule && (m.dieCut === 'flat' || m.dieCut === 'rotary')) {
-    if (o.rule > m.maxRule + 1e-9) fails.push(`Die has ${fmtRule(o.rule)}" of rule; max on this machine is ${fmtRule(m.maxRule)}". See the production department`);
+    // Over the max is a "Check", not a hard stop: production can sometimes run a little over
+    if (o.rule > m.maxRule + 1e-9) warns.push(`Die has ${fmtRule(o.rule)}" of rule; max on this machine is ${fmtRule(m.maxRule)}". See the production department`);
     else oks.push(`Rule ${fmtRule(o.rule)}" OK (max ${fmtRule(m.maxRule)}")`);
   }
 
