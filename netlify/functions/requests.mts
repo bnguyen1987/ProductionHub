@@ -17,6 +17,7 @@ function cleanNew(b: any) {
     shift: s(b.shift, 20),
     customer: s(b.customer, 120),
     spec: s(b.spec, 60),
+    order: s(b.order, 60),
     machine: s(b.machine, 80),
     type: s(b.type, 60),
     current: s(b.current, 1000),

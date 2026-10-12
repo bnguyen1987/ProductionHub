@@ -27,7 +27,7 @@ const TXT = {
     title: 'Change Requests',
     intro: 'See a better way to run a job, like a different pallet size or count? Plate or die needs repair before the next run? Send it here. Management reviews every request.',
     newBtn: 'New request', listBtn: 'Review requests', nNew: (n) => `${n} new`,
-    job: 'Job', customer: 'Customer name *', spec: 'Spec # *', machine: 'Machine (optional)',
+    job: 'Job', customer: 'Customer name *', spec: 'Spec # *', order: 'Order #', machine: 'Machine (optional)',
     theChange: 'The change', whatChange: 'What should change?',
     plateNo: 'Plate #', dieNo: 'Die #', toolNoPh: 'if marked on it', repairOr: 'Repair or replace?', nextRun: 'Next run date (if known)',
     current: 'How it is now', currentPh: 'e.g. 40 × 48 pallet, 375 per pallet',
@@ -50,9 +50,9 @@ const TXT = {
     statuses: { New: 'New', Approved: 'Approved', Rejected: 'Rejected', Done: 'Done' },
     // review list
     loadingList: 'Loading requests…', platesDies: 'Plates & dies', all: 'All',
-    search: 'Search customer, spec #, name…', qr: 'Print QR poster', qrTitle: 'Print a poster with the QR code for the floor',
+    search: 'Search customer, spec #, order #, name…', qr: 'Print QR poster', qrTitle: 'Print a poster with the QR code for the floor',
     none: (what, q) => `No ${what}requests${q ? ' match that search' : ''}.`, noneOpenTool: 'open plate or die ',
-    specWord: 'Spec', plate: 'Plate', die: 'Die', runs: 'runs', nextRunW: 'next run',
+    specWord: 'Spec', orderWord: 'Order', plate: 'Plate', die: 'Die', runs: 'runs', nextRunW: 'next run',
     machineH: 'Machine', currentH: 'How it is now', changeH: 'Change it to', wrongH: "What's wrong", whyH: 'Why', notesH: 'Notes',
     photoTag: 'Photo', photoFail: 'Could not load the photo.',
     reviewed: (when, by) => `Last reviewed ${when}${by ? ` by ${by}` : ''}`,
@@ -65,7 +65,7 @@ const TXT = {
     title: 'Solicitudes de cambio',
     intro: '¿Ve una mejor manera de correr un trabajo, como otro tamaño de tarima o cantidad? ¿Una placa o suaje necesita reparación antes de la próxima corrida? Envíelo aquí. La gerencia revisa cada solicitud.',
     newBtn: 'Nueva solicitud', listBtn: 'Revisar solicitudes', nNew: (n) => `${n} nueva${n > 1 ? 's' : ''}`,
-    job: 'Trabajo', customer: 'Nombre del cliente *', spec: '# de spec *', machine: 'Máquina (opcional)',
+    job: 'Trabajo', customer: 'Nombre del cliente *', spec: '# de spec *', order: '# de orden', machine: 'Máquina (opcional)',
     theChange: 'El cambio', whatChange: '¿Qué se debe cambiar?',
     plateNo: '# de placa', dieNo: '# de suaje', toolNoPh: 'si está marcado', repairOr: '¿Reparar o reemplazar?', nextRun: 'Fecha de la próxima corrida (si la sabe)',
     current: 'Cómo está ahora', currentPh: 'ej. tarima 40 × 48, 375 por tarima',
@@ -97,9 +97,9 @@ const TXT = {
     actions: { Repair: 'Reparar', Replace: 'Reemplazar', 'Not sure': 'No estoy seguro' },
     statuses: { New: 'Nueva', Approved: 'Aprobada', Rejected: 'Rechazada', Done: 'Terminada' },
     loadingList: 'Cargando solicitudes…', platesDies: 'Placas y suajes', all: 'Todas',
-    search: 'Buscar cliente, # de spec, nombre…', qr: 'Imprimir póster QR', qrTitle: 'Imprimir un póster con el código QR para la planta',
+    search: 'Buscar cliente, # de spec, # de orden, nombre…', qr: 'Imprimir póster QR', qrTitle: 'Imprimir un póster con el código QR para la planta',
     none: (what, q) => `No hay solicitudes ${what}${q ? 'que coincidan con la búsqueda' : ''}.`, noneOpenTool: 'abiertas de placas o suajes ',
-    specWord: 'Spec', plate: 'Placa', die: 'Suaje', runs: 'corre', nextRunW: 'próxima corrida',
+    specWord: 'Spec', orderWord: 'Orden', plate: 'Placa', die: 'Suaje', runs: 'corre', nextRunW: 'próxima corrida',
     machineH: 'Máquina', currentH: 'Cómo está ahora', changeH: 'Cambiarlo a', wrongH: 'Problema', whyH: 'Por qué', notesH: 'Notas',
     photoTag: 'Foto', photoFail: 'No se pudo cargar la foto.',
     reviewed: (when, by) => `Revisada ${when}${by ? ` por ${by}` : ''}`,
@@ -114,7 +114,7 @@ const locale = () => (getLang() === 'es' ? 'es-MX' : 'en-US');
 
 let view, list = [], filter = 'New', photo = null, draft = null;
 
-const blankForm = () => ({ name: '', shift: '', customer: '', spec: '', machine: '', type: TYPES[0], current: '', change: '', reason: '', toolNo: '', toolAction: 'Repair', nextRun: '' });
+const blankForm = () => ({ name: '', shift: '', customer: '', spec: '', order: '', machine: '', type: TYPES[0], current: '', change: '', reason: '', toolNo: '', toolAction: 'Repair', nextRun: '' });
 function guessShift() { const d = new Date(), m = d.getHours() * 60 + d.getMinutes(); return m >= 14 * 60 + 30 || m < 4 * 60 ? '2nd' : '1st'; }
 function ssGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
 function ssSet(k, v) { try { sessionStorage.setItem(k, v); } catch {} }
@@ -187,8 +187,11 @@ function paintForm(keepPhoto = false) {
             <div class="field"><label for="rq_customer">${T.customer}</label><input type="text" id="rq_customer" data-f="customer" autocomplete="off" required></div>
             <div class="field"><label for="rq_spec">${T.spec}</label><input type="text" id="rq_spec" data-f="spec" autocomplete="off" required></div>
           </div>
-          <div class="field"><label for="rq_machine">${T.machine}</label>
-            <select id="rq_machine" data-f="machine"><option value="">—</option>${MACHINES_7.map((m) => `<option>${esc(m)}</option>`).join('')}</select></div>
+          <div class="row">
+            <div class="field"><label for="rq_order">${T.order}</label><input type="text" id="rq_order" data-f="order" autocomplete="off"></div>
+            <div class="field"><label for="rq_machine">${T.machine}</label>
+              <select id="rq_machine" data-f="machine"><option value="">—</option>${MACHINES_7.map((m) => `<option>${esc(m)}</option>`).join('')}</select></div>
+          </div>
         </section>
         <section class="card">
           <h2><span class="n">2</span>${T.theChange}</h2>
@@ -305,7 +308,7 @@ function paintList(q = ($('#rqSearch', view) || {}).value || '') {
   const label = (s) => (s === 'Tooling' ? T.platesDies : s === 'All' ? T.all : tStatus(s));
   const needle = q.trim().toLowerCase();
   const shown = list.filter((r) => inFilter(r) &&
-    (!needle || [r.customer, r.spec, r.name, r.type, tType(r.type), r.change, r.current, r.reason, r.machine, r.toolNo].join(' ').toLowerCase().includes(needle)));
+    (!needle || [r.customer, r.spec, r.order, r.name, r.type, tType(r.type), r.change, r.current, r.reason, r.machine, r.toolNo].join(' ').toLowerCase().includes(needle)));
   const noneWhat = filter === 'All' ? '' : filter === 'Tooling' ? T.noneOpenTool : (getLang() === 'es' ? tStatus(filter).toLowerCase() + 's ' : filter.toLowerCase() + ' ');
   box.innerHTML = `
     <div class="btn-row no-print" style="margin-bottom:12px;align-items:center">
@@ -329,7 +332,7 @@ function itemHtml(r) {
   const shift = r.shift ? ` (${esc(T.shifts[r.shift] || r.shift)})` : '';
   return `<details class="entry" data-id="${k}">
     <summary><span class="pill ${PILL[r.status] || 'info'}">${esc(tStatus(r.status))}</span>
-      <span class="when">${esc(r.customer)} · ${T.specWord} ${esc(r.spec)}</span>
+      <span class="when">${esc(r.customer)} · ${T.specWord} ${esc(r.spec)}${r.order ? ` · ${T.orderWord} ${esc(r.order)}` : ''}</span>
       <span class="who">${esc(tType(r.type))} · ${esc(r.name)}${shift} · ${esc(fmtDate(r.savedAt))}</span>
       ${tool ? `<span class="pill warn">${toolWord(r.type)}: ${esc(tAction(r.toolAction || 'Repair').toLowerCase())}${r.nextRun ? ` · ${T.runs} ${esc(fmtDay(r.nextRun))}` : ''}</span>` : ''}
       ${r.hasPhoto ? `<span class="pill">${T.photoTag}</span>` : ''}</summary>
@@ -447,7 +450,7 @@ function printOne(id) {
   const when = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
   const build = (img) => `
     <div class="ps-head"><div><h1>Change Request</h1><div class="ps-sub">GoldenWest Packaging · Ontario</div></div><div class="ps-date">Submitted ${esc(when(r.savedAt))}</div></div>
-    <table class="ps-kv ps-top"><caption>Job</caption>${row('Customer', r.customer)}${row('Spec #', r.spec)}${row('Machine', r.machine)}</table>
+    <table class="ps-kv ps-top"><caption>Job</caption>${row('Customer', r.customer)}${row('Spec #', r.spec)}${row('Order #', r.order)}${row('Machine', r.machine)}</table>
     <table class="ps-kv ps-top"><caption>Request</caption>${row('What to change', r.type)}${tool ? row(word + ' #', r.toolNo) + row('Repair or replace', r.toolAction) + row('Next run', r.nextRun ? day(r.nextRun) : '') : ''}${row('How it is now', r.current)}${row(tool ? "What's wrong" : 'Change it to', r.change)}${row(tool ? 'Notes' : 'Why', r.reason)}${row('Requested by', `${r.name}${r.shift ? ` (${r.shift} shift)` : ''}`)}${r.lang === 'es' ? row('Written in', 'Spanish') : ''}</table>
     <table class="ps-kv ps-top"><caption>Review</caption><tr><th>Status</th><td>${esc(r.status)}</td></tr><tr><th>Reviewed by</th><td>${esc(r.reviewedBy || '')}</td></tr><tr><th>Note</th><td style="height:44px">${esc(r.reviewNote || '')}</td></tr></table>
     ${img ? `<figure><img src="${img}" alt="Photo"><figcaption>Photo from the floor</figcaption></figure>` : ''}
