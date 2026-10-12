@@ -212,6 +212,7 @@ function update() {
 
   res.innerHTML = `
     <h2>Result · ${palletLabel(r)}</h2>
+    ${load.oversize ? `<div class="alert warn" style="margin-bottom:10px"><b>Oversize:</b> the ${flat} piece is bigger than this pallet. ${overhangText(r)}${state.pallet === 'auto' ? ' Best fit picked the pallet with the least overhang.' : ''}${state.two === '2' ? '' : ' Two pallets side by side may avoid it.'}</div>` : ''}
     <div class="big-nums">
       ${r.qty ? `<div class="stat hero"><div class="v">${fmtNum(r.pallets)}</div><div class="l">Pallet${r.pallets === 1 ? '' : 's'} for ${fmtNum(r.qty)} pcs</div></div>` : ''}
       <div class="stat ${r.qty ? '' : 'hero'}"><div class="v">${fmtNum(load.perPallet)}</div><div class="l">${r.two ? 'Pieces per load (2 pallets)' : 'Pieces per full pallet'}</div></div>
@@ -230,7 +231,7 @@ function update() {
       ${r.bundle && load.rawPerPallet !== load.perPallet ? `<dt>Fits by height</dt><dd>${fmtNum(load.rawPerPallet)} pcs, rounded ${load.perPallet > load.rawPerPallet ? 'up' : 'down'} to ${fmtNum(load.perPallet)} (whole bundles)</dd>` : ''}
       <dt>Footprint used</dt><dd>${fmtNum(load.footprintUse * 100)}%</dd>
       ${wt ? `<dt>Weight per full ${r.two ? 'load' : 'pallet'} (est.)</dt><dd>≈ ${fmtNum(wt.pallet)} lb</dd><dt>Weight per piece (est.)</dt><dd>${fmtNum(wt.piece, 2)} lb</dd>` : ''}
-      ${load.overhangX || load.overhangY ? `<dt>Overhang</dt><dd>${fmtIn(Math.max(load.overhangX, load.overhangY))} per side</dd>` : ''}
+      <dt>Overhang</dt><dd>${load.overhangX > 0.01 || load.overhangY > 0.01 ? overhangText(r, true) : 'None'}</dd>
       ${r.qty && r.loads > 1 ? `<dt>Last ${r.two ? 'load' : 'pallet'}</dt><dd>${fmtNum(r.lastPallet)} pcs</dd>` : ''}
     </dl>
     ${load.footprintUse < 0.7 ? '<p class="note" style="margin:12px 0 0">Less than 70% of the deck is covered. Check another pallet size, or confirm the customer is OK with this pattern.</p>' : ''}`;
@@ -262,6 +263,7 @@ function topViewSvg(pallet, load) {
     ${load.rects.map((r, i) => `<rect x="${tx(r.x) + 0.15}" y="${ty(r.y) + 0.15}" width="${r.w - 0.3}" height="${r.l - 0.3}" fill="#d9b88a" stroke="#6b4e2c" stroke-width=".35"/>
       <text x="${tx(r.x + r.w / 2)}" y="${ty(r.y + r.l / 2) + fs * 0.35}" font-size="${fs}" text-anchor="middle" fill="#4a3519" font-family="sans-serif">${i + 1}</text>`).join('')}
     ${load.chimney && load.chimney.w > 0.01 && load.chimney.l > 0.01 ? `<rect x="${tx(load.chimney.x)}" y="${ty(load.chimney.y)}" width="${load.chimney.w}" height="${load.chimney.l}" fill="none" stroke="#c4651a" stroke-width=".5" stroke-dasharray="1.2 .8"/>` : ''}
+    ${load.oversize || load.overhangX > 0.01 || load.overhangY > 0.01 ? `<rect x="${tx(0)}" y="${ty(0)}" width="${pallet.l}" height="${pallet.w}" fill="none" stroke="#b3261e" stroke-width=".6" stroke-dasharray="2 1.2"/><text x="${tx(pallet.l / 2)}" y="${ty(0) - 1}" font-size="${fs * 0.8}" text-anchor="middle" fill="#b3261e" font-family="sans-serif">pallet edge</text>` : ''}
     <text x="${tx(pallet.l / 2)}" y="${H - 1}" font-size="${fs * 0.9}" text-anchor="middle" fill="currentColor" font-family="sans-serif" opacity=".7">${fmtNum(pallet.l, pallet.l % 1 ? 2 : 0)}" length</text>
   </svg>`;
 }
@@ -376,7 +378,9 @@ function drawScene(data) {
 
   // frame camera on first draw / size change
   const height = PALLET_H + load.stackHeight;
-  const size = Math.max(L, W, height);
+  const spanX = Math.max(L, ...load.rects.map((r) => Math.max(r.x + r.w, L) - Math.min(r.x, 0)));
+  const spanZ = Math.max(W, ...load.rects.map((r) => Math.max(r.y + r.l, W) - Math.min(r.y, 0)));
+  const size = Math.max(spanX, spanZ, height);
   const target = new THREE.Vector3(0, height / 2, 0);
   const changed = Math.abs(size - three.size) > 0.5 || !three.framed;
   three.controls.target.copy(target);
@@ -427,7 +431,7 @@ function printSheet() {
         <caption>Pallet</caption>
         ${row('Stacking pattern', patternText(load))}
         ${row('Pallet size (W × L)', palletLabel(r))}
-        ${row('Overhang allowed', `${esc(state.overhang)}" per side`)}
+        ${row('Overhang', load.overhangX > 0.01 || load.overhangY > 0.01 ? overhangText(r, true) : 'None')}
         ${row('Max height incl. pallet', `${esc(state.maxTotal)}" (${esc(state.palletH)}" pallet)`)}
         ${row('Load height incl. pallet', fmtIn(PALLET_H + load.stackHeight))}
         ${row('Footprint used', `${fmtNum(load.footprintUse * 100)}%`)}
@@ -479,4 +483,14 @@ function palletLabel(r) {
 
 function bundleText(load, bundle) {
   return `${load.fullTiers} × ${bundle}${load.loose ? ` + ${load.loose} loose on top` : ''}`;
+}
+
+// "Hangs over 9" each side on the 72" sides and 7 1/2" each side on the 60" sides"
+function overhangText(r, short = false) {
+  const { load, base } = r;
+  const parts = [];
+  if (load.overhangX > 0.01) parts.push(`${fmtIn(load.overhangX)} each end of the ${fmtNum(base.l, base.l % 1 ? 2 : 0)}" length`);
+  if (load.overhangY > 0.01) parts.push(`${fmtIn(load.overhangY)} each side of the ${fmtNum(base.w, base.w % 1 ? 2 : 0)}" width`);
+  if (!parts.length) return short ? 'None' : 'No overhang.';
+  return short ? parts.join(', ') : `It hangs over ${parts.join(' and ')}.`;
 }

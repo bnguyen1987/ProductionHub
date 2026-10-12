@@ -116,7 +116,22 @@ export function bestPattern(X, Y, a, b) {
 
 // Full load for one pallet size.
 // pallet: { w, l } (inches), overhang per side, maxStack = product height limit (no pallet).
-export function loadFor({ piece, pallet, overhang = 0, maxStack, bundle, mode = 'auto', fullBundles = false }) {
+// Smallest overhang per side needed for one piece to sit on this pallet (best orientation).
+export function neededOverhang(piece, pallet) {
+  return Math.min(...[[piece.a, piece.b], [piece.b, piece.a]].map(([p, q]) => Math.max(0, (p - pallet.l) / 2, (q - pallet.w) / 2)));
+}
+
+// Oversize pieces: if nothing fits within the allowed overhang, use the smallest overhang that works
+// and flag the load as oversize so the screen can say how far it hangs over.
+export function loadFor(args) {
+  const ld = loadOn(args);
+  if (ld.cols > 0) return { ...ld, oversize: false };
+  const need = neededOverhang(args.piece, args.pallet);
+  const ld2 = loadOn({ ...args, overhang: Math.max(args.overhang || 0, need) + 1e-6 });
+  return { ...ld2, oversize: ld2.cols > 0 };
+}
+
+function loadOn({ piece, pallet, overhang = 0, maxStack, bundle, mode = 'auto', fullBundles = false }) {
   const X = pallet.l + 2 * overhang, Y = pallet.w + 2 * overhang;
   const pat = patternFor(X, Y, piece.a, piece.b, mode);
   // center the pattern on the pallet (x along pallet length, y along width; origin = pallet corner)
@@ -139,7 +154,7 @@ export function loadFor({ piece, pallet, overhang = 0, maxStack, bundle, mode = 
     rects, cols: pat.count, kind: pat.kind, chimney: pat.chimney ? { ...pat.chimney, x: pat.chimney.x + offX, y: pat.chimney.y + offY } : null, tiers, fullTiers, loose, tierPieces, perStack, perPallet, rawPerPallet, bundlesPerPallet: bundle > 0 ? perPallet / bundle : 0,
     tierHeight: tierPieces * piece.h,
     stackHeight: perStack * piece.h,
-    footprintUse: pat.count ? (pat.count * piece.a * piece.b) / (pallet.l * pallet.w) : 0,
+    footprintUse: pat.count ? Math.min(1, (pat.count * piece.a * piece.b) / (pallet.l * pallet.w)) : 0,
     overhangX: Math.max(0, (pat.usedX - pallet.l) / 2), overhangY: Math.max(0, (pat.usedY - pallet.w) / 2),
   };
 }
@@ -172,7 +187,10 @@ export function recommend({ piece, qty, overhang, maxStack, bundle, mode = 'auto
     const { pallets: units } = palletsNeeded(qty || ld.perPallet, ld.perPallet);
     rows.push({ w, l, ...ld, ...extra, units, pallets: two ? units * 2 : units });
   }
-  if (qty > 0) rows.sort((p, q) => p.pallets - q.pallets || p.w * p.l - q.w * q.l || q.footprintUse - p.footprintUse);
-  else rows.sort((p, q) => q.footprintUse - p.footprintUse || q.perPallet - p.perPallet);
+  const oh = (r) => Math.max(r.overhangX, r.overhangY);
+  // Pallets that hold the load within the allowed overhang come first. Oversize loads: least overhang first.
+  const over = (p, q) => (p.oversize - q.oversize) || (p.oversize && q.oversize ? oh(p) - oh(q) : 0);
+  if (qty > 0) rows.sort((p, q) => over(p, q) || p.pallets - q.pallets || p.w * p.l - q.w * q.l || q.footprintUse - p.footprintUse);
+  else rows.sort((p, q) => over(p, q) || q.footprintUse - p.footprintUse || q.perPallet - p.perPallet);
   return rows;
 }
