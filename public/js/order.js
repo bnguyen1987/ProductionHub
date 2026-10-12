@@ -1,5 +1,5 @@
 import { $, $$, esc, api, fileToPayload, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
-import { checkAll, estimateBlank } from './ordercalc.js';
+import { checkAll, estimateBlank, runHours, slitterCheck, SPEC_REV } from './ordercalc.js';
 
 const STYLES = ['RSC', 'HSC', 'FOL', 'Die Cut', 'Sheet', 'Other'];
 const FLUTES = ['E', 'B', 'C', 'BC', 'A', 'SF'];
@@ -85,7 +85,10 @@ function run() {
     box.innerHTML = '<h2>Can we run it?</h2><p class="hint" style="margin:0">Upload a quote, or enter the sheet size (or box L × W × D for RSC/HSC/FOL).</p>';
     return;
   }
-  const results = checkAll({ sheetW, sheetL, flute: o.flute, colors: +o.colors || 0, D: D > 0 ? D : 0, style: o.style, up: Math.max(1, parseInt(o.up, 10) || 1) });
+  const up = Math.max(1, parseInt(o.up, 10) || 1), qty = Math.max(0, Math.floor(+o.qty || 0));
+  const order = { sheetW, sheetL, flute: o.flute, colors: +o.colors || 0, L: L > 0 ? L : 0, W: W > 0 ? W : 0, D: D > 0 ? D : 0, style: o.style, up, qty };
+  const results = checkAll(order);
+  const slit = slitterCheck(order);
   const pass = results.filter((r) => r.status === 'pass');
   const warn = results.filter((r) => r.status === 'warn');
   const best = pass[0] || warn[0];
@@ -93,11 +96,11 @@ function run() {
     ? `<div class="alert ok"><b>Yes, it can run.</b> Best fit: ${esc(pass[0].machine.name)}${pass.length > 1 ? ` (${pass.length} machines qualify)` : ''}.</div>`
     : warn.length
       ? `<div class="alert warn"><b>Maybe.</b> ${warn.length} machine${warn.length > 1 ? 's' : ''} could run it with conditions. Read the notes below.</div>`
-      : '<div class="alert err"><b>No.</b> None of the six machines can run this as entered.</div>';
+      : '<div class="alert err"><b>No.</b> None of the machines can run this as entered.</div>';
 
   box.innerHTML = `<h2>Can we run it?</h2>
     ${verdict}
-    <dl class="kv" style="margin:12px 0">
+    ${slit ? `<div class="alert info" style="margin-top:10px"><b>Small order:</b> about ${fmtNum(slit.sqft)} sq ft, under 2,000 sq ft. Policy: run it on the slitter from stock sheets${slit.fits.length ? ` (${slit.fits.map((s) => `#${s.id} ${esc(s.name)}`).join(' or ')})` : ''}.${slit.under12 ? ' Anything under 12" goes to the bandsaw.' : slit.fits.length ? '' : ' Sheet is over the slitter limits (80" × 142").'} Check the Stock Sheet tab for a sheet to cut from.</div>` : ''}    <dl class="kv" style="margin:12px 0">
       <dt>Sheet</dt><dd>${fmtIn(sheetW)} × ${fmtIn(sheetL)}${estimated ? ' <span class="pill warn">estimated</span>' : ''}</dd>
       <dt>Flute / colors</dt><dd>${esc(o.flute || '–')} · ${+o.colors ? esc(o.colors) + ' color' : 'no print'}</dd>
       ${+o.qty ? `<dt>Quantity</dt><dd>${fmtNum(+o.qty)}</dd>` : ''}
@@ -105,13 +108,13 @@ function run() {
     ${results.map((r) => {
       const m = r.machine;
       const isBest = r === best;
-      const hrs = +o.qty && m.speed ? (+o.qty / Math.max(1, parseInt(o.up, 10) || 1)) / m.speed : 0;
+      const hrs = runHours(m, qty, up);
       return `<div class="mach ${r.status}">
         <div class="mach-head">
           <b>${esc(m.name)}</b>
           <span class="pill ${r.status === 'pass' ? 'ok' : r.status === 'warn' ? 'warn' : 'bad'}">${r.status === 'pass' ? 'Can run' : r.status === 'warn' ? 'Check' : 'Cannot run'}</span>
           ${isBest ? '<span class="pill star">Best fit</span>' : ''}
-          <span class="meta">#${m.id} · crew ${esc(m.crewTxt)}${m.speed ? ` · ${fmtNum(m.speed)}/hr` : ''}${hrs ? ` · ~${fmtNum(hrs, 1)} run hrs` : ''}</span>
+          <span class="meta">#${m.id} · crew ${esc(m.crewTxt)}${m.speed ? ` · ${fmtNum(m.speed)}/hr${m.speedEst ? ' (est.)' : ''}` : ''} · setup ${m.setup} min${hrs ? ` · ~${fmtNum(hrs, 1)} hrs` : ''}</span>
         </div>
         <ul>
           ${r.fails.map((t) => `<li class="bad">${esc(t)}</li>`).join('')}
@@ -121,7 +124,7 @@ function run() {
         </ul>
       </div>`;
     }).join('')}
-    <p class="note" style="margin:12px 0 0">Checks sheet size, flute, print colors, depth and number-up against the machine spec sheets. It does not check die board size, rule length, tooling on hand, or schedule capacity. Run hours are at rated speed, before setup.</p>`;
+    <p class="note" style="margin:12px 0 0">Checks sheet size, flute, print colors, panel sizes, number-up and machine minimums against the machine spec sheets (${SPEC_REV}). It does not check die board size, rule length, tooling on hand, or schedule capacity. Hours = quantity at the DPR standard speed plus standard setup (setup times are estimates).</p>`;
 }
 
 async function readQuote(file) {

@@ -1,27 +1,47 @@
-// Machine specs transcribed from the six St. Worth Container machine spec sheets
-// (same data as the earlier New Orders Checker). Sheet W = width, L = length, inches.
+// Machine specs from "Machine Specification Sheets", Ontario plant, Rev. 10/7/2026.
+// Sheet W = width, L = length, inches. speed = Daily Production Report standard speed (Sept 2026),
+// setup = standard setup minutes (EST on the spec sheets). minQty = machine minimum order quantity.
+// Machines with no confirmed sheet size (Isowa) are shown as "Check" for die-cut jobs only.
+export const SPEC_REV = 'Rev. 10/7/2026';
+
 export const MACHINES = [
-  { id: 147, name: '42" Emba FFG', model: 'EMBA 245 QS Ultima', type: 'FFG', crew: 3, crewTxt: '3', speed: 3000, maxColor: 2,
-    minW: 11.0, minL: 23.65, maxW: 41.35, maxL: 94.5, skipFeedMaxW: 55.15,
-    notes: 'Hand feed and hand stack. Skip-feed extends max sheet width to 55.15" if the job qualifies. Anilox 280 (1st) / 260 (2nd).' },
-  { id: 144, name: '66" McKinley FFG', model: 'EMBA 245 QS Ultima', type: 'FFG', crew: 3, crewTxt: '3 (up to 5)', speed: 1300, maxColor: 2,
-    minW: 16.0, minL: 25.5, maxW: 66.0, maxL: 118.0, maxUpOk: 3,
-    notes: 'Cold glue. Extended glue tab recommended for depth 3" or less. Anilox 250 both stations.' },
-  { id: 132, name: '66" Shanghai RDC Slotter', model: 'Shanghai Juer JPS-1-1636', type: 'PRESS', crew: 2, crewTxt: '2 (up to 3)', speed: 900, maxColor: 2,
-    minW: 16.0, minL: 22.0, maxW: 66.0, maxL: 139.0, maxUpOk: 2,
-    notes: 'Hand feed, rotary die cutting. Standard slot 3/8". Min set panel 14", min W panel 2-3/16". Max rule 1000". Anilox 220 (1st) / 250 (2nd).' },
-  { id: 126, name: '86" Jumbo Press', model: 'Corrugated Components Inc.', type: 'PRESS', crew: 2, crewTxt: '2', speed: 250, maxColor: 1,
-    minW: 24.0, minL: 24.0, maxW: 86.0, maxL: 205.0, minDepth: 5, maxUpOk: 2,
-    notes: 'Hand feed, one color only. Min box depth 5". Min W panel 3-13/16", min length panel 7-3/4".' },
-  { id: 137, name: 'Large Marumatsu FBDC', model: 'Marumatsu Diamond CM-1712VII', type: 'FLATBED', crew: 2, crewTxt: '2', speed: 0, maxColor: 0,
-    minW: 15.75, minL: 23.5625, maxW: 47.1875, maxL: 66.125,
-    notes: 'Flat die cutter, hand feed/stack. Max rule 800" (over needs supervisor OK). Max die cut 46-7/16" × 65-5/16". Confirm die board fits.' },
-  { id: 138, name: 'Small Marumatsu FBDC', model: 'Marumatsu SM1410', type: 'FLATBED', crew: 2, crewTxt: '2', speed: 0, maxColor: 0,
-    minW: 11.85, minL: 21.65, maxW: 40.15, maxL: 55.1,
-    notes: 'Flat die cutter, hand feed/stack. Max rule 800" (over needs supervisor OK). Max die cut 54.30" × 39.35" (55.50" × 40.15" with stripping knife).' },
+  { id: 147, name: '42" Emba FFG', type: 'FFG', crew: 3, crewTxt: '3', speed: 3316, setup: 30, maxColor: 2, minQty: 50,
+    minW: 11.0, minL: 23.65, maxW: 41.35, maxL: 94.5, skipFeedMaxW: 55.15, twoPanel: true,
+    notes: 'Hand feed and hand stack. Top print, cold glue, slot 0.25". Skip-feed takes sheets up to 55.15" wide. Max bundle 25 SW / 15 DW, 12" high. Anilox 280 (1st) / 260 (2nd).' },
+  { id: 144, name: '66" McKinley FFG', type: 'FFG', crew: 3, crewTxt: '3 (up to 5)', speed: 793, setup: 45, maxColor: 2, minQty: 100,
+    minW: 16.0, minL: 25.5, maxW: 66.0, maxL: 116.0, maxUpOk: 3,
+    notes: 'Hand feed and hand stack. Bottom print, cold glue, glue tab 1.5", slot 0.375". Max bundle 25 SW / 15 DW, 12" high. Anilox 250 both stations.' },
+  { id: 149, name: 'Shanghai Juer Mini FFG', type: 'FFG', crew: 3, crewTxt: '3', speed: 2000, speedEst: true, setup: 30, maxColor: 2, minQty: 0,
+    minW: 11.81, minL: 23.62, maxW: 39.37, maxL: 78.74, minPanelL: 7.5, minPanelW: 4.8,
+    notes: 'Hand feed and hand stack. Top print, cold glue, max glue tab 1.75", slot 0.275". Printable area 37.4" × 78.74". Max bundle 25 SW / 15 DW, 12" high. Speed is an estimate; anilox to be confirmed.' },
+  { id: 132, name: '66" Shanghai RDC Slotter', type: 'PRESS', crew: 2, crewTxt: '2 (up to 3)', speed: 1266, setup: 45, maxColor: 2, minQty: 100,
+    minW: 16.0, minL: 22.0, maxW: 66.0, maxL: 139.0, maxUpOk: 2, maxRule: 1000,
+    notes: 'Hand feed. Top print, rotary die cutting, slot 0.375". Max rule 1,000" (more needs production OK). Rotary die boards over 10 ft are cut in half. OPF orders over 1,000 pcs need a rotary die board. Anilox 220 (1st) / 250 (2nd).' },
+  { id: 126, name: '86" Jumbo Press', type: 'PRESS', crew: 2, crewTxt: '2', speed: 407, setup: 60, maxColor: 1, minQty: 100,
+    minW: 24.0, minL: 24.0, maxW: 86.0, maxL: 205.0, maxUpOk: 2,
+    notes: 'Hand feed. One color, top print, attachments, slot 0.375". Printable area 86" × 200". Anything over 86" needs production approval. Anilox 220.' },
+  { id: 130, name: 'Isowa Rotary Die Cut', type: 'RDC', crew: 2, crewTxt: '2–4', speed: 770, setup: 40, maxColor: 0, minQty: 100,
+    unconfirmed: true, maxRule: 500,
+    notes: 'Plain rotary die cut, hand feed and hand stack. 66" cylinder. Max rule 500" (more needs production OK). Sheet size limits are not confirmed yet.' },
+  { id: 137, name: 'Large Marumatsu FBDC', type: 'FLATBED', crew: 2, crewTxt: '2', speed: 600, setup: 45, maxColor: 0, minQty: 100, qtyUnit: 'sheets',
+    minW: 15.75, minL: 23.5625, maxW: 47.1875, maxL: 66.125, maxRule: 800,
+    notes: 'Flat die cutter, hand feed/stack. Max die cut 46 7/16" × 65 5/16". Die board 20 13/16" × 24 3/8" up to 48 3/8" × 72 7/16". Max rule 800" (more needs production OK). Hand stripping and bundling available.' },
+  { id: 138, name: 'Small Marumatsu FBDC', type: 'FLATBED', crew: 2, crewTxt: '2', speed: 553, setup: 40, maxColor: 0, minQty: 100, qtyUnit: 'sheets',
+    minW: 11.85, minL: 21.65, maxW: 40.15, maxL: 55.1, maxRule: 500,
+    notes: 'Flat die cutter, hand feed/stack. Max die cut 54.30" × 39.35" (55.50" × 40.15" with stripping knife). Die board 21.65" × 18.15" up to 61.40" × 41.30". Max rule 500" (more needs production OK). Hand stripping and bundling available.' },
 ];
 
+// Slitters: any order under 2,000 sq ft runs on the slitter from stock sheets.
+export const SLITTERS = [
+  { id: 110, name: '142" Slitter', minW: 12, minL: 12, maxW: 80, maxL: 142 },
+  { id: 111, name: '120" Slitter', minW: 12, minL: 12, maxW: 80, maxL: 119 },
+];
+export const SMALL_ORDER_SQFT = 2000;
+
 export const RUN_FLUTES = ['E', 'B', 'C', 'BC'];
+
+// EMBA two-panel rule: panels 1+2 and 3+4 (L + W for an RSC) between 11 13/16" and 47 1/4"; any single panel at least 4 15/16".
+const EMBA_PAIR_MIN = 11.8125, EMBA_PAIR_MAX = 47.25, EMBA_PANEL_MIN = 4.9375;
 
 // Estimated blank (sheet) size for a folding carton style from inside L×W×D.
 export function estimateBlank({ style, L, W, D }) {
@@ -33,20 +53,31 @@ export function estimateBlank({ style, L, W, D }) {
 }
 
 const inRange = (v, lo, hi) => v >= lo - 1e-9 && v <= hi + 1e-9;
+const fmt = (x) => `${Math.round(x * 100) / 100}"`;
+
+// Order square footage (sheets × sheet area). qty is boxes; number-up boxes come off one sheet.
+export function orderSqft({ sheetW, sheetL, qty, up = 1 }) {
+  if (!(sheetW > 0 && sheetL > 0 && qty > 0)) return 0;
+  return Math.ceil(qty / Math.max(1, up)) * (sheetW * sheetL) / 144;
+}
 
 export function checkMachine(m, o) {
   const fails = [], warns = [], oks = [];
   const { sheetW: w, sheetL: l } = o;
-  const fmt = (x) => `${Math.round(x * 100) / 100}"`;
+  const slotted = ['RSC', 'HSC', 'FOL'].includes(o.style);
 
   // Size
-  const wOk = inRange(w, m.minW, m.maxW), lOk = inRange(l, m.minL, m.maxL);
-  if (wOk && lOk) oks.push(`Sheet ${fmt(w)} × ${fmt(l)} fits (${fmt(m.minW)}–${fmt(m.maxW)} × ${fmt(m.minL)}–${fmt(m.maxL)})`);
-  else if (lOk && m.skipFeedMaxW && inRange(w, m.minW, m.skipFeedMaxW)) warns.push(`Width ${fmt(w)} is over ${fmt(m.maxW)}. Only runs with skip-feed (up to ${fmt(m.skipFeedMaxW)})`);
-  else {
-    if (!wOk) fails.push(`Sheet width ${fmt(w)} is outside ${fmt(m.minW)}–${fmt(m.maxW)}`);
-    if (!lOk) fails.push(`Sheet length ${fmt(l)} is outside ${fmt(m.minL)}–${fmt(m.maxL)}`);
-    if (inRange(l, m.minW, m.maxW) && inRange(w, m.minL, m.maxL)) warns.push('Would fit if the sheet is turned 90°. Confirm feed direction with the supervisor');
+  if (m.unconfirmed) {
+    warns.push('Sheet size limits for this machine are not confirmed yet. Check with production');
+  } else {
+    const wOk = inRange(w, m.minW, m.maxW), lOk = inRange(l, m.minL, m.maxL);
+    if (wOk && lOk) oks.push(`Sheet ${fmt(w)} × ${fmt(l)} fits (${fmt(m.minW)}–${fmt(m.maxW)} × ${fmt(m.minL)}–${fmt(m.maxL)})`);
+    else if (lOk && m.skipFeedMaxW && inRange(w, m.minW, m.skipFeedMaxW)) warns.push(`Width ${fmt(w)} is over ${fmt(m.maxW)}. Only runs with skip-feed (up to ${fmt(m.skipFeedMaxW)})`);
+    else {
+      if (!wOk) fails.push(`Sheet width ${fmt(w)} is outside ${fmt(m.minW)}–${fmt(m.maxW)}`);
+      if (!lOk) fails.push(`Sheet length ${fmt(l)} is outside ${fmt(m.minL)}–${fmt(m.maxL)}`);
+      if (inRange(l, m.minW, m.maxW) && inRange(w, m.minL, m.maxL)) warns.push('Would fit if the sheet is turned 90°. Confirm feed direction with the supervisor');
+    }
   }
 
   // Flute
@@ -54,32 +85,67 @@ export function checkMachine(m, o) {
 
   // Print
   const colors = o.colors || 0;
-  if (m.type === 'FLATBED') {
+  if (m.type === 'FLATBED' || m.type === 'RDC') {
     if (colors > 0) warns.push('No print units. Sheets must be printed on another machine first');
   } else if (colors > m.maxColor) fails.push(`${colors} colors; this machine prints ${m.maxColor} max`);
   else if (colors > 0) oks.push(`${colors} color${colors > 1 ? 's' : ''} OK (max ${m.maxColor})`);
 
-  // Depth
-  if (m.minDepth && o.D > 0 && o.D < m.minDepth) fails.push(`Box depth ${fmt(o.D)} is under the ${m.minDepth}" minimum`);
-
-  // Style
-  const style = o.style;
-  if (['RSC', 'HSC', 'FOL'].includes(style)) {
+  // Style / routing
+  if (slotted) {
     if (m.type === 'PRESS') warns.push('No folder-gluer. Joint must be glued or stitched separately');
-    if (m.type === 'FLATBED') warns.push('Flatbed die cutter. Not the usual route for a slotted box');
+    if (m.type === 'FLATBED' || m.type === 'RDC') warns.push('Die cutter. Not the usual route for a slotted box');
   }
-  if (style === 'Die Cut' && m.type === 'FFG') warns.push('Die-cut style. Confirm this job can be done on a folder-gluer');
+  if (o.style === 'Die Cut' && m.type === 'FFG') warns.push('Die-cut style. Confirm this job can be done on a folder-gluer');
+
+  // Panel rules (slotted boxes with L and W known)
+  if (slotted && m.type === 'FFG' && o.L > 0 && o.W > 0) {
+    if (m.twoPanel) {
+      const pair = o.L + o.W, small = Math.min(o.L, o.W);
+      if (pair < EMBA_PAIR_MIN) fails.push(`L + W is ${fmt(pair)}; two panels together must be at least 11 13/16"`);
+      else if (pair > EMBA_PAIR_MAX) fails.push(`L + W is ${fmt(pair)}; two panels together can't be over 47 1/4"`);
+      else if (small < EMBA_PANEL_MIN) fails.push(`Smallest panel is ${fmt(small)}; minimum single panel is 4 15/16"`);
+      else oks.push(`Panels OK (L + W ${fmt(pair)}, within 11 13/16"–47 1/4")`);
+    }
+    if (m.minPanelL && (o.L < m.minPanelL || o.W < m.minPanelW)) fails.push(`Panels ${fmt(o.L)} × ${fmt(o.W)} are under the minimum slots of ${fmt(m.minPanelL)} × ${fmt(m.minPanelW)}`);
+    if (o.D > 0 && o.D <= 3) oks.push('Depth 3" or less: extended glue tab recommended');
+  }
 
   // Number up
   if (o.up > 1 && m.maxUpOk && o.up > m.maxUpOk) warns.push(`${o.up}-up needs supervisor sign-off on this machine (over ${m.maxUpOk}-up)`);
+
+  // Minimum quantity (die cutters count sheets)
+  if (o.qty > 0 && m.minQty) {
+    const n = m.qtyUnit === 'sheets' ? Math.ceil(o.qty / Math.max(1, o.up || 1)) : o.qty;
+    if (n < m.minQty) warns.push(`Under the machine minimum of ${m.minQty} ${m.qtyUnit || 'pcs'} (${n} ${m.qtyUnit || 'pcs'})`);
+  }
 
   const status = fails.length ? 'fail' : warns.length ? 'warn' : 'pass';
   return { machine: m, status, fails, warns, oks };
 }
 
+// Machines that apply to this order (Isowa only for die-cut work, since its sizes aren't confirmed).
+function machinesFor(order) {
+  return MACHINES.filter((m) => !m.unconfirmed || order.style === 'Die Cut');
+}
+
 // Pass first, then warn, then fail. Within a group: faster, then smaller crew.
 export function checkAll(order) {
   const rank = { pass: 0, warn: 1, fail: 2 };
-  return MACHINES.map((m) => checkMachine(m, order))
+  return machinesFor(order).map((m) => checkMachine(m, order))
     .sort((a, b) => rank[a.status] - rank[b.status] || b.machine.speed - a.machine.speed || a.machine.crew - b.machine.crew);
+}
+
+// Run hours at the DPR standard speed, plus standard setup.
+export function runHours(m, qty, up = 1) {
+  if (!(qty > 0) || !m.speed) return 0;
+  const units = m.qtyUnit === 'sheets' ? Math.ceil(qty / Math.max(1, up)) : qty / Math.max(1, up);
+  return units / m.speed + (m.setup || 0) / 60;
+}
+
+// Small-order policy: under 2,000 sq ft → slitter from stock sheets.
+export function slitterCheck(o) {
+  const sqft = orderSqft(o);
+  if (!sqft || sqft >= SMALL_ORDER_SQFT) return null;
+  const fits = SLITTERS.filter((s) => (inRange(o.sheetW, s.minW, s.maxW) && inRange(o.sheetL, s.minL, s.maxL)) || (inRange(o.sheetL, s.minW, s.maxW) && inRange(o.sheetW, s.minL, s.maxL)));
+  return { sqft, fits, under12: o.sheetW < 12 || o.sheetL < 12 };
 }
