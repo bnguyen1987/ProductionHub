@@ -6,6 +6,7 @@ const PAGES = [
   { id: 'stock', title: 'Stock Sheet Calculator', short: 'Stock Sheet', desc: 'Outs, trim waste and sheets needed for a stock size.', load: () => import('./stock.js') },
   { id: 'handoff', title: 'Shift Handoff Log', short: 'Handoff', desc: 'Machine status, open jobs, quality/safety and maintenance notes for the next shift.', load: () => import('./handoff.js') },
   { id: 'order', title: 'New Order Checker', short: 'Order Check', desc: 'Upload a quote and see which machines can run it.', load: () => import('./order.js') },
+  { id: 'requests', title: 'Change Requests', short: 'Requests', desc: 'Suggest a change to a job, like a better pallet size. Scan the QR code on the floor.', load: () => import('./requests.js') },
 ];
 
 const app = $('#app');
@@ -103,7 +104,13 @@ function renderHome(view) {
     <div class="home-grid">
       ${PAGES.map((p) => `<a class="home-card" href="#${p.id}"><span class="ic">${ICONS[p.id]}</span><h3>${p.title}</h3><p>${p.desc}</p></a>`).join('')}
     </div>
+    <div id="newRequests"></div>
     <div class="latest card" id="latestHandoff"><h2>Latest shift handoff</h2><div class="hint"><span class="spinner"></span> Loading…</div></div>`;
+  api('/api/requests').then(({ requests }) => {
+    const n = (requests || []).filter((r) => r.status === 'New').length;
+    const box = $('#newRequests');
+    if (box && n) box.innerHTML = `<div class="alert info" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span><b>${n} new change request${n > 1 ? 's' : ''}</b> waiting for review.</span><a class="btn small" href="#requests" onclick="try{sessionStorage.setItem('requests_tab','list')}catch(e){}">Review</a></div>`;
+  }).catch(() => {});
   api('/api/handoff?limit=1').then(({ entries }) => {
     const box = $('#latestHandoff');
     if (!box) return;
