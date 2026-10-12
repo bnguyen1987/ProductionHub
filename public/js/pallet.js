@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { $, $$, esc, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
-import { CALIPER, FOLD_ALLOWANCE, GRADES_BY_FLUTE, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
+import { perTrailer, CALIPER, FOLD_ALLOWANCE, GRADES_BY_FLUTE, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
 
 let PALLET_H = 5; // wood pallet height (in), set from the form
 let state, three = null, last = null;
@@ -236,12 +236,25 @@ function update() {
     </dl>
     ${load.footprintUse < 0.7 ? '<p class="note" style="margin:12px 0 0">Less than 70% of the deck is covered. Check another pallet size, or confirm the customer is OK with this pattern.</p>' : ''}`;
 
-  recBox.innerHTML = `<h2>Pallet options ${r.qty ? '· fewest pallets first' : '· best coverage first'}</h2>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pallet</th><th>${r.two ? 'Pcs/load' : 'Pcs/pallet'}</th>${r.qty ? '<th>Pallets</th>' : ''}<th>Coverage</th><th></th></tr></thead><tbody>
-    ${r.recs.slice(0, 6).map((p, i) => {
+  // two short lists: fewest pallets, and best deck coverage (most product per trailer)
+  const withTrailer = r.recs.map((p) => {
+    const base = p.base || { w: p.w, l: p.l };
+    const loadsPerTruck = perTrailer({ footW: base.w + 2 * p.overhangY, footL: base.l + 2 * p.overhangX, loadH: PALLET_H + p.stackHeight });
+    return { ...p, loadsPerTruck, pcsPerTruck: loadsPerTruck * p.perPallet };
+  });
+  const fewest = withTrailer.slice(0, 3);
+  const coverage = [...withTrailer].sort((p, q) => (p.oversize - q.oversize) || q.footprintUse - p.footprintUse || q.pcsPerTruck - p.pcsPerTruck).slice(0, 3);
+  const table = (rows, title, hint) => `
+    <h3 style="margin:14px 0 4px;font-size:15px">${title}</h3><p class="hint" style="margin:0 0 6px">${hint}</p>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pallet</th><th>${r.two ? 'Pcs/load' : 'Pcs/pallet'}</th>${r.qty ? '<th>Pallets</th>' : ''}<th>Coverage</th><th>Per trailer</th><th></th></tr></thead><tbody>
+    ${rows.map((p, i) => {
       const sel = pallet.w === p.w && pallet.l === p.l;
-      return `<tr class="${sel ? 'best' : ''}"><td style="white-space:nowrap">${r.two ? '2 × ' : ''}${p.w} × ${p.l}${i === 0 ? ' <span class="pill star">Best</span>' : ''}${r.two && p.base ? `<br><span class="hint">${p.base.w} × ${p.base.l} base</span>` : ''}</td><td>${fmtNum(p.perPallet)}</td>${r.qty ? `<td>${p.pallets}</td>` : ''}<td>${fmtNum(p.footprintUse * 100)}%</td><td><button class="btn small" type="button" data-pick="${p.w}x${p.l}" ${sel ? 'disabled' : ''}>Use</button></td></tr>`;
+      return `<tr class="${sel ? 'best' : ''}"><td style="white-space:nowrap">${r.two ? '2 × ' : ''}${p.w} × ${p.l}${i === 0 ? ' <span class="pill star">Best</span>' : ''}${r.two && p.base ? `<br><span class="hint">${p.base.w} × ${p.base.l} base</span>` : ''}${p.oversize ? '<br><span class="pill warn">overhang</span>' : ''}</td><td>${fmtNum(p.perPallet)}</td>${r.qty ? `<td>${p.pallets}</td>` : ''}<td>${fmtNum(p.footprintUse * 100)}%</td><td style="white-space:nowrap">${fmtNum(p.pcsPerTruck)} pcs<br><span class="hint">${p.loadsPerTruck} ${r.two ? 'loads' : 'pallets'}</span></td><td><button class="btn small" type="button" data-pick="${p.w}x${p.l}" ${sel ? 'disabled' : ''}>Use</button></td></tr>`;
     }).join('')}</tbody></table></div>`;
+  recBox.innerHTML = `<h2>Pallet options</h2>
+    ${table(fewest, 'Fewest pallets', r.qty ? `Least pallets for ${fmtNum(r.qty)} pcs, then the smallest pallet.` : 'Enter an order quantity to rank by pallet count.')}
+    ${table(coverage, 'Best coverage', 'Fills the most of the pallet deck, so the most product ships per trailer. Pallet count not considered.')}
+    <p class="hint" style="margin:8px 0 0">Per trailer = 53' van, about 100" × 630" × 108" inside, double stacked when two fit under the roof.</p>`;
   $$('#palRecs [data-pick]').forEach((b) => b.addEventListener('click', () => { state.pallet = b.dataset.pick; $('#pPal').value = state.pallet; update(); }));
 
   $('#topView').innerHTML = topViewSvg(r.base, load);
