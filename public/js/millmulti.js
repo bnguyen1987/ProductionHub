@@ -1,5 +1,5 @@
 // "Mill size for multiple blanks" tab: one sheet size to order that gives the least total trim across several blanks.
-import { $, $$, esc, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
+import { $, $$, esc, parseInches, fmtIn16 as fmtIn, fmtNum, saveForm, loadForm } from './common.js';
 import { bestMillSizes } from './stockcalc.js';
 
 const STEPS = [['1', '1"'], ['0.5', '1/2"'], ['0.25', '1/4"'], ['0.125', '1/8"']];

@@ -1,4 +1,4 @@
-import { $, $$, esc, api, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
+import { $, $$, esc, api, setupDrop, parseInches, fmtIn16 as fmtIn, fmtNum, saveForm, loadForm } from './common.js';
 import { cutStock, millSizes, parseExportRows, rankStock } from './stockcalc.js';
 import { renderMulti } from './millmulti.js';
 
@@ -21,8 +21,8 @@ export function render(view) {
       <button type="button" data-t="compare">Compare stock on hand</button>
       <button type="button" data-t="multi">Mill size for multiple blanks</button>
     </div>
-    <div id="multiView" class="hidden"></div>
-    <div class="layout stock-layout" id="compareView">
+    <div id="multiView" class="hidden" data-sixteenths></div>
+    <div class="layout stock-layout" id="compareView" data-sixteenths>
       <div class="stack">
         <section class="card">
           <h2><span class="n">1</span>Order</h2>

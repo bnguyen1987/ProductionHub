@@ -119,7 +119,7 @@ export function loadForm(key) { try { return JSON.parse(localStorage.getItem('gw
 
 // ---- fraction <-> decimal helper under inch fields ----
 // Typed a fraction (15 1/8, 15-1/8, 15`02) -> shows "= 15.125"". Typed a decimal (15.125) -> shows "= 15 1/8"".
-export function inchConversion(raw) {
+export function inchConversion(raw, sixteenths = false) {
   const s = String(raw ?? '').trim();
   if (!s) return '';
   const v = parseInches(s);
@@ -128,7 +128,7 @@ export function inchConversion(raw) {
   if (isFraction) return `= ${(+v.toFixed(4)).toString()}"`;
   if (/\./.test(s)) {
     const exact = Math.abs(v * 16 - Math.round(v * 16)) < 1e-6;
-    return `${exact ? '=' : '≈'} ${fmtIn(v)}${exact ? '' : ' (nearest 1/16)'}`;
+    return `${exact ? '=' : '≈'} ${sixteenths ? fmtIn16(v) : fmtIn(v)}${exact ? '' : ' (nearest 1/16)'}`;
   }
   return '';
 }
@@ -140,7 +140,7 @@ function updateInchHint(input) {
     hint.className = 'hint inch-conv';
     input.insertAdjacentElement('afterend', hint);
   }
-  const t = inchConversion(input.value);
+  const t = inchConversion(input.value, !!input.closest('[data-sixteenths]'));
   if (hint.textContent !== t) hint.textContent = t; // only touch the DOM on change (avoids observer loops)
   const disp = t ? '' : 'none';
   if (hint.style.display !== disp) hint.style.display = disp;
@@ -149,3 +149,13 @@ function updateInchHint(input) {
 const INCH_SEL = 'input[type="text"][inputmode="decimal"]';
 export function refreshInchHints(root = document) { root.querySelectorAll(INCH_SEL).forEach(updateInchHint); }
 document.addEventListener('input', (e) => { if (e.target.matches && e.target.matches(INCH_SEL)) updateInchHint(e.target); });
+
+// Same as fmtIn but always in sixteenths, not reduced (73.75 -> 73 12/16"), the stock-sheet convention.
+export function fmtIn16(x, unit = '"') {
+  if (!isFinite(x)) return '–';
+  const neg = x < 0; x = Math.abs(x);
+  let whole = Math.floor(x), six = Math.round((x - whole) * 16);
+  if (six === 16) { whole += 1; six = 0; }
+  const body = six ? (whole ? `${whole} ${six}/16` : `${six}/16`) : `${whole}`;
+  return (neg ? '-' : '') + body + unit;
+}
