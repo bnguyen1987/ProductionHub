@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { $, $$, esc, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
-import { CALIPER, GRADES, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
+import { CALIPER, GRADES_BY_FLUTE, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
 
 const PALLET_H = 5; // typical wood pallet height, inches
 let state, three = null, last = null;
 
-const DEFAULTS = { two: '1', pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200', caliper: String(boardSpec('C', '200').caliper), lbsMsf: String(boardSpec('C', '200').lbsMsf), bundle: '25', qty: '', maxStack: '48', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
+const DEFAULTS = { two: '1', pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200C', caliper: String(boardSpec('C', '200C').caliper), lbsMsf: String(boardSpec('C', '200C').lbsMsf), bundle: '25', qty: '', maxStack: '48', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
 
 export function render(view) {
   state = { ...DEFAULTS, ...(loadForm('pallet') || {}) };
@@ -30,10 +30,9 @@ export function render(view) {
           </div>
           <div class="lbl" style="margin:4px 0 6px">Flute</div>
           <div class="seg" id="fluteSeg">${Object.keys(CALIPER).map((k) => `<button type="button" data-k="${k}">${k}</button>`).join('')}</div>
-          <div class="lbl" style="margin:10px 0 6px">Grade</div>
-          <div class="seg" id="gradeSeg">${GRADES.map((g) => `<button type="button" data-k="${g}">${g}</button>`).join('')}</div>
+          <div class="field" style="margin-top:10px;max-width:280px"><label for="pGrade">Board grade (mill standard)</label><select id="pGrade"></select><span class="hint" id="pGradeInfo"></span></div>
           <div class="row" style="margin-top:10px">
-            <div class="field"><label for="pCal">Caliper per sheet (in)</label><input id="pCal" data-f="caliper" type="number" step="0.001" min="0"><span class="hint">Set by flute + grade, edit if needed</span></div>
+            <div class="field"><label for="pCal">Caliper per sheet (in)</label><input id="pCal" data-f="caliper" type="number" step="0.001" min="0"><span class="hint">Mill max caliper for the grade (QF-582). Edit if needed</span></div>
             <div class="field"><label for="pWt">Board weight (lb/MSF)</label><input id="pWt" data-f="lbsMsf" type="number" step="1" min="0"><span class="hint">Estimate, edit if needed</span></div>
             <div class="field"><label for="pBundle">Pieces per bundle</label><input id="pBundle" data-f="bundle" type="number" min="0" step="1"><span class="hint">0 = loose stacked</span></div>
           </div>
@@ -93,9 +92,17 @@ export function render(view) {
     el.addEventListener('input', () => { state[el.dataset.f] = el.value; update(); });
   });
   $$('#styleSeg button').forEach((b) => b.addEventListener('click', () => { state.style = b.dataset.k; update(); }));
-  const applyBoard = () => { const b = boardSpec(state.flute, state.grade); state.caliper = String(b.caliper); state.lbsMsf = String(b.lbsMsf); $('#pCal').value = state.caliper; $('#pWt').value = state.lbsMsf; update(); };
-  $$('#fluteSeg button').forEach((b) => b.addEventListener('click', () => { state.flute = b.dataset.k; applyBoard(); }));
-  $$('#gradeSeg button').forEach((b) => b.addEventListener('click', () => { state.grade = b.dataset.k; applyBoard(); }));
+  const fillGrades = () => {
+    const spec = boardSpec(state.flute, state.grade);
+    state.grade = spec.grade;
+    $('#pGrade').innerHTML = GRADES_BY_FLUTE[state.flute].map((g) => `<option ${g === state.grade ? 'selected' : ''}>${g}</option>`).join('');
+    $('#pGradeInfo').textContent = `${spec.components} · mill max caliper ${spec.caliper}"`;
+  };
+  const applyBoard = () => { fillGrades(); const b = boardSpec(state.flute, state.grade); state.caliper = String(b.caliper); state.lbsMsf = String(b.lbsMsf); $('#pCal').value = state.caliper; $('#pWt').value = state.lbsMsf; update(); };
+  $$('#fluteSeg button').forEach((b) => b.addEventListener('click', () => { state.flute = b.dataset.k; state.grade = state.grade.replace(/(B|C|E|D)$/, ''); applyBoard(); }));
+  $('#pGrade').addEventListener('change', (e) => { state.grade = e.target.value; applyBoard(); });
+  // first load: older saved settings used short grades and estimated calipers; move them onto the mill table
+  if (!/[A-Z]$/.test(String(state.grade))) applyBoard(); else fillGrades();
   $$('#patSeg button').forEach((b) => b.addEventListener('click', () => { state.pattern = b.dataset.k; update(); }));
   $$('#twoSeg button').forEach((b) => b.addEventListener('click', () => { state.two = b.dataset.k; update(); }));
   $$('#showSeg button').forEach((b) => b.addEventListener('click', () => { state.show = b.dataset.k; update(); }));
@@ -160,7 +167,6 @@ function update() {
   saveForm('pallet', state);
   $$('#styleSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.style)));
   $$('#fluteSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.flute)));
-  $$('#gradeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.grade)));
   $$('#patSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.pattern)));
   $$('#twoSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.two)));
   $$('#showSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.show)));
@@ -198,7 +204,7 @@ function update() {
       <div class="stat"><div class="v">${fmtIn(totalH)}</div><div class="l">Load height incl. pallet</div></div>
     </div>
     <dl class="kv" style="margin-top:12px">
-      <dt>Board</dt><dd>${esc(state.grade)} ${esc(state.flute)} · ${esc(state.caliper)}" caliper</dd>
+      <dt>Board</dt><dd>${esc(state.grade)} · ${esc(state.caliper)}" caliper</dd>
       <dt>Flat piece size</dt><dd>${flat}</dd>
       <dt>Stacking pattern</dt><dd>${patternText(load)}</dd>
       <dt>Stacks per layer</dt><dd>${load.cols}</dd>
@@ -391,7 +397,7 @@ function printSheet() {
         ${row('Style', esc(styleName))}
         ${row('Size', dims)}
         ${row('Flat size on pallet', `${fmtIn(piece.b)} × ${fmtIn(piece.a)}`)}
-        ${row('Grade / flute', `${esc(state.grade)} ${esc(state.flute)}`)}
+        ${row('Board grade', `${esc(state.grade)} (${esc(state.flute)} flute)`)}
         ${row('Caliper', `${esc(state.caliper)}"`)}
         ${row('Pieces per bundle', r.bundle ? fmtNum(r.bundle) : 'Loose')}
       </table>
