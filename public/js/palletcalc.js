@@ -19,10 +19,29 @@ export function boardSpec(flute, grade) {
   return { grade: row[0], caliper: row[1], lbsMsf: row[2], components: row[3] };
 }
 
-// Pallet sizes written Width x Length (inches), the way they're ordered.
-export const STANDARD_PALLETS = [
-  [30, 30], [36, 36], [36, 48], [36, 60], [40, 40], [40, 48], [42, 42], [42, 48], [44, 44], [44, 48], [48, 48], [48, 52], [48, 60], [48, 72], [48, 84], [48, 96], [54, 72], [60, 72],
-]; // sorted by width, then length
+// Pallets we buy, from "Pallet Costs and Sizes" (7/1/26 Ontario pallet price list). Sizes stored width ≤ length.
+// This is the built-in default; an uploaded price list replaces it (see /api/pallets).
+export const DEFAULT_PALLET_PRICES = [{"type": "30 x 54 PLT (2way)", "w": 30.0, "l": 54.0, "cost": 7.25}, {"type": "36 x 36 PLT (2way)", "w": 36.0, "l": 36.0, "cost": 3.25}, {"type": "36 x 60 PLT (2way)", "w": 36.0, "l": 60.0, "cost": 4}, {"type": "40 x 40 PLT (2way)", "w": 40.0, "l": 40.0, "cost": 4}, {"type": "40 x 40 PLT (2way) - HT", "w": 40.0, "l": 40.0, "cost": 5}, {"type": "40 x 52 PLT (4way)", "w": 40.0, "l": 52.0, "cost": 10.25}, {"type": "40 x 60 PLT (2way)", "w": 40.0, "l": 60.0, "cost": 4.25}, {"type": "42 x 42 PLT (2way)", "w": 42.0, "l": 42.0, "cost": 4.65}, {"type": "44 x 44 PLT (2way)", "w": 44.0, "l": 44.0, "cost": 4.65}, {"type": "44 x 56 PLT (2way)", "w": 44.0, "l": 56.0, "cost": 12}, {"type": "48 x 36 PLT (2way)", "w": 36.0, "l": 48.0, "cost": 3.75}, {"type": "48 x 40 PLT (2way)", "w": 40.0, "l": 48.0, "cost": 3.95}, {"type": "48 x 40 PLT (2way) - HT", "w": 40.0, "l": 48.0, "cost": 5.5}, {"type": "48 x 40 PLT (4way) - HT - #1", "w": 40.0, "l": 48.0, "cost": 15.25}, {"type": "48 x 40 PLT (4way) - #1 - NEW", "w": 40.0, "l": 48.0, "cost": 14.25}, {"type": "48 x 40 PLT (4way)", "w": 40.0, "l": 48.0, "cost": 6.25}, {"type": "48 x 40 PLT (4way) - HT", "w": 40.0, "l": 48.0, "cost": null}, {"type": "48 x 40 PLT - block", "w": 40.0, "l": 48.0, "cost": 3.75}, {"type": "48 x 48 PLT (2way)", "w": 48.0, "l": 48.0, "cost": 3.75}, {"type": "48 x 48 PLT (2way) - HT", "w": 48.0, "l": 48.0, "cost": 6.75}, {"type": "48 x 60 PLT (2way)", "w": 48.0, "l": 60.0, "cost": 8.25}, {"type": "48 x 60 PLT (4way) - NEW", "w": 48.0, "l": 60.0, "cost": 24.5}, {"type": "48 x 60 PLT (4way)", "w": 48.0, "l": 60.0, "cost": 10.25}, {"type": "48 x 72 PLT (2way)", "w": 48.0, "l": 72.0, "cost": 24.5}, {"type": "48 x 78 PLT (2way)", "w": 48.0, "l": 78.0, "cost": null}, {"type": "48 x 90 PLT (2way)", "w": 48.0, "l": 90.0, "cost": 20.25}, {"type": "48 x 96 PLT (2way)", "w": 48.0, "l": 96.0, "cost": 45}, {"type": "48 x 42 PLT (2way)", "w": 42.0, "l": 48.0, "cost": 7}, {"type": "55 x 46 PLT (2way)", "w": 46.0, "l": 55.0, "cost": 15.5}, {"type": "55 x 56 PLT (2way)", "w": 55.0, "l": 56.0, "cost": 6.5}, {"type": "58 x 107 PLT (2way)", "w": 58.0, "l": 107.0, "cost": 24.75}, {"type": "60 x 60 PLT (2way)", "w": 60.0, "l": 60.0, "cost": 9}, {"type": "60 x 72 PLT (2way)", "w": 60.0, "l": 72.0, "cost": 23.5}, {"type": "65 x 135 PLT (2way)", "w": 65.0, "l": 135.0, "cost": 25.5}, {"type": "65 x 95 PLT (2way)", "w": 65.0, "l": 95.0, "cost": 25}, {"type": "72 x 72 PLT (2way)", "w": 72.0, "l": 72.0, "cost": 27.5}, {"type": "78 x 48 PLT (2way)", "w": 48.0, "l": 78.0, "cost": null}, {"type": "80 x 75 PLT (2way)", "w": 75.0, "l": 80.0, "cost": 24.75}, {"type": "86 x 96 PLT (2way) - HT", "w": 86.0, "l": 96.0, "cost": null}, {"type": "96 x 40 PLT (2way)", "w": 40.0, "l": 96.0, "cost": 23.5}, {"type": "96 x 48 PLT (2way)", "w": 48.0, "l": 96.0, "cost": 50}]
+;
+
+// One entry per pallet size, using the cheapest priced type (or heat-treated only).
+export function palletCatalog(list = DEFAULT_PALLET_PRICES, htOnly = false) {
+  const bySize = new Map();
+  for (const p of list) {
+    if (!(p.w > 0 && p.l > 0)) continue;
+    const w = Math.min(p.w, p.l), l = Math.max(p.w, p.l), key = `${w}x${l}`;
+    const isHT = /\bHT\b/i.test(p.type || '');
+    if (htOnly && !isHT) continue;
+    const cur = bySize.get(key) || { w, l, cost: null, type: null, types: [] };
+    cur.types.push(p.type);
+    if (p.cost > 0 && (cur.cost === null || p.cost < cur.cost)) { cur.cost = p.cost; cur.type = p.type; }
+    if (!cur.type) cur.type = p.type;
+    bySize.set(key, cur);
+  }
+  return [...bySize.values()].sort((a, b) => a.w - b.w || a.l - b.l);
+}
+
+export let STANDARD_PALLETS = palletCatalog().map((p) => [p.w, p.l]); // sorted by width, then length
 
 // Flat (folded/glued) size of one piece on the pallet.
 // RSC/HSC/FOL ship glued and folded flat: length = L + W, width = D + flaps.

@@ -1,12 +1,17 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
-import { $, $$, esc, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
-import { perTrailer, CALIPER, FOLD_ALLOWANCE, GRADES_BY_FLUTE, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
+import { $, $$, esc, api, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
+import { perTrailer, CALIPER, FOLD_ALLOWANCE, GRADES_BY_FLUTE, boardSpec, DEFAULT_PALLET_PRICES, palletCatalog, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
 
 let PALLET_H = 5; // wood pallet height (in), set from the form
 let state, three = null, last = null;
+// Pallet price list (shared upload, else the built-in 7/1/26 list) and the per-size catalog built from it.
+let prices = { items: DEFAULT_PALLET_PRICES, fileName: 'Pallet Costs and Sizes (7/1/26 list)', uploadedAt: null };
+let catalog = palletCatalog(prices.items);
+const priceOf = (w, l) => catalog.find((c) => c.w === Math.min(w, l) && c.l === Math.max(w, l)) || null;
+const money = (x) => (x === null || x === undefined || !isFinite(x) ? '–' : '$' + x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
-const DEFAULTS = { two: '1', pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200C', caliper: String(boardSpec('C', '200C').caliper), lbsMsf: String(boardSpec('C', '200C').lbsMsf), bundle: '25', qty: '', maxTotal: '52', palletH: '5', foldPct: String(FOLD_ALLOWANCE), thick: '', fullBundles: false, overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
+const DEFAULTS = { htOnly: false, two: '1', pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200C', caliper: String(boardSpec('C', '200C').caliper), lbsMsf: String(boardSpec('C', '200C').lbsMsf), bundle: '25', qty: '', maxTotal: '52', palletH: '5', foldPct: String(FOLD_ALLOWANCE), thick: '', fullBundles: false, overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
 
 export function render(view) {
   state = { ...DEFAULTS, ...(loadForm('pallet') || {}) };
@@ -54,10 +59,16 @@ export function render(view) {
           </div>
           <div class="row">
             <div class="field"><label for="pPal">Pallet size (W × L)</label>
-              <select id="pPal" data-f="pallet"><option value="auto">Best fit (recommended)</option>${STANDARD_PALLETS.map(([w, l]) => `<option value="${w}x${l}">${w} × ${l}</option>`).join('')}<option value="custom">Custom size…</option></select></div>
+              <select id="pPal" data-f="pallet"></select></div>
             <div class="field" id="customWrap"><label>Custom W × L (in)</label><div style="display:flex;gap:6px"><input data-f="customW" id="pCW" type="text" inputmode="decimal" placeholder="W"><input data-f="customL" id="pCL" type="text" inputmode="decimal" placeholder="L"></div></div>
           </div>
-          <label style="display:flex;gap:8px;align-items:center;margin:0 0 12px;font-size:14.5px"><input type="checkbox" id="pFull" style="width:18px;height:18px"> Only count full bundles (no partial bundle on top)</label>
+          <label style="display:flex;gap:8px;align-items:center;margin:0 0 8px;font-size:14.5px"><input type="checkbox" id="pFull" style="width:18px;height:18px"> Only count full bundles (no partial bundle on top)</label>
+          <label style="display:flex;gap:8px;align-items:center;margin:0 0 12px;font-size:14.5px"><input type="checkbox" id="pHT" style="width:18px;height:18px"> Heat-treated (HT) pallets only</label>
+          <div class="rep" style="margin-bottom:12px">
+            <div class="lbl" style="margin-bottom:4px">Pallet prices</div>
+            <div id="pPriceStatus" class="hint"></div>
+            <label class="btn small" style="margin-top:6px;position:relative;overflow:hidden">Update prices (.xlsx)<input type="file" id="pPriceFile" accept=".xlsx,.xls,.csv" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label>
+          </div>
           <div class="lbl" style="margin:2px 0 6px">Pallets under each load</div>
           <div class="seg" id="twoSeg" style="margin-bottom:12px">
             <button type="button" data-k="1">1 pallet</button>
@@ -114,6 +125,17 @@ export function render(view) {
   if (!/[A-Z]$/.test(String(state.grade))) applyBoard(); else fillGrades();
   $$('#patSeg button').forEach((b) => b.addEventListener('click', () => { state.pattern = b.dataset.k; update(); }));
   $$('#twoSeg button').forEach((b) => b.addEventListener('click', () => { state.two = b.dataset.k; update(); }));
+  $('#pHT').checked = !!state.htOnly;
+  $('#pHT').addEventListener('change', (e) => { state.htOnly = e.target.checked; rebuildCatalog(); update(); });
+  $('#pPriceFile').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) uploadPrices(f); });
+  try { const c = JSON.parse(localStorage.getItem('gwprod_pallet_prices') || 'null'); if (c && Array.isArray(c.items) && c.items.length) prices = c; } catch {}
+  rebuildCatalog();
+  api('/api/pallets').then((d) => {
+    if (d && Array.isArray(d.items) && d.items.length && (d.uploadedAt || '') >= (prices.uploadedAt || '')) {
+      prices = d; try { localStorage.setItem('gwprod_pallet_prices', JSON.stringify(d)); } catch {}
+      rebuildCatalog(); update();
+    }
+  }).catch(() => {});
   $('#pFull').checked = !!state.fullBundles;
   $('#pFull').addEventListener('change', (e) => { state.fullBundles = e.target.checked; update(); });
   $$('#showSeg button').forEach((b) => b.addEventListener('click', () => { state.show = b.dataset.k; update(); }));
@@ -157,11 +179,16 @@ function compute() {
   const piece = flatPiece({ style: state.style, ...dims, caliper, foldPct: parseFloat(state.foldPct) || 0, thickness: parseFloat(state.thick) || 0 });
   const fullBundles = !!state.fullBundles;
   const two = state.two === '2';
-  const recs = recommend({ piece, qty, overhang, maxStack, bundle, mode: state.pattern, two, fullBundles });
+  const recs = recommend({ piece, qty, overhang, maxStack, bundle, mode: state.pattern, two, fullBundles, sizes: catalog.map((c) => [c.w, c.l]) });
   let pallet, load;
   if (state.pallet === 'auto') {
     if (!recs.length) return { piece, recs, qty, noFit: true };
-    pallet = { w: recs[0].w, l: recs[0].l };
+    // Best fit = lowest pallet cost (pallets × price; per piece if no quantity), fewer pallets as the tiebreaker.
+    // Loads that fit within the allowed overhang always beat oversize ones. Falls back to fewest pallets with no prices.
+    const cost = (p) => { const pr = priceOf(p.w, p.l); if (!pr || pr.cost === null) return null; const per = pr.cost * (two ? 2 : 1); return qty > 0 ? pr.cost * p.pallets : per / p.perPallet; };
+    const priced = recs.filter((p) => cost(p) !== null);
+    const pick = priced.length ? [...priced].sort((p, q) => (p.oversize - q.oversize) || (p.oversize && q.oversize ? Math.max(p.overhangX, p.overhangY) - Math.max(q.overhangX, q.overhangY) : 0) || cost(p) - cost(q) || p.pallets - q.pallets)[0] : recs[0];
+    pallet = { w: pick.w, l: pick.l };
   } else if (state.pallet === 'custom') {
     const w = parseInches(state.customW), l = parseInches(state.customL);
     if (!(w > 0 && l > 0)) return { need: ['custom pallet size'] };
@@ -219,6 +246,7 @@ function update() {
       <div class="stat"><div class="v">${fmtIn(totalH)}</div><div class="l">Load height incl. pallet</div></div>
     </div>
     <dl class="kv" style="margin-top:12px">
+      ${(() => { const pr = priceOf(pallet.w, pallet.l); if (!pr) return ''; const n = r.two ? 2 : 1; return pr.cost === null ? `<dt>Pallet price</dt><dd>no price on list</dd>` : `<dt>Pallet price</dt><dd>${money(pr.cost)} each${r.qty ? ` · <b>${money(pr.cost * r.pallets)}</b> for ${fmtNum(r.pallets)} pallets` : n > 1 ? ` · ${money(pr.cost * 2)} per load` : ''}<br><span class="hint">${esc(pr.type)}</span></dd>`; })()}
       <dt>Board</dt><dd>${esc(state.grade)} · ${esc(state.caliper)}" caliper</dd>
       <dt>Flat piece size</dt><dd>${flat}</dd>
       <dt>Stacking pattern</dt><dd>${patternText(load)}</dd>
@@ -240,20 +268,29 @@ function update() {
   const withTrailer = r.recs.map((p) => {
     const base = p.base || { w: p.w, l: p.l };
     const loadsPerTruck = perTrailer({ footW: base.w + 2 * p.overhangY, footL: base.l + 2 * p.overhangX, loadH: PALLET_H + p.stackHeight });
-    return { ...p, loadsPerTruck, pcsPerTruck: loadsPerTruck * p.perPallet };
+    const pr = priceOf(p.w, p.l);
+    const each = pr ? pr.cost : null;
+    const perLoad = each !== null ? each * (r.two ? 2 : 1) : null;
+    const total = each !== null && r.qty ? each * p.pallets : null;
+    const perPc = perLoad !== null ? perLoad / p.perPallet : null;
+    return { ...p, loadsPerTruck, pcsPerTruck: loadsPerTruck * p.perPallet, each, total, perPc };
   });
   const fewest = withTrailer.slice(0, 3);
   const coverage = [...withTrailer].sort((p, q) => (p.oversize - q.oversize) || q.footprintUse - p.footprintUse || q.pcsPerTruck - p.pcsPerTruck).slice(0, 3);
+  const costKey = (p) => (r.qty ? p.total : p.perPc);
+  const cheapest = withTrailer.filter((p) => costKey(p) !== null)
+    .sort((p, q) => (p.oversize - q.oversize) || costKey(p) - costKey(q) || p.pallets - q.pallets).slice(0, 3);
   const table = (rows, title, hint) => `
     <h3 style="margin:14px 0 4px;font-size:15px">${title}</h3><p class="hint" style="margin:0 0 6px">${hint}</p>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pallet</th><th>${r.two ? 'Pcs/load' : 'Pcs/pallet'}</th>${r.qty ? '<th>Pallets</th>' : ''}<th>Coverage</th><th>Per trailer</th><th></th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pallet</th><th>${r.two ? 'Pcs/load' : 'Pcs/pallet'}</th>${r.qty ? '<th>Pallets</th>' : ''}<th>Coverage</th><th>Per trailer</th><th>${r.qty ? 'Pallet cost' : '$/pallet'}</th><th></th></tr></thead><tbody>
     ${rows.map((p, i) => {
       const sel = pallet.w === p.w && pallet.l === p.l;
-      return `<tr class="${sel ? 'best' : ''}"><td style="white-space:nowrap">${r.two ? '2 × ' : ''}${p.w} × ${p.l}${i === 0 ? ' <span class="pill star">Best</span>' : ''}${r.two && p.base ? `<br><span class="hint">${p.base.w} × ${p.base.l} base</span>` : ''}${p.oversize ? '<br><span class="pill warn">overhang</span>' : ''}</td><td>${fmtNum(p.perPallet)}</td>${r.qty ? `<td>${p.pallets}</td>` : ''}<td>${fmtNum(p.footprintUse * 100)}%</td><td style="white-space:nowrap">${fmtNum(p.pcsPerTruck)} pcs<br><span class="hint">${p.loadsPerTruck} ${r.two ? 'loads' : 'pallets'}</span></td><td><button class="btn small" type="button" data-pick="${p.w}x${p.l}" ${sel ? 'disabled' : ''}>Use</button></td></tr>`;
+      return `<tr class="${sel ? 'best' : ''}"><td style="white-space:nowrap">${r.two ? '2 × ' : ''}${p.w} × ${p.l}${i === 0 ? ' <span class="pill star">Best</span>' : ''}${r.two && p.base ? `<br><span class="hint">${p.base.w} × ${p.base.l} base</span>` : ''}${p.oversize ? '<br><span class="pill warn">overhang</span>' : ''}</td><td>${fmtNum(p.perPallet)}</td>${r.qty ? `<td>${p.pallets}</td>` : ''}<td>${fmtNum(p.footprintUse * 100)}%</td><td style="white-space:nowrap">${fmtNum(p.pcsPerTruck)} pcs<br><span class="hint">${p.loadsPerTruck} ${r.two ? 'loads' : 'pallets'}</span></td><td style="white-space:nowrap">${p.each === null ? '<span class="hint">no price</span>' : r.qty ? `<b>${money(p.total)}</b><br><span class="hint">${money(p.each)} ea</span>` : money(p.each)}</td><td><button class="btn small" type="button" data-pick="${p.w}x${p.l}" ${sel ? 'disabled' : ''}>Use</button></td></tr>`;
     }).join('')}</tbody></table></div>`;
   recBox.innerHTML = `<h2>Pallet options</h2>
     ${table(fewest, 'Fewest pallets', r.qty ? `Least pallets for ${fmtNum(r.qty)} pcs, then the smallest pallet.` : 'Enter an order quantity to rank by pallet count.')}
     ${table(coverage, 'Best coverage', 'Fills the most of the pallet deck, so the most product ships per trailer. Pallet count not considered.')}
+    ${cheapest.length ? table(cheapest, 'Lowest pallet cost', r.qty ? `Cheapest total pallet cost for ${fmtNum(r.qty)} pcs (pallets needed × price).` : 'Lowest pallet cost per piece. Enter an order quantity to see the total.') : ''}
     <p class="hint" style="margin:8px 0 0">Per trailer = 53' van, about 100" × 630" × 108" inside, double stacked when two fit under the roof.</p>`;
   $$('#palRecs [data-pick]').forEach((b) => b.addEventListener('click', () => { state.pallet = b.dataset.pick; $('#pPal').value = state.pallet; update(); }));
 
@@ -444,6 +481,7 @@ function printSheet() {
         <caption>Pallet</caption>
         ${row('Stacking pattern', patternText(load))}
         ${row('Pallet size (W × L)', palletLabel(r))}
+        ${(() => { const pr = priceOf(pallet.w, pallet.l); return pr && pr.cost !== null ? row('Pallet cost', `${money(pr.cost)} each${r.qty ? ` · ${money(pr.cost * r.pallets)} for ${fmtNum(r.pallets)}` : ''}`) : ''; })()}
         ${row('Overhang', load.overhangX > 0.01 || load.overhangY > 0.01 ? overhangText(r, true) : 'None')}
         ${row('Max height incl. pallet', `${esc(state.maxTotal)}" (${esc(state.palletH)}" pallet)`)}
         ${row('Load height incl. pallet', fmtIn(PALLET_H + load.stackHeight))}
@@ -506,4 +544,60 @@ function overhangText(r, short = false) {
   if (load.overhangY > 0.01) parts.push(`${fmtIn(load.overhangY)} each side of the ${fmtNum(base.w, base.w % 1 ? 2 : 0)}" width`);
   if (!parts.length) return short ? 'None' : 'No overhang.';
   return short ? parts.join(', ') : `It hangs over ${parts.join(' and ')}.`;
+}
+
+
+// ---------- pallet price list ----------
+function rebuildCatalog() {
+  catalog = palletCatalog(prices.items, !!state.htOnly);
+  const sel = $('#pPal');
+  if (!sel) return;
+  const keep = state.pallet;
+  sel.innerHTML = `<option value="auto">Best fit (lowest pallet cost)</option>${catalog.map((c) => `<option value="${c.w}x${c.l}">${c.w} × ${c.l}${c.cost !== null ? ` · ${money(c.cost)}` : ' · no price'}</option>`).join('')}<option value="custom">Custom size…</option>`;
+  if (keep !== 'auto' && keep !== 'custom' && !catalog.some((c) => `${c.w}x${c.l}` === keep)) state.pallet = 'auto';
+  sel.value = state.pallet;
+  const when = prices.uploadedAt ? new Date(prices.uploadedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const st = $('#pPriceStatus');
+  if (st) st.textContent = `${catalog.length} sizes${state.htOnly ? ' (HT only)' : ''} from ${prices.fileName || 'price list'}${when ? `, uploaded ${when}` : ''}. Cheapest type per size is used.`;
+}
+
+async function uploadPrices(file) {
+  const st = $('#pPriceStatus');
+  st.innerHTML = '<span class="spinner"></span> Reading the price list…';
+  try {
+    if (!window.XLSX) await new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'vendor/xlsx.full.min.js'; sc.onload = res; sc.onerror = () => rej(new Error('Could not load the Excel reader')); document.head.appendChild(sc); });
+    const wb = window.XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const rows = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true });
+    const items = parsePriceRows(rows);
+    if (!items.length) throw new Error('No pallet sizes found. The file needs "Pallet Type", "Pallet Size" and "Cost" columns.');
+    prices = { items, fileName: file.name, uploadedAt: new Date().toISOString() };
+    try { localStorage.setItem('gwprod_pallet_prices', JSON.stringify(prices)); } catch {}
+    rebuildCatalog(); update();
+    try { prices = await api('/api/pallets', { method: 'PUT', body: JSON.stringify({ items, fileName: file.name }) }); localStorage.setItem('gwprod_pallet_prices', JSON.stringify(prices)); rebuildCatalog(); st.textContent += ' Shared with everyone.'; }
+    catch (e) { st.textContent += ` (Saved on this device only: ${e.message})`; }
+  } catch (e) {
+    st.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`;
+  }
+}
+
+export function parsePriceRows(rows) {
+  const norm = (v) => String(v ?? '').toLowerCase().trim();
+  let h = -1, cT = -1, cS = -1, cC = -1;
+  for (let r = 0; r < Math.min(rows.length, 15) && h < 0; r++) {
+    const cells = (rows[r] || []).map(norm);
+    const s = cells.findIndex((c) => c.includes('size'));
+    const c = cells.findIndex((x) => x.includes('cost') || x.includes('price'));
+    if (s >= 0 && c >= 0) { h = r; cS = s; cC = c; cT = cells.findIndex((x) => x.includes('type') || x.includes('description')); }
+  }
+  if (h < 0) return [];
+  const out = [];
+  for (let r = h + 1; r < rows.length; r++) {
+    const row = rows[r] || [];
+    const m = String(row[cS] ?? '').match(/(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)/);
+    if (!m) continue;
+    const a = +m[1], b = +m[2];
+    const cost = row[cC] === '' || row[cC] === null || !isFinite(+String(row[cC]).replace(/[$,]/g, '')) ? null : +String(row[cC]).replace(/[$,]/g, '');
+    out.push({ type: String(cT >= 0 ? row[cT] : row[cS]).trim(), w: Math.min(a, b), l: Math.max(a, b), cost: cost > 0 ? cost : null });
+  }
+  return out;
 }

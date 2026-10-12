@@ -12,6 +12,7 @@ One site for the floor: Ink Calculator, Pallet Calculator (3D), Stock Sheet Calc
 - `netlify/functions/ai.mts` — reads sample photos and quotes
 - `netlify/functions/handoff.mts` — saves and lists shift handoffs
 - `netlify/functions/stock.mts` — shares the latest uploaded stock Export list
+- `netlify/functions/pallets.mts` — shares the latest uploaded pallet price list (store `pallet-prices`); built-in default is the 7/1/26 list
 
 ## Deploy
 Netlify project: `gwpg-production`. Connect this repo (build settings come from `netlify.toml`).
