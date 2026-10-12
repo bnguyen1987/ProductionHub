@@ -23,6 +23,15 @@ export const ICONS = {
   logo: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8l8-4 8 4v9l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v9"/></svg>',
 };
 
+// ---- language (Change Requests + login) ----
+const LANG_KEY = 'gwprod_lang';
+export function getLang() { try { return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en'; } catch { return 'en'; } }
+export function setLang(l) { try { localStorage.setItem(LANG_KEY, l === 'es' ? 'es' : 'en'); } catch {} }
+export function langToggle(id = 'langToggle') {
+  const l = getLang();
+  return `<div class="seg lang-toggle" id="${id}" role="group" aria-label="Language / Idioma"><button type="button" data-lang="en" aria-pressed="${l === 'en'}">English</button><button type="button" data-lang="es" aria-pressed="${l === 'es'}">Español</button></div>`;
+}
+
 // ---- access code ----
 const CODE_KEY = 'gwprod_code';
 export function getCode() { try { return localStorage.getItem(CODE_KEY) || ''; } catch { return ''; } }

@@ -242,3 +242,6 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeri
 #printSheet .qr-code{width:4.6in;margin:0 auto}
 #printSheet .qr-code svg{width:100%;height:auto;display:block}
 #printSheet .qr-steps{text-align:left;font-size:16px;line-height:1.6;max-width:6in;margin:14px auto 0}
+
+.lang-toggle button{min-height:34px;padding:0 12px;font-size:13.5px}
+.rq-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}

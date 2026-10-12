@@ -1,4 +1,4 @@
-import { ICONS, $, esc, getCode, setCode, clearCode, api, refreshInchHints } from './common.js';
+import { ICONS, $, esc, getCode, setCode, clearCode, api, refreshInchHints, getLang, setLang, langToggle } from './common.js';
 
 const PAGES = [
   { id: 'ink', title: 'Ink Calculator', short: 'Ink', desc: 'Snap a photo of the printed sample and get buckets to order.', load: () => import('./ink.js') },
@@ -20,18 +20,25 @@ function themeToggle() {
 }
 try { const t = localStorage.getItem('gwprod_theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
 
-function renderLogin(msg = '') {
+const LOGIN_TXT = {
+  en: { code: 'Access code', open: 'Open', wrong: 'That code is not right.', notSet: 'The access code is not set up on the server yet.' },
+  es: { code: 'Código de acceso', open: 'Entrar', wrong: 'Ese código no es correcto.', notSet: 'El código de acceso todavía no está configurado en el servidor.' },
+};
+function renderLogin(msgKey = '') {
+  const T = LOGIN_TXT[getLang()];
   app.innerHTML = `
     <div class="login">
       <div class="brand-mark">${ICONS.logo}</div>
       <h1>Production Hub</h1>
       <p>GoldenWest Packaging · Ontario</p>
       <form id="loginForm">
-        <input type="password" id="code" placeholder="Access code" autocomplete="current-password" aria-label="Access code" required>
-        <button class="btn primary" type="submit">Open</button>
-        <div id="loginMsg" class="${msg ? 'alert err' : ''}">${esc(msg)}</div>
+        <input type="password" id="code" placeholder="${T.code}" autocomplete="current-password" aria-label="${T.code}" required>
+        <button class="btn primary" type="submit">${T.open}</button>
+        <div id="loginMsg" class="${msgKey ? 'alert err' : ''}">${msgKey ? esc(T[msgKey]) : ''}</div>
       </form>
+      <div style="display:flex;justify-content:center;margin-top:14px">${langToggle('loginLang')}</div>
     </div>`;
+  document.querySelectorAll('#loginLang [data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang); renderLogin(msgKey); }));
   $('#code').focus();
   $('#loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -40,8 +47,8 @@ function renderLogin(msg = '') {
     setCode($('#code').value.trim());
     try {
       const r = await fetch('/api/handoff?limit=1', { headers: { 'x-access-code': getCode() } });
-      if (r.status === 401) { clearCode(); renderLogin('That code is not right.'); return; }
-      if (r.status === 503) { clearCode(); renderLogin('The access code is not set up on the server yet.'); return; }
+      if (r.status === 401) { clearCode(); renderLogin('wrong'); return; }
+      if (r.status === 503) { clearCode(); renderLogin('notSet'); return; }
       renderShell();
     } catch {
       renderShell(); // offline: let calculators work anyway

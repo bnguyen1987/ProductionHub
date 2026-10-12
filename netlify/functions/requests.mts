@@ -24,6 +24,7 @@ function cleanNew(b: any) {
     reason: s(b.reason, 2000),
     toolNo: s(b.toolNo, 60),
     toolAction: ["Repair", "Replace", "Not sure"].includes(b.toolAction) ? b.toolAction : "",
+    lang: b.lang === "es" ? "es" : "en",
     nextRun: /^\d{4}-\d{2}-\d{2}$/.test(String(b.nextRun || "")) ? String(b.nextRun) : "",
   };
 }
