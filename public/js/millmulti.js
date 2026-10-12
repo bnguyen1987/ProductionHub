@@ -100,7 +100,7 @@ function run() {
     </div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>Sheet W × L</th><th>Total trim</th><th>Avg waste</th>${hasQty ? '<th>Sheets</th>' : ''}<th></th></tr></thead><tbody>
       ${results.map((c, i) => `<tr data-pick="${i}" class="${i === 0 ? 'best' : ''}" style="cursor:pointer">
-        <td>${i + 1}</td><td style="white-space:nowrap"><b>${fmtIn(c.w)} × ${fmtIn(c.l)}</b></td><td>${fmtIn(c.totalWaste)}</td><td>${fmtNum(c.avgPct * 100, 1)}%</td>
+        <td>${i + 1}</td><td style="white-space:nowrap"><b>${fmtIn(c.w)} × ${fmtIn(c.l)}</b><br><span class="hint">${(+c.w.toFixed(4))} × ${(+c.l.toFixed(4))}</span></td><td>${fmtIn(c.totalWaste)}</td><td>${fmtNum(c.avgPct * 100, 1)}%</td>
         ${hasQty ? `<td>${fmtNum(totalSheets(c))}</td>` : ''}<td><button class="btn small" type="button">Details</button></td></tr>`).join('')}
     </tbody></table></div>
     <p class="hint" style="margin:8px 0 0">Ranked by total inches of trim (width trim + length trim for each blank), then lowest waste %. Ties are common; pick the size your mill stocks.</p>`;

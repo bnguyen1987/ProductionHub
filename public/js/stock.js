@@ -191,7 +191,7 @@ function calc() {
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th>Sheet</th><th>Pcs/sht</th><th>Waste</th>${qty ? '<th>Need</th>' : ''}<th>Avail</th>${qty ? '<th>Pull</th>' : ''}</tr></thead><tbody>
           ${shown.map((x, i) => `<tr class="${i === 0 ? 'best' : ''}">
             <td style="white-space:nowrap">${x.itemNo ? `<b>#${esc(x.itemNo)}</b> ` : ''}${MATCH_PILL[x.match] || ''}<br><span class="hint">${esc(x.manual ? x.desc : `${x.grade} ${x.flute} ${x.color}`)}</span></td>
-            <td style="white-space:nowrap">${fmtIn(x.w)} × ${fmtIn(x.l)}</td>
+            <td style="white-space:nowrap">${fmtIn(x.w)} × ${fmtIn(x.l)}<br><span class="hint">${dec(x.w)} × ${dec(x.l)}</span></td>
             <td><b>${x.perSheet}</b><br><span class="hint">${x.outsW}×${x.outsL}</span></td>
             <td style="white-space:nowrap">${fmtIn(x.wasteIn)}<br><span class="hint">${fmtNum(x.wastePct * 100, 1)}%</span></td>
             ${qty ? `<td>${fmtNum(x.sheets)}</td>` : ''}
@@ -210,7 +210,7 @@ function calc() {
   mill.innerHTML = `<h2>Zero-waste mill sizes</h2>
     ${sizes.length ? `<p class="hint" style="margin:0 0 8px">Exact multiples of the blank, between 50 × 50 and 75 × 100.</p>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Mill size W × L</th><th>Outs W×L</th><th>Pcs/sht</th>${qty ? '<th>Sheets</th>' : ''}</tr></thead><tbody>
-      ${sizes.slice(0, 9).map((s) => `<tr><td>${fmtIn(s.w)} × ${fmtIn(s.l)}</td><td>${s.outsW} × ${s.outsL}</td><td>${s.perSheet}</td>${qty ? `<td>${fmtNum(Math.ceil(qty / s.perSheet))}</td>` : ''}</tr>`).join('')}
+      ${sizes.slice(0, 9).map((s) => `<tr><td style="white-space:nowrap">${fmtIn(s.w)} × ${fmtIn(s.l)}<br><span class="hint">${dec(s.w)} × ${dec(s.l)}</span></td><td>${s.outsW} × ${s.outsL}</td><td>${s.perSheet}</td>${qty ? `<td>${fmtNum(Math.ceil(qty / s.perSheet))}</td>` : ''}</tr>`).join('')}
       </tbody></table></div>` : '<p class="hint" style="margin:0">No exact multiple of this blank falls between 50 × 50 and 75 × 100. Size a mill order by hand.</p>'}`;
 }
 
@@ -238,3 +238,6 @@ function recHtml(r, qty) {
   const detail = sub ? ` <b>#${esc(sub.itemNo || sub.desc)}</b> (${fmtIn(sub.w)} × ${fmtIn(sub.l)}, ${sub.perSheet} per sheet, ${fmtIn(sub.wasteIn)} waste${sub.avail !== null && sub.avail !== undefined ? `, ${fmtNum(sub.avail)} available` : ''}${qty && sub.useSheets ? `; pull ${fmtNum(sub.useSheets)} sheets` : ''}).` : '';
   return `<div class="alert ${cls}" style="margin-bottom:10px"><b>Grade recommendation:</b> ${esc(rec.text)}${sub ? '' : ''}${detail}${sub ? ' Confirm the upgrade with the customer/CSR if needed.' : ''}</div>`;
 }
+
+// decimal inches for the second line under a size: 73.75, 99.75, 60
+const dec = (x) => (+x.toFixed(4)).toString();
