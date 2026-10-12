@@ -108,7 +108,7 @@ export function render(view) {
     $('#pGradeInfo').textContent = `${spec.components} · mill max caliper ${spec.caliper}"`;
   };
   const applyBoard = () => { fillGrades(); const b = boardSpec(state.flute, state.grade); state.caliper = String(b.caliper); state.lbsMsf = String(b.lbsMsf); $('#pCal').value = state.caliper; $('#pWt').value = state.lbsMsf; update(); };
-  $$('#fluteSeg button').forEach((b) => b.addEventListener('click', () => { state.flute = b.dataset.k; state.grade = state.grade.replace(/(B|C|E|D)$/, ''); applyBoard(); }));
+  $$('#fluteSeg button').forEach((b) => b.addEventListener('click', () => { state.flute = b.dataset.k; state.grade = state.grade.replace(/(BC|B|C|E|D)$/, ''); applyBoard(); }));
   $('#pGrade').addEventListener('change', (e) => { state.grade = e.target.value; applyBoard(); });
   // first load: older saved settings used short grades and estimated calipers; move them onto the mill table
   if (!/[A-Z]$/.test(String(state.grade))) applyBoard(); else fillGrades();
