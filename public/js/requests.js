@@ -10,23 +10,28 @@ export const TYPES = [
   'Max load height',
   'Box spec / dimensions',
   'Print / ink',
+  'Print plate: repair / replace',
+  'Cutting die: repair / replace',
   'Other',
 ];
+export const isTool = (t) => /^(Print plate|Cutting die)/.test(t || '');
+const toolWord = (t) => (/^Print plate/.test(t) ? 'Plate' : 'Die');
 const STATUSES = ['New', 'Approved', 'Rejected', 'Done'];
 const PILL = { New: 'info', Approved: 'ok', Rejected: 'bad', Done: 'star' };
 
 let view, list = [], filter = 'New', photo = null;
 
-const blankForm = () => ({ name: '', shift: '', customer: '', spec: '', machine: '', type: TYPES[0], current: '', change: '', reason: '' });
+const blankForm = () => ({ name: '', shift: '', customer: '', spec: '', machine: '', type: TYPES[0], current: '', change: '', reason: '', toolNo: '', toolAction: 'Repair', nextRun: '' });
 function guessShift() { const d = new Date(), m = d.getHours() * 60 + d.getMinutes(); return m >= 14 * 60 + 30 || m < 4 * 60 ? '2nd' : '1st'; }
 function ssGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
 function ssSet(k, v) { try { sessionStorage.setItem(k, v); } catch {} }
+const fmtDay = (ymd) => { const d = new Date(ymd + 'T12:00:00'); return isNaN(d) ? ymd : d.toLocaleDateString([], { month: 'short', day: 'numeric' }); };
 const fmtDate = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
 
 export function render(el) {
   view = el;
   view.innerHTML = `
-    <div class="page-head"><h1>Change Requests</h1><p>See a better way to run a job, like a different pallet size or count? Send it here. Management reviews every request.</p></div>
+    <div class="page-head"><h1>Change Requests</h1><p>See a better way to run a job, like a different pallet size or count? Plate or die needs repair before the next run? Send it here. Management reviews every request.</p></div>
     <div class="btn-row no-print" style="margin-bottom:14px">
       <button class="btn primary" id="rqNewBtn" type="button">New request</button>
       <button class="btn" id="rqListBtn" type="button">Review requests <span id="rqNewCount"></span></button>
@@ -82,9 +87,16 @@ function paintForm() {
           <h2><span class="n">2</span>The change</h2>
           <div class="field"><label for="rq_type">What should change?</label>
             <select id="rq_type" data-f="type">${TYPES.map((t) => `<option>${esc(t)}</option>`).join('')}</select></div>
-          <div class="field"><label for="rq_current">How it is now</label><input type="text" id="rq_current" data-f="current" placeholder="e.g. 40 × 48 pallet, 375 per pallet"></div>
-          <div class="field"><label for="rq_change">Change it to *</label><textarea id="rq_change" data-f="change" rows="2" placeholder="e.g. 48 × 48 pallet, 450 per pallet" required></textarea></div>
-          <div class="field"><label for="rq_reason">Why?</label><textarea id="rq_reason" data-f="reason" rows="3" placeholder="e.g. boxes hang over the edge, load leans, fewer pallets per order"></textarea></div>
+          <div id="rqTool" class="hidden">
+            <div class="row">
+              <div class="field"><label for="rq_toolNo" id="rqToolNoLbl">Plate / die #</label><input type="text" id="rq_toolNo" data-f="toolNo" autocomplete="off" placeholder="if marked on it"></div>
+              <div class="field"><label for="rq_toolAction">Repair or replace?</label><select id="rq_toolAction" data-f="toolAction"><option>Repair</option><option>Replace</option><option>Not sure</option></select></div>
+            </div>
+            <div class="field"><label for="rq_nextRun">Next run date (if known)</label><input type="date" id="rq_nextRun" data-f="nextRun"></div>
+          </div>
+          <div class="field" id="rqCurField"><label for="rq_current">How it is now</label><input type="text" id="rq_current" data-f="current" placeholder="e.g. 40 × 48 pallet, 375 per pallet"></div>
+          <div class="field"><label for="rq_change" id="rqChangeLbl">Change it to *</label><textarea id="rq_change" data-f="change" rows="2" placeholder="e.g. 48 × 48 pallet, 450 per pallet" required></textarea></div>
+          <div class="field"><label for="rq_reason" id="rqReasonLbl">Why?</label><textarea id="rq_reason" data-f="reason" rows="3" placeholder="e.g. boxes hang over the edge, load leans, fewer pallets per order"></textarea></div>
           <div class="field"><label>Photo (optional)</label>
             <label class="drop" id="rqDrop" style="display:block"><input type="file" accept="image/*" capture="environment" hidden>
               <span id="rqDropTxt">Tap to take or add a photo</span></label>
@@ -105,10 +117,22 @@ function paintForm() {
     </div>`;
   $$('[data-f]', view).forEach((el) => {
     el.value = f[el.dataset.f] ?? '';
-    const upd = () => { f[el.dataset.f] = el.value; saveForm('request_draft', f); const m = $('#rqMsg', view); if (m && m.querySelector('.err')) m.innerHTML = ''; };
+    const upd = () => { f[el.dataset.f] = el.value; saveForm('request_draft', f); const m = $('#rqMsg', view); if (m && m.innerHTML) m.innerHTML = ''; };
     el.addEventListener('input', upd);
     el.addEventListener('change', upd);
   });
+  const applyType = () => {
+    const tool = isTool(f.type);
+    $('#rqTool', view).classList.toggle('hidden', !tool);
+    $('#rqCurField', view).classList.toggle('hidden', tool);
+    $('#rqToolNoLbl', view).textContent = tool ? `${toolWord(f.type)} #` : 'Plate / die #';
+    $('#rqChangeLbl', view).textContent = tool ? "What's wrong with it? *" : 'Change it to *';
+    $('#rq_change', view).placeholder = tool ? (toolWord(f.type) === 'Plate' ? 'e.g. plate is worn on the logo, print is light / filling in, plate is lifting' : 'e.g. rule is dull and not cutting through, rubber is worn, scores cracking') : 'e.g. 48 × 48 pallet, 450 per pallet';
+    $('#rqReasonLbl', view).textContent = tool ? 'Anything else? (optional)' : 'Why?';
+    $('#rq_reason', view).placeholder = tool ? 'e.g. had to slow the machine down, extra waste, which station / color' : 'e.g. boxes hang over the edge, load leans, fewer pallets per order';
+  };
+  $('#rq_type', view).addEventListener('change', applyType);
+  applyType();
   const drop = $('#rqDrop', view), input = drop.querySelector('input');
   input.addEventListener('change', () => input.files[0] && takePhoto(input.files[0]));
   $('#rqSubmit', view).addEventListener('click', () => submit(f));
@@ -128,11 +152,12 @@ async function takePhoto(file) {
 
 async function submit(f) {
   const msg = $('#rqMsg', view), btn = $('#rqSubmit', view);
-  const missing = [['name', 'your name'], ['customer', 'customer name'], ['spec', 'spec #'], ['change', 'the change']].filter(([k]) => !String(f[k] || '').trim()).map(([, t]) => t);
+  const missing = [['name', 'your name'], ['customer', 'customer name'], ['spec', 'spec #'], ['change', isTool(f.type) ? "what's wrong with it" : 'the change']].filter(([k]) => !String(f[k] || '').trim()).map(([, t]) => t);
   if (missing.length) { msg.innerHTML = `<div class="alert err">Please fill in ${missing.join(', ')}.</div>`; return; }
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending…';
   try {
-    await api('/api/requests', { method: 'POST', body: JSON.stringify({ ...f, photo }) });
+    const body = isTool(f.type) ? { ...f, current: '' } : { ...f, toolNo: '', toolAction: '', nextRun: '' };
+    await api('/api/requests', { method: 'POST', body: JSON.stringify({ ...body, photo }) });
     // keep the person's name and shift for next time, clear the rest
     saveForm('request_draft', { ...blankForm(), name: f.name, shift: f.shift });
     paintForm();
@@ -160,17 +185,19 @@ async function loadList() {
 
 function paintList(q = ($('#rqSearch', view) || {}).value || '') {
   const box = $('#rqList', view);
-  const counts = Object.fromEntries(['All', ...STATUSES].map((s) => [s, s === 'All' ? list.length : list.filter((r) => r.status === s).length]));
+  const openTool = (r) => isTool(r.type) && (r.status === 'New' || r.status === 'Approved');
+  const inFilter = (r) => filter === 'All' || (filter === 'Tooling' ? openTool(r) : r.status === filter);
+  const counts = Object.fromEntries(['All', 'Tooling', ...STATUSES].map((s) => [s, s === 'All' ? list.length : s === 'Tooling' ? list.filter(openTool).length : list.filter((r) => r.status === s).length]));
   const needle = q.trim().toLowerCase();
-  const shown = list.filter((r) => (filter === 'All' || r.status === filter) &&
-    (!needle || [r.customer, r.spec, r.name, r.type, r.change, r.current, r.reason, r.machine].join(' ').toLowerCase().includes(needle)));
+  const shown = list.filter((r) => inFilter(r) &&
+    (!needle || [r.customer, r.spec, r.name, r.type, r.change, r.current, r.reason, r.machine, r.toolNo].join(' ').toLowerCase().includes(needle)));
   box.innerHTML = `
     <div class="btn-row no-print" style="margin-bottom:12px;align-items:center">
-      <div class="seg" id="rqFilter">${['New', 'Approved', 'Done', 'Rejected', 'All'].map((s) => `<button type="button" data-s="${s}" aria-pressed="${s === filter}">${s} (${counts[s]})</button>`).join('')}</div>
+      <div class="seg" id="rqFilter">${['New', 'Approved', 'Done', 'Rejected', 'Tooling', 'All'].map((s) => `<button type="button" data-s="${s}" aria-pressed="${s === filter}">${s === 'Tooling' ? 'Plates & dies' : s} (${counts[s]})</button>`).join('')}</div>
       <input id="rqSearch" type="search" placeholder="Search customer, spec #, name…" value="${esc(q)}" style="flex:1;min-width:180px">
       <button class="btn ghost" id="rqQrBtn" type="button" title="Print a poster with the QR code for the floor">Print QR poster</button>
     </div>
-    ${shown.length ? shown.map(itemHtml).join('') : `<p class="hint">No ${filter === 'All' ? '' : filter.toLowerCase() + ' '}requests${needle ? ' match that search' : ''}.</p>`}`;
+    ${shown.length ? shown.map(itemHtml).join('') : `<p class="hint">No ${filter === 'All' ? '' : filter === 'Tooling' ? 'open plate or die ' : filter.toLowerCase() + ' '}requests${needle ? ' match that search' : ''}.</p>`}`;
   $('#rqQrBtn', box).addEventListener('click', printQr);
   $$('#rqFilter button', box).forEach((b) => b.addEventListener('click', () => { filter = b.dataset.s; paintList($('#rqSearch', view).value); }));
   const search = $('#rqSearch', box);
@@ -187,12 +214,14 @@ function itemHtml(r) {
     <summary><span class="pill ${PILL[r.status] || 'info'}">${esc(r.status)}</span>
       <span class="when">${esc(r.customer)} · Spec ${esc(r.spec)}</span>
       <span class="who">${esc(r.type)} · ${esc(r.name)}${r.shift ? ` (${esc(r.shift)})` : ''} · ${esc(fmtDate(r.savedAt))}</span>
+      ${isTool(r.type) ? `<span class="pill warn">${toolWord(r.type)} ${esc((r.toolAction || 'repair').toLowerCase())}${r.nextRun ? ` · runs ${esc(fmtDay(r.nextRun))}` : ''}</span>` : ''}
       ${r.hasPhoto ? '<span class="pill">Photo</span>' : ''}</summary>
     <div class="body">
       ${r.machine ? `<h4>Machine</h4><p>${esc(r.machine)}</p>` : ''}
       ${r.current ? `<h4>How it is now</h4><p>${esc(r.current)}</p>` : ''}
-      <h4>Change it to</h4><p><b>${esc(r.change)}</b></p>
-      ${r.reason ? `<h4>Why</h4><p>${esc(r.reason)}</p>` : ''}
+      ${isTool(r.type) ? `<h4>${toolWord(r.type)}</h4><p>${r.toolNo ? `#${esc(r.toolNo)} · ` : ''}<b>${esc(r.toolAction || 'Repair')}</b>${r.nextRun ? ` · next run ${esc(fmtDay(r.nextRun))}` : ''}</p>` : ''}
+      <h4>${isTool(r.type) ? "What's wrong" : 'Change it to'}</h4><p><b>${esc(r.change)}</b></p>
+      ${r.reason ? `<h4>${isTool(r.type) ? 'Notes' : 'Why'}</h4><p>${esc(r.reason)}</p>` : ''}
       ${r.hasPhoto ? `<div class="rq-photo" style="margin-top:10px"><span class="hint"><span class="spinner"></span> Loading photo…</span></div>` : ''}
       ${r.reviewedAt ? `<p class="hint" style="margin-top:10px">Last reviewed ${esc(fmtDate(r.reviewedAt))}${r.reviewedBy ? ` by ${esc(r.reviewedBy)}` : ''}</p>` : ''}
       <div class="no-print" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
@@ -298,7 +327,7 @@ function printOne(id) {
   const build = (img) => `
     <div class="ps-head"><div><h1>Change Request</h1><div class="ps-sub">GoldenWest Packaging · Ontario</div></div><div class="ps-date">Submitted ${esc(fmtDate(r.savedAt))}</div></div>
     <table class="ps-kv ps-top"><caption>Job</caption>${row('Customer', r.customer)}${row('Spec #', r.spec)}${row('Machine', r.machine)}</table>
-    <table class="ps-kv ps-top"><caption>Request</caption>${row('What to change', r.type)}${row('How it is now', r.current)}${row('Change it to', r.change)}${row('Why', r.reason)}${row('Requested by', `${r.name}${r.shift ? ` (${r.shift} shift)` : ''}`)}</table>
+    <table class="ps-kv ps-top"><caption>Request</caption>${row('What to change', r.type)}${isTool(r.type) ? row(toolWord(r.type) + ' #', r.toolNo) + row('Repair or replace', r.toolAction) + row('Next run', r.nextRun ? fmtDay(r.nextRun) : '') : ''}${row('How it is now', r.current)}${row(isTool(r.type) ? "What's wrong" : 'Change it to', r.change)}${row(isTool(r.type) ? 'Notes' : 'Why', r.reason)}${row('Requested by', `${r.name}${r.shift ? ` (${r.shift} shift)` : ''}`)}</table>
     <table class="ps-kv ps-top"><caption>Review</caption><tr><th>Status</th><td>${esc(r.status)}</td></tr><tr><th>Reviewed by</th><td>${esc(r.reviewedBy || '')}</td></tr><tr><th>Note</th><td style="height:44px">${esc(r.reviewNote || '')}</td></tr></table>
     ${img ? `<figure><img src="${img}" alt="Photo"><figcaption>Photo from the floor</figcaption></figure>` : ''}
     <div class="ps-sign"><span>Approved by: ______________________</span><span>Date: ____________</span></div>`;
