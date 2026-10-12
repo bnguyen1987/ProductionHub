@@ -118,19 +118,30 @@ export function patternFor(X, Y, a, b, mode = 'auto') {
 }
 
 export function bestPattern(X, Y, a, b) {
+  // each candidate keeps its blocks so the smaller block can be centered next to the bigger one
   const cands = [];
   for (const [p, q] of [[a, b], [b, a]]) {
-    cands.push(grid(0, 0, X, Y, p, q));
+    cands.push({ blocks: [grid(0, 0, X, Y, p, q)], axis: null });
     // split along X: first block p×q, remainder q×p
-    for (let i = 1; i < fit(X, p); i++) cands.push([...grid(0, 0, i * p, Y, p, q), ...grid(i * p, 0, X - i * p, Y, q, p)]);
+    for (let i = 1; i < fit(X, p); i++) cands.push({ blocks: [grid(0, 0, i * p, Y, p, q), grid(i * p, 0, X - i * p, Y, q, p)], axis: 'x' });
     // split along Y
-    for (let j = 1; j < fit(Y, q); j++) cands.push([...grid(0, 0, X, j * q, p, q), ...grid(0, j * q, X, Y - j * q, q, p)]);
+    for (let j = 1; j < fit(Y, q); j++) cands.push({ blocks: [grid(0, 0, X, j * q, p, q), grid(0, j * q, X, Y - j * q, q, p)], axis: 'y' });
   }
+  const count = (c) => c.blocks.reduce((n, b) => n + b.length, 0);
   let best = cands[0];
-  for (const c of cands) if (c.length > best.length) best = c;
-  if (!best.length) return { rects: [], count: 0, usedX: 0, usedY: 0 };
-  const usedX = Math.max(...best.map((r) => r.x + r.w)), usedY = Math.max(...best.map((r) => r.y + r.l));
-  return { rects: best, count: best.length, usedX, usedY };
+  for (const c of cands) if (count(c) > count(best)) best = c;
+  let rects = best.blocks.flat();
+  if (!rects.length) return { rects: [], count: 0, usedX: 0, usedY: 0 };
+  const usedX = Math.max(...rects.map((r) => r.x + r.w)), usedY = Math.max(...rects.map((r) => r.y + r.l));
+  // center each block across the split (e.g. a short single stack beside a taller column of two)
+  if (best.axis) {
+    rects = best.blocks.flatMap((blk) => {
+      if (!blk.length) return [];
+      if (best.axis === 'x') { const h = Math.max(...blk.map((r) => r.y + r.l)) - Math.min(...blk.map((r) => r.y)); const dy = (usedY - h) / 2 - Math.min(...blk.map((r) => r.y)); return blk.map((r) => ({ ...r, y: r.y + dy })); }
+      const w = Math.max(...blk.map((r) => r.x + r.w)) - Math.min(...blk.map((r) => r.x)); const dx = (usedX - w) / 2 - Math.min(...blk.map((r) => r.x)); return blk.map((r) => ({ ...r, x: r.x + dx }));
+    });
+  }
+  return { rects, count: rects.length, usedX, usedY };
 }
 
 // Full load for one pallet size.
