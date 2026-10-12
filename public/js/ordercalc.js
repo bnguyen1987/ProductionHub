@@ -1,25 +1,26 @@
+// Die cut: EMBA and McKinley cannot die cut; Shanghai rotary die only; 86" Jumbo partial die cuts only (hand holes).
 // Machine specs from "Machine Specification Sheets", Ontario plant, Rev. 10/7/2026.
 // Sheet W = width, L = length, inches. speed = Daily Production Report standard speed (Sept 2026),
 // setup = standard setup minutes (EST on the spec sheets). minQty = machine minimum order quantity.
 export const SPEC_REV = 'Rev. 10/7/2026';
 
 export const MACHINES = [
-  { id: 147, name: '42" Emba FFG', type: 'FFG', crew: 3, crewTxt: '3', speed: 3316, setup: 30, maxColor: 2, minQty: 50,
+  { id: 147, dieCut: 'none', name: '42" Emba FFG', type: 'FFG', crew: 3, crewTxt: '3', speed: 3316, setup: 30, maxColor: 2, minQty: 50,
     minW: 11.0, minL: 23.65, maxW: 41.35, maxL: 94.5, skipFeedMaxW: 55.15, twoPanel: true,
     notes: 'Hand feed and hand stack. Top print, cold glue, slot 0.25". Skip-feed takes sheets up to 55.15" wide. Max bundle 25 SW / 15 DW, 12" high. Anilox 280 (1st) / 260 (2nd).' },
-  { id: 144, name: '66" McKinley FFG', type: 'FFG', crew: 3, crewTxt: '3 (up to 5)', speed: 793, setup: 45, maxColor: 2, minQty: 100,
+  { id: 144, dieCut: 'none', name: '66" McKinley FFG', type: 'FFG', crew: 3, crewTxt: '3 (up to 5)', speed: 793, setup: 45, maxColor: 2, minQty: 100,
     minW: 16.0, minL: 25.5, maxW: 66.0, maxL: 116.0, maxUpOk: 3,
     notes: 'Hand feed and hand stack. Bottom print, cold glue, glue tab 1.5", slot 0.375". Max bundle 25 SW / 15 DW, 12" high. Anilox 250 both stations.' },
-  { id: 132, name: '66" Shanghai RDC Slotter', type: 'PRESS', crew: 2, crewTxt: '2 (up to 3)', speed: 1266, setup: 45, maxColor: 2, minQty: 100,
+  { id: 132, dieCut: 'rotary', name: '66" Shanghai RDC Slotter', type: 'PRESS', crew: 2, crewTxt: '2 (up to 3)', speed: 1266, setup: 45, maxColor: 2, minQty: 100,
     minW: 16.0, minL: 22.0, maxW: 66.0, maxL: 139.0, maxUpOk: 2, maxRule: 1000,
     notes: 'Hand feed. Top print, rotary die cutting, slot 0.375". Max rule 1,000" (more needs production OK). Rotary die boards over 10 ft are cut in half. OPF orders over 1,000 pcs need a rotary die board. Anilox 220 (1st) / 250 (2nd).' },
-  { id: 126, name: '86" Jumbo Press', type: 'PRESS', crew: 2, crewTxt: '2', speed: 407, setup: 60, maxColor: 1, minQty: 100,
+  { id: 126, dieCut: 'partial', name: '86" Jumbo Press', type: 'PRESS', crew: 2, crewTxt: '2', speed: 407, setup: 60, maxColor: 1, minQty: 100,
     minW: 24.0, minL: 24.0, maxW: 86.0, maxL: 205.0, maxUpOk: 2,
     notes: 'Hand feed. One color, top print, attachments, slot 0.375". Printable area 86" × 200". Anything over 86" needs production approval. Anilox 220.' },
-  { id: 137, name: 'Large Marumatsu FBDC', type: 'FLATBED', crew: 2, crewTxt: '2', speed: 600, setup: 45, maxColor: 0, minQty: 100, qtyUnit: 'sheets',
+  { id: 137, dieCut: 'flat', name: 'Large Marumatsu FBDC', type: 'FLATBED', crew: 2, crewTxt: '2', speed: 600, setup: 45, maxColor: 0, minQty: 100, qtyUnit: 'sheets',
     minW: 15.75, minL: 23.5625, maxW: 47.1875, maxL: 66.125, maxRule: 800,
     notes: 'Flat die cutter, hand feed/stack. Max die cut 46 7/16" × 65 5/16". Die board 20 13/16" × 24 3/8" up to 48 3/8" × 72 7/16". Max rule 800" (more needs production OK). Hand stripping and bundling available.' },
-  { id: 138, name: 'Small Marumatsu FBDC', type: 'FLATBED', crew: 2, crewTxt: '2', speed: 553, setup: 40, maxColor: 0, minQty: 100, qtyUnit: 'sheets',
+  { id: 138, dieCut: 'flat', name: 'Small Marumatsu FBDC', type: 'FLATBED', crew: 2, crewTxt: '2', speed: 553, setup: 40, maxColor: 0, minQty: 100, qtyUnit: 'sheets',
     minW: 11.85, minL: 21.65, maxW: 40.15, maxL: 55.1, maxRule: 500,
     notes: 'Flat die cutter, hand feed/stack. Max die cut 54.30" × 39.35" (55.50" × 40.15" with stripping knife). Die board 21.65" × 18.15" up to 61.40" × 41.30". Max rule 500" (more needs production OK). Hand stripping and bundling available.' },
 ];
@@ -86,7 +87,15 @@ export function checkMachine(m, o) {
     if (m.type === 'PRESS') warns.push('No folder-gluer. Joint must be glued or stitched separately');
     if (m.type === 'FLATBED') warns.push('Die cutter. Not the usual route for a slotted box');
   }
-  if (o.style === 'Die Cut' && m.type === 'FFG') warns.push('Die-cut style. Confirm this job can be done on a folder-gluer');
+  // Die cutting: EMBA/McKinley can't die cut (print only); Shanghai = rotary die only; Jumbo = partial cuts only (hand holes)
+  if (o.style === 'Die Cut') {
+    if (m.dieCut === 'none') {
+      if (colors > 0) warns.push('Cannot die cut. Can only print the sheets, then die cut on the Shanghai (rotary) or a Marumatsu');
+      else fails.push('Cannot die cut, and there is no print for it to do');
+    } else if (m.dieCut === 'partial') warns.push('Partial die cuts only (hand holes, vents). Cannot do a full die cut');
+    else if (m.dieCut === 'rotary') oks.push('Die cut must be a rotary die (rotary die board)');
+    else if (m.dieCut === 'flat') oks.push('Flat die cut');
+  }
 
   // Panel rules (slotted boxes with L and W known)
   if (slotted && m.type === 'FFG' && o.L > 0 && o.W > 0) {
