@@ -223,7 +223,8 @@ function update() {
       <dt>Pieces per stack</dt><dd>${fmtNum(load.perStack)}</dd>
       ${r.bundle ? `<dt>Bundles high</dt><dd>${bundleText(load, r.bundle)}</dd>` : ''}
       ${r.two ? `<dt>Loads</dt><dd>${r.qty ? `${fmtNum(r.loads)} × 2 pallets` : '2 pallets each'}</dd>` : ''}
-      <dt>Bundles per ${r.two ? 'load' : 'pallet'}</dt><dd>${r.bundle ? `${fmtNum(load.cols * load.fullTiers)}${load.loose ? ` + ${load.cols} partial` : ''}` : '–'}</dd>
+      <dt>Bundles per ${r.two ? 'load' : 'pallet'}</dt><dd>${r.bundle ? fmtNum(load.bundlesPerPallet) : '–'}</dd>
+      ${r.bundle && load.rawPerPallet !== load.perPallet ? `<dt>Fits by height</dt><dd>${fmtNum(load.rawPerPallet)} pcs, rounded ${load.perPallet > load.rawPerPallet ? 'up' : 'down'} to ${fmtNum(load.perPallet)} (whole bundles)</dd>` : ''}
       <dt>Footprint used</dt><dd>${fmtNum(load.footprintUse * 100)}%</dd>
       ${wt ? `<dt>Weight per full ${r.two ? 'load' : 'pallet'} (est.)</dt><dd>≈ ${fmtNum(wt.pallet)} lb</dd><dt>Weight per piece (est.)</dt><dd>${fmtNum(wt.piece, 2)} lb</dd>` : ''}
       ${load.overhangX || load.overhangY ? `<dt>Overhang</dt><dd>${fmtIn(Math.max(load.overhangX, load.overhangY))} per side</dd>` : ''}
@@ -331,9 +332,12 @@ function drawScene(data) {
   // Product: fill tier by tier, stack by stack, up to "pieces".
   const slots = [];
   let remain = pieces;
-  for (let t = 0; t < load.tiers && remain > 0; t++) {
+  // per-stack cap; rounding up to a whole bundle can add a few pieces above the height-fit count
+  const colCap = Math.max(load.perStack, Math.ceil(pieces / Math.max(1, load.rects.length)));
+  const tierMax = load.tierPieces > 0 ? Math.ceil(colCap / load.tierPieces) : 0;
+  for (let t = 0; t < tierMax && remain > 0; t++) {
     for (let c = 0; c < load.rects.length && remain > 0; c++) {
-      const n = Math.min(load.tierPieces, load.perStack - t * load.tierPieces, remain);
+      const n = Math.min(load.tierPieces, colCap - t * load.tierPieces, remain);
       if (n <= 0) continue;
       slots.push({ t, c, n }); remain -= n;
     }

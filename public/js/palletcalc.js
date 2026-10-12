@@ -132,9 +132,11 @@ export function loadFor({ piece, pallet, overhang = 0, maxStack, bundle, mode = 
   } else { tierPieces = perStackMax; tiers = perStackMax > 0 ? 1 : 0; perStack = perStackMax; }
   const fullTiers = bundle > 0 ? Math.floor(perStack / bundle) : tiers;
   const loose = bundle > 0 ? perStack - fullTiers * bundle : 0;
-  const perPallet = pat.count * perStack;
+  // Pallet total is rounded to the nearest whole bundle (e.g. 242 at 25/bundle -> 250).
+  const rawPerPallet = pat.count * perStack;
+  const perPallet = bundle > 0 && rawPerPallet > 0 ? Math.max(bundle, Math.round(rawPerPallet / bundle) * bundle) : rawPerPallet;
   return {
-    rects, cols: pat.count, kind: pat.kind, chimney: pat.chimney ? { ...pat.chimney, x: pat.chimney.x + offX, y: pat.chimney.y + offY } : null, tiers, fullTiers, loose, tierPieces, perStack, perPallet,
+    rects, cols: pat.count, kind: pat.kind, chimney: pat.chimney ? { ...pat.chimney, x: pat.chimney.x + offX, y: pat.chimney.y + offY } : null, tiers, fullTiers, loose, tierPieces, perStack, perPallet, rawPerPallet, bundlesPerPallet: bundle > 0 ? perPallet / bundle : 0,
     tierHeight: tierPieces * piece.h,
     stackHeight: perStack * piece.h,
     footprintUse: pat.count ? (pat.count * piece.a * piece.b) / (pallet.l * pallet.w) : 0,
