@@ -50,7 +50,7 @@ export function render(view) {
             <div class="field"><label for="pQty">Order quantity</label><input id="pQty" data-f="qty" type="number" min="0" step="1" placeholder="5000"></div>
             <div class="field"><label for="pMax">Max height incl. pallet (in)</label><input id="pMax" data-f="maxTotal" type="number" min="1" step="0.5"><span class="hint">Floor to top of the load</span></div>
             <div class="field hidden"><label for="pPH">Pallet height (in)</label><input id="pPH" data-f="palletH" type="number" min="0" step="0.25"></div>
-            <div class="field"><label for="pOver">Overhang allowed</label><select id="pOver" data-f="overhang">${[0, 1, 2, 3].map((n) => `<option value="${n}">${n}" per side</option>`).join('')}</select></div>
+            <div class="field"><label for="pOver">Overhang allowed</label><select id="pOver" data-f="overhang">${[0, 1, 2, 3, 4, 5].map((n) => `<option value="${n}">${n}" per side</option>`).join('')}</select></div>
           </div>
           <div class="row">
             <div class="field"><label for="pPal">Pallet size (W × L)</label>
