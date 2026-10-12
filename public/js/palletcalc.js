@@ -22,7 +22,7 @@ export function boardSpec(flute, grade) {
 // Pallet sizes written Width x Length (inches), the way they're ordered.
 export const STANDARD_PALLETS = [
   [30, 30], [36, 36], [40, 40], [42, 42], [44, 44], [48, 48],
-  [36, 48], [40, 48], [42, 48], [44, 48], [48, 52], [48, 60], [48, 72], [48, 84], [48, 96], [54, 72], [60, 72],
+  [36, 48], [36, 60], [40, 48], [42, 48], [44, 48], [48, 52], [48, 60], [48, 72], [48, 84], [48, 96], [54, 72], [60, 72],
 ];
 
 // Flat (folded/glued) size of one piece on the pallet.
