@@ -116,3 +116,36 @@ export function setupDrop(zone, onFile) {
 // Persist simple form values per tool so a refresh doesn't wipe work.
 export function saveForm(key, obj) { try { localStorage.setItem('gwprod_' + key, JSON.stringify(obj)); } catch {} }
 export function loadForm(key) { try { return JSON.parse(localStorage.getItem('gwprod_' + key) || 'null'); } catch { return null; } }
+
+// ---- fraction <-> decimal helper under inch fields ----
+// Typed a fraction (15 1/8, 15-1/8, 15`02) -> shows "= 15.125"". Typed a decimal (15.125) -> shows "= 15 1/8"".
+export function inchConversion(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  const v = parseInches(s);
+  if (!isFinite(v)) return '';
+  const isFraction = /[\/`]/.test(s) || /^\d+\s*-\s*\d{1,2}$/.test(s) || /\d\s+\d/.test(s);
+  if (isFraction) return `= ${(+v.toFixed(4)).toString()}"`;
+  if (/\./.test(s)) {
+    const exact = Math.abs(v * 16 - Math.round(v * 16)) < 1e-6;
+    return `${exact ? '=' : '≈'} ${fmtIn(v)}${exact ? '' : ' (nearest 1/16)'}`;
+  }
+  return '';
+}
+
+function updateInchHint(input) {
+  let hint = input.nextElementSibling;
+  if (!hint || !hint.classList.contains('inch-conv')) {
+    hint = document.createElement('span');
+    hint.className = 'hint inch-conv';
+    input.insertAdjacentElement('afterend', hint);
+  }
+  const t = inchConversion(input.value);
+  if (hint.textContent !== t) hint.textContent = t; // only touch the DOM on change (avoids observer loops)
+  const disp = t ? '' : 'none';
+  if (hint.style.display !== disp) hint.style.display = disp;
+}
+
+const INCH_SEL = 'input[type="text"][inputmode="decimal"]';
+export function refreshInchHints(root = document) { root.querySelectorAll(INCH_SEL).forEach(updateInchHint); }
+document.addEventListener('input', (e) => { if (e.target.matches && e.target.matches(INCH_SEL)) updateInchHint(e.target); });

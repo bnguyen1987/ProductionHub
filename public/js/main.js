@@ -1,4 +1,4 @@
-import { ICONS, $, esc, getCode, setCode, clearCode, api } from './common.js';
+import { ICONS, $, esc, getCode, setCode, clearCode, api, refreshInchHints } from './common.js';
 
 const PAGES = [
   { id: 'ink', title: 'Ink Calculator', short: 'Ink', desc: 'Snap a photo of the printed sample and get buckets to order.', load: () => import('./ink.js') },
@@ -88,6 +88,9 @@ async function route() {
     view.innerHTML = '';
     current = mod;
     mod.render(view);
+    refreshInchHints(view);
+    // rows added later (stock sizes, blanks) get hints too
+    if (!view._inchObs) { view._inchObs = new MutationObserver(() => { clearTimeout(view._inchT); view._inchT = setTimeout(() => refreshInchHints(view), 50); }); view._inchObs.observe(view, { childList: true, subtree: true }); }
   } catch (e) {
     view.innerHTML = `<div class="alert err">Could not load this tool. Check your connection and refresh.</div>`;
     console.error(e);
