@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { $, $$, esc, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
-import { CALIPER, GRADES_BY_FLUTE, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
+import { CALIPER, FOLD_ALLOWANCE, GRADES_BY_FLUTE, boardSpec, STANDARD_PALLETS, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
 
 let PALLET_H = 5; // wood pallet height (in), set from the form
 let state, three = null, last = null;
 
-const DEFAULTS = { two: '1', pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200C', caliper: String(boardSpec('C', '200C').caliper), lbsMsf: String(boardSpec('C', '200C').lbsMsf), bundle: '25', qty: '', maxTotal: '52', palletH: '5', overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
+const DEFAULTS = { two: '1', pattern: 'auto', customer: '', job: '', notes: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '200C', caliper: String(boardSpec('C', '200C').caliper), lbsMsf: String(boardSpec('C', '200C').lbsMsf), bundle: '25', qty: '', maxTotal: '52', palletH: '5', foldPct: String(FOLD_ALLOWANCE), thick: '', fullBundles: false, overhang: '0', pallet: 'auto', customW: '', customL: '', show: 'full', board: 'kraft' };
 
 export function render(view) {
   state = { ...DEFAULTS, ...(loadForm('pallet') || {}) };
@@ -36,6 +36,10 @@ export function render(view) {
             <div class="field"><label for="pWt">Board weight (lb/MSF)</label><input id="pWt" data-f="lbsMsf" type="number" step="1" min="0"><span class="hint">Estimate, edit if needed</span></div>
             <div class="field"><label for="pBundle">Pieces per bundle</label><input id="pBundle" data-f="bundle" type="number" min="0" step="1"><span class="hint">0 = loose stacked</span></div>
           </div>
+          <div class="row">
+            <div class="field"><label for="pFold">Fold allowance (%)</label><input id="pFold" data-f="foldPct" type="number" min="0" step="1"><span class="hint">Folded box = 2 × caliper + this %. ${FOLD_ALLOWANCE}% matched the floor test</span></div>
+            <div class="field"><label for="pThick">Measured thickness per piece (in)</label><input id="pThick" data-f="thick" type="number" min="0" step="0.001" placeholder="optional"><span class="hint">Bundle height ÷ pcs. Overrides the line to the left</span></div>
+          </div>
         </section>
         <section class="card">
           <h2><span class="n">2</span>Order &amp; pallet</h2>
@@ -50,6 +54,7 @@ export function render(view) {
               <select id="pPal" data-f="pallet"><option value="auto">Best fit (recommended)</option>${STANDARD_PALLETS.map(([w, l]) => `<option value="${w}x${l}">${w} × ${l}</option>`).join('')}<option value="custom">Custom size…</option></select></div>
             <div class="field" id="customWrap"><label>Custom W × L (in)</label><div style="display:flex;gap:6px"><input data-f="customW" id="pCW" type="text" inputmode="decimal" placeholder="W"><input data-f="customL" id="pCL" type="text" inputmode="decimal" placeholder="L"></div></div>
           </div>
+          <label style="display:flex;gap:8px;align-items:center;margin:0 0 12px;font-size:14.5px"><input type="checkbox" id="pFull" style="width:18px;height:18px"> Only count full bundles (no partial bundle on top)</label>
           <div class="lbl" style="margin:2px 0 6px">Pallets under each load</div>
           <div class="seg" id="twoSeg" style="margin-bottom:12px">
             <button type="button" data-k="1">1 pallet</button>
@@ -106,6 +111,8 @@ export function render(view) {
   if (!/[A-Z]$/.test(String(state.grade))) applyBoard(); else fillGrades();
   $$('#patSeg button').forEach((b) => b.addEventListener('click', () => { state.pattern = b.dataset.k; update(); }));
   $$('#twoSeg button').forEach((b) => b.addEventListener('click', () => { state.two = b.dataset.k; update(); }));
+  $('#pFull').checked = !!state.fullBundles;
+  $('#pFull').addEventListener('change', (e) => { state.fullBundles = e.target.checked; update(); });
   $$('#showSeg button').forEach((b) => b.addEventListener('click', () => { state.show = b.dataset.k; update(); }));
   $$('#viewer [data-cam]').forEach((b) => b.addEventListener('click', () => setCam(b.dataset.cam)));
   $('#boardBtn').addEventListener('click', () => { state.board = state.board === 'kraft' ? 'white' : 'kraft'; update(); });
@@ -144,9 +151,10 @@ function compute() {
   if (!(maxStack > 0)) need.push('max height (must be taller than the pallet)');
   if (need.length) return { need };
 
-  const piece = flatPiece({ style: state.style, ...dims, caliper });
+  const piece = flatPiece({ style: state.style, ...dims, caliper, foldPct: parseFloat(state.foldPct) || 0, thickness: parseFloat(state.thick) || 0 });
+  const fullBundles = !!state.fullBundles;
   const two = state.two === '2';
-  const recs = recommend({ piece, qty, overhang, maxStack, bundle, mode: state.pattern, two });
+  const recs = recommend({ piece, qty, overhang, maxStack, bundle, mode: state.pattern, two, fullBundles });
   let pallet, load;
   if (state.pallet === 'auto') {
     if (!recs.length) return { piece, recs, qty, noFit: true };
@@ -160,8 +168,8 @@ function compute() {
     pallet = { w, l };
   }
   let base = { ...pallet, join: null };
-  if (two) { const t = loadTwo({ piece, pallet, overhang, maxStack, bundle, mode: state.pattern }); load = t.load; base = { ...t.base, join: t.join }; }
-  else load = loadFor({ piece, pallet, overhang, maxStack, bundle, mode: state.pattern });
+  if (two) { const t = loadTwo({ piece, pallet, overhang, maxStack, bundle, mode: state.pattern, fullBundles }); load = t.load; base = { ...t.base, join: t.join }; }
+  else load = loadFor({ piece, pallet, overhang, maxStack, bundle, mode: state.pattern, fullBundles });
   const pn = palletsNeeded(qty, load.perPallet); // per load (one or two pallets)
   return { piece, recs, pallet, base, two, load, qty, bundle, overhang, loads: pn.pallets, lastPallet: pn.lastPallet, pallets: two ? pn.pallets * 2 : pn.pallets };
 }
@@ -211,9 +219,11 @@ function update() {
       <dt>Flat piece size</dt><dd>${flat}</dd>
       <dt>Stacking pattern</dt><dd>${patternText(load)}</dd>
       <dt>Stacks per layer</dt><dd>${load.cols}</dd>
-      ${r.bundle ? `<dt>Bundles high</dt><dd>${load.tiers} × ${r.bundle} pcs (${fmtIn(load.tierHeight)} each)</dd>` : `<dt>Pieces per stack</dt><dd>${fmtNum(load.perStack)}</dd>`}
+      <dt>Thickness per piece</dt><dd>${fmtNum(r.piece.h, 3)}"${parseFloat(state.thick) > 0 ? ' (measured)' : ''}</dd>
+      <dt>Pieces per stack</dt><dd>${fmtNum(load.perStack)}</dd>
+      ${r.bundle ? `<dt>Bundles high</dt><dd>${bundleText(load, r.bundle)}</dd>` : ''}
       ${r.two ? `<dt>Loads</dt><dd>${r.qty ? `${fmtNum(r.loads)} × 2 pallets` : '2 pallets each'}</dd>` : ''}
-      <dt>Bundles per ${r.two ? 'load' : 'pallet'}</dt><dd>${r.bundle ? fmtNum(load.cols * load.tiers) : '–'}</dd>
+      <dt>Bundles per ${r.two ? 'load' : 'pallet'}</dt><dd>${r.bundle ? `${fmtNum(load.cols * load.fullTiers)}${load.loose ? ` + ${load.cols} partial` : ''}` : '–'}</dd>
       <dt>Footprint used</dt><dd>${fmtNum(load.footprintUse * 100)}%</dd>
       ${wt ? `<dt>Weight per full ${r.two ? 'load' : 'pallet'} (est.)</dt><dd>≈ ${fmtNum(wt.pallet)} lb</dd><dt>Weight per piece (est.)</dt><dd>${fmtNum(wt.piece, 2)} lb</dd>` : ''}
       ${load.overhangX || load.overhangY ? `<dt>Overhang</dt><dd>${fmtIn(Math.max(load.overhangX, load.overhangY))} per side</dd>` : ''}
@@ -323,7 +333,8 @@ function drawScene(data) {
   let remain = pieces;
   for (let t = 0; t < load.tiers && remain > 0; t++) {
     for (let c = 0; c < load.rects.length && remain > 0; c++) {
-      const n = Math.min(load.tierPieces, remain);
+      const n = Math.min(load.tierPieces, load.perStack - t * load.tierPieces, remain);
+      if (n <= 0) continue;
       slots.push({ t, c, n }); remain -= n;
     }
   }
@@ -402,6 +413,7 @@ function printSheet() {
         ${row('Flat size on pallet', `${fmtIn(piece.b)} × ${fmtIn(piece.a)}`)}
         ${row('Board grade', `${esc(state.grade)} (${esc(state.flute)} flute)`)}
         ${row('Caliper', `${esc(state.caliper)}"`)}
+        ${row('Thickness per piece', `${fmtNum(piece.h, 3)}"`)}
         ${row('Pieces per bundle', r.bundle ? fmtNum(r.bundle) : 'Loose')}
       </table>
       <table class="ps-kv">
@@ -418,7 +430,7 @@ function printSheet() {
     <div class="ps-big">
       <div><b>${fmtNum(load.perPallet)}</b><span>pcs per full ${r.two ? 'load (2 pallets)' : 'pallet'}</span></div>
       <div><b>${load.cols}</b><span>stacks per layer</span></div>
-      <div><b>${r.bundle ? `${load.tiers} × ${r.bundle}` : fmtNum(load.perStack)}</b><span>${r.bundle ? 'bundles high × pcs' : 'pcs per stack'}</span></div>
+      <div><b>${fmtNum(load.perStack)}</b><span>pcs per stack${r.bundle ? ` (${bundleText(load, r.bundle)})` : ''}</span></div>
       ${r.qty ? `<div><b>${fmtNum(r.pallets)}</b><span>pallets for ${fmtNum(r.qty)} pcs</span></div>` : ''}
       ${r.qty && r.loads > 1 ? `<div><b>${fmtNum(r.lastPallet)}</b><span>pcs on last ${r.two ? 'load' : 'pallet'}</span></div>` : ''}
     </div>
@@ -456,4 +468,8 @@ function palletLabel(r) {
   if (!r.two) return `${n(r.pallet.w)} × ${n(r.pallet.l)} pallet`;
   const how = r.base.join === 'width' ? 'side by side' : 'end to end';
   return `2 × ${n(r.pallet.w)} × ${n(r.pallet.l)} pallets ${how} (${n(r.base.w)} × ${n(r.base.l)} base)`;
+}
+
+function bundleText(load, bundle) {
+  return `${load.fullTiers} × ${bundle}${load.loose ? ` + ${load.loose} loose on top` : ''}`;
 }

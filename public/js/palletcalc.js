@@ -28,11 +28,16 @@ export const STANDARD_PALLETS = [
 // Flat (folded/glued) size of one piece on the pallet.
 // RSC/HSC/FOL ship glued and folded flat: length = L + W, width = D + flaps.
 // Each folded box is 2 layers of board thick; a sheet/blank is 1 layer.
-export function flatPiece({ style, L, W, D, sheetW, sheetL, caliper }) {
-  if (style === 'SHEET') return { a: sheetL, b: sheetW, h: caliper, layers: 1, areaSqIn: sheetL * sheetW };
+// A glued, folded box stacks thicker than 2 × caliper (folds, glue joint, spring-back).
+// 16% allowance calibrated from a floor test: 275D 12x10x4-1/2 RSC, 40x48, 52" incl. pallet = 375 pcs.
+export const FOLD_ALLOWANCE = 16;
+
+export function flatPiece({ style, L, W, D, sheetW, sheetL, caliper, foldPct = FOLD_ALLOWANCE, thickness = 0 }) {
+  if (style === 'SHEET') return { a: sheetL, b: sheetW, h: thickness > 0 ? thickness : caliper, layers: 1, areaSqIn: sheetL * sheetW };
   const flaps = style === 'HSC' ? W / 2 : style === 'FOL' ? 2 * W : W; // RSC: two half-width flaps
   // board area ≈ the unfolded blank: (2L + 2W + 1.25" joint) × (D + flaps)
-  return { a: L + W, b: D + flaps, h: caliper * 2, layers: 2, areaSqIn: (2 * L + 2 * W + 1.25) * (D + flaps) };
+  const h = thickness > 0 ? thickness : caliper * 2 * (1 + (foldPct || 0) / 100);
+  return { a: L + W, b: D + flaps, h, layers: 2, areaSqIn: (2 * L + 2 * W + 1.25) * (D + flaps) };
 }
 
 const fit = (space, size) => (size > 0 ? Math.floor((space + 1e-9) / size) : 0);
@@ -112,20 +117,25 @@ export function bestPattern(X, Y, a, b) {
 
 // Full load for one pallet size.
 // pallet: { w, l } (inches), overhang per side, maxStack = product height limit (no pallet).
-export function loadFor({ piece, pallet, overhang = 0, maxStack, bundle, mode = 'auto' }) {
+export function loadFor({ piece, pallet, overhang = 0, maxStack, bundle, mode = 'auto', fullBundles = false }) {
   const X = pallet.l + 2 * overhang, Y = pallet.w + 2 * overhang;
   const pat = patternFor(X, Y, piece.a, piece.b, mode);
   // center the pattern on the pallet (x along pallet length, y along width; origin = pallet corner)
   const offX = (pallet.l - pat.usedX) / 2, offY = (pallet.w - pat.usedY) / 2;
   const rects = pat.rects.map((r) => ({ ...r, x: r.x + offX, y: r.y + offY }));
   const perStackMax = Math.floor((maxStack + 1e-9) / piece.h);
-  let tierPieces, tiers;
-  if (bundle > 0) { tierPieces = bundle; tiers = Math.floor(perStackMax / bundle); }
-  else { tierPieces = perStackMax; tiers = perStackMax > 0 ? 1 : 0; }
-  const perStack = tierPieces * tiers;
+  // Stacks are filled to the height limit; the top bundle can be partial unless fullBundles is set.
+  let tierPieces, tiers, perStack;
+  if (bundle > 0) {
+    tierPieces = bundle;
+    perStack = fullBundles ? Math.floor(perStackMax / bundle) * bundle : perStackMax;
+    tiers = Math.ceil(perStack / bundle);
+  } else { tierPieces = perStackMax; tiers = perStackMax > 0 ? 1 : 0; perStack = perStackMax; }
+  const fullTiers = bundle > 0 ? Math.floor(perStack / bundle) : tiers;
+  const loose = bundle > 0 ? perStack - fullTiers * bundle : 0;
   const perPallet = pat.count * perStack;
   return {
-    rects, cols: pat.count, kind: pat.kind, chimney: pat.chimney ? { ...pat.chimney, x: pat.chimney.x + offX, y: pat.chimney.y + offY } : null, tiers, tierPieces, perStack, perPallet,
+    rects, cols: pat.count, kind: pat.kind, chimney: pat.chimney ? { ...pat.chimney, x: pat.chimney.x + offX, y: pat.chimney.y + offY } : null, tiers, fullTiers, loose, tierPieces, perStack, perPallet,
     tierHeight: tierPieces * piece.h,
     stackHeight: perStack * piece.h,
     footprintUse: pat.count ? (pat.count * piece.a * piece.b) / (pallet.l * pallet.w) : 0,
@@ -141,22 +151,22 @@ export function palletsNeeded(qty, perPallet) {
 
 // Two of the same pallet pushed together. join 'width' = side by side across the width (2W × L),
 // join 'length' = end to end (W × 2L). Returns the better of the two joins (more pieces, then less overhang).
-export function loadTwo({ piece, pallet, overhang = 0, maxStack, bundle, mode = 'auto' }) {
+export function loadTwo({ piece, pallet, overhang = 0, maxStack, bundle, mode = 'auto', fullBundles = false }) {
   const opts = [
     { join: 'width', base: { w: pallet.w * 2, l: pallet.l } },
     { join: 'length', base: { w: pallet.w, l: pallet.l * 2 } },
-  ].map((o) => ({ ...o, load: loadFor({ piece, pallet: o.base, overhang, maxStack, bundle, mode }) }));
+  ].map((o) => ({ ...o, load: loadFor({ piece, pallet: o.base, overhang, maxStack, bundle, mode, fullBundles }) }));
   opts.sort((x, y) => y.load.perPallet - x.load.perPallet || y.load.footprintUse - x.load.footprintUse);
   return opts[0];
 }
 
 // Rank standard sizes: fewest pallets, then smallest pallet (less wood, less overhang risk), then best footprint use.
-export function recommend({ piece, qty, overhang, maxStack, bundle, mode = 'auto', two = false, sizes = STANDARD_PALLETS }) {
+export function recommend({ piece, qty, overhang, maxStack, bundle, mode = 'auto', two = false, fullBundles = false, sizes = STANDARD_PALLETS }) {
   const rows = [];
   for (const [w, l] of sizes) {
     let ld, extra = {};
-    if (two) { const t = loadTwo({ piece, pallet: { w, l }, overhang, maxStack, bundle, mode }); ld = t.load; extra = { join: t.join, base: t.base }; }
-    else ld = loadFor({ piece, pallet: { w, l }, overhang, maxStack, bundle, mode });
+    if (two) { const t = loadTwo({ piece, pallet: { w, l }, overhang, maxStack, bundle, mode, fullBundles }); ld = t.load; extra = { join: t.join, base: t.base }; }
+    else ld = loadFor({ piece, pallet: { w, l }, overhang, maxStack, bundle, mode, fullBundles });
     if (!ld.perPallet) continue;
     const { pallets: units } = palletsNeeded(qty || ld.perPallet, ld.perPallet);
     rows.push({ w, l, ...ld, ...extra, units, pallets: two ? units * 2 : units });
