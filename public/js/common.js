@@ -2,6 +2,7 @@
 
 export const MACHINES_7 = [
   '142" Slitter',
+  '120" Slitter',
   '86" Jumbo Press',
   '66" Shanghai RDC Slotter',
   'Large Marumatsu FBDC',
