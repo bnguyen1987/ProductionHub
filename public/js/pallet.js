@@ -10,6 +10,9 @@ const DEFAULTS = { two: '1', pattern: 'auto', customer: '', job: '', notes: '', 
 
 export function render(view) {
   state = { ...DEFAULTS, ...(loadForm('pallet') || {}) };
+  // these settings are hidden on screen, so always use the standard values
+  state.foldPct = DEFAULTS.foldPct; state.thick = ''; state.palletH = DEFAULTS.palletH;
+  state.lbsMsf = String(boardSpec(state.flute, state.grade).lbsMsf);
   view.innerHTML = `
     <div class="page-head"><h1>Pallet Calculator</h1><p>How many pieces fit on a pallet, how many pallets the order needs, and what the load will look like. Boxes are figured glued and folded flat.</p></div>
     <div class="layout wide-left">
@@ -32,11 +35,11 @@ export function render(view) {
           <div class="seg" id="fluteSeg">${Object.keys(CALIPER).map((k) => `<button type="button" data-k="${k}">${k}</button>`).join('')}</div>
           <div class="field" style="margin-top:10px;max-width:280px"><label for="pGrade">Board grade (mill standard)</label><select id="pGrade"></select><span class="hint" id="pGradeInfo"></span></div>
           <div class="row" style="margin-top:10px">
-            <div class="field"><label for="pCal">Caliper per sheet (in)</label><input id="pCal" data-f="caliper" type="number" step="0.001" min="0"><span class="hint">Mill max caliper for the grade (QF-582). Edit if needed</span></div>
-            <div class="field"><label for="pWt">Board weight (lb/MSF)</label><input id="pWt" data-f="lbsMsf" type="number" step="1" min="0"><span class="hint">Estimate, edit if needed</span></div>
             <div class="field"><label for="pBundle">Pieces per bundle</label><input id="pBundle" data-f="bundle" type="number" min="0" step="1"><span class="hint">0 = loose stacked</span></div>
+            <div class="field"><label for="pCal">Caliper per sheet (in)</label><input id="pCal" data-f="caliper" type="number" step="0.001" min="0"><span class="hint">Mill max caliper for the grade (QF-582). Edit if needed</span></div>
+            <div class="field hidden"><label for="pWt">Board weight (lb/MSF)</label><input id="pWt" data-f="lbsMsf" type="number" step="1" min="0"></div>
           </div>
-          <div class="row">
+          <div class="row hidden">
             <div class="field"><label for="pFold">Fold allowance (%)</label><input id="pFold" data-f="foldPct" type="number" min="0" step="1"><span class="hint">Folded box = 2 × caliper + this %. ${FOLD_ALLOWANCE}% matched the floor test</span></div>
             <div class="field"><label for="pThick">Measured thickness per piece (in)</label><input id="pThick" data-f="thick" type="number" min="0" step="0.001" placeholder="optional"><span class="hint">Bundle height ÷ pcs. Overrides the line to the left</span></div>
           </div>
@@ -46,7 +49,7 @@ export function render(view) {
           <div class="row">
             <div class="field"><label for="pQty">Order quantity</label><input id="pQty" data-f="qty" type="number" min="0" step="1" placeholder="5000"></div>
             <div class="field"><label for="pMax">Max height incl. pallet (in)</label><input id="pMax" data-f="maxTotal" type="number" min="1" step="0.5"><span class="hint">Floor to top of the load</span></div>
-            <div class="field"><label for="pPH">Pallet height (in)</label><input id="pPH" data-f="palletH" type="number" min="0" step="0.25"></div>
+            <div class="field hidden"><label for="pPH">Pallet height (in)</label><input id="pPH" data-f="palletH" type="number" min="0" step="0.25"></div>
             <div class="field"><label for="pOver">Overhang allowed</label><select id="pOver" data-f="overhang">${[0, 1, 2, 3].map((n) => `<option value="${n}">${n}" per side</option>`).join('')}</select></div>
           </div>
           <div class="row">
