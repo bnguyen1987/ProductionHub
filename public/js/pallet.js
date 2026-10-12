@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { $, $$, esc, api, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
-import { perTrailer, CALIPER, FOLD_ALLOWANCE, GRADES_BY_FLUTE, boardSpec, DEFAULT_PALLET_PRICES, palletCatalog, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
+import { perTrailer, TRAILER, CALIPER, FOLD_ALLOWANCE, GRADES_BY_FLUTE, boardSpec, DEFAULT_PALLET_PRICES, palletCatalog, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
 
 let PALLET_H = 5; // wood pallet height (in), set from the form
 let state, three = null, last = null;
@@ -201,7 +201,7 @@ function compute() {
   if (two) { const t = loadTwo({ piece, pallet, overhang, maxStack, bundle, mode: state.pattern, fullBundles }); load = t.load; base = { ...t.base, join: t.join }; }
   else load = loadFor({ piece, pallet, overhang, maxStack, bundle, mode: state.pattern, fullBundles });
   const pn = palletsNeeded(qty, load.perPallet); // per load (one or two pallets)
-  return { piece, recs, pallet, base, two, load, qty, bundle, overhang, loads: pn.pallets, lastPallet: pn.lastPallet, pallets: two ? pn.pallets * 2 : pn.pallets };
+  return { piece, recs, pallet, base, two, load, qty, bundle, overhang, maxStack, fullBundles, loads: pn.pallets, lastPallet: pn.lastPallet, pallets: two ? pn.pallets * 2 : pn.pallets };
 }
 
 function update() {
@@ -273,10 +273,28 @@ function update() {
     const perLoad = each !== null ? each * (r.two ? 2 : 1) : null;
     const total = each !== null && r.qty ? each * p.pallets : null;
     const perPc = perLoad !== null ? perLoad / p.perPallet : null;
-    return { ...p, loadsPerTruck, pcsPerTruck: loadsPerTruck * p.perPallet, each, total, perPc };
+    // Trailer view: as built, or shortened so two loads stack under the roof, whichever ships more per truck.
+    let truck = { perPallet: p.perPallet, loadsPerTruck, pcsPerTruck: loadsPerTruck * p.perPallet, shortH: null, pallets: p.pallets };
+    const dblH = Math.floor(TRAILER.h / 2); // tallest load that still double stacks
+    if (PALLET_H + p.stackHeight > dblH && dblH - PALLET_H > r.piece.h) {
+      const args = { piece: r.piece, overhang: r.overhang, maxStack: dblH - PALLET_H, bundle: r.bundle, mode: state.pattern, fullBundles: r.fullBundles };
+      const ld = r.two ? loadTwo({ ...args, pallet: { w: p.w, l: p.l } }).load : loadFor({ ...args, pallet: { w: p.w, l: p.l } });
+      if (ld.perPallet > 0) {
+        const lpt = perTrailer({ footW: base.w + 2 * ld.overhangY, footL: base.l + 2 * ld.overhangX, loadH: PALLET_H + ld.stackHeight });
+        if (lpt * ld.perPallet > truck.pcsPerTruck) {
+          const units = r.qty ? Math.ceil(r.qty / ld.perPallet) : 0;
+          truck = { perPallet: ld.perPallet, loadsPerTruck: lpt, pcsPerTruck: lpt * ld.perPallet, shortH: PALLET_H + ld.stackHeight, pallets: r.two ? units * 2 : units };
+        }
+      }
+    }
+    truck.trucks = r.qty && truck.pcsPerTruck ? r.qty / truck.pcsPerTruck : null;
+    return { ...p, loadsPerTruck, pcsPerTruck: loadsPerTruck * p.perPallet, trucks: r.qty && loadsPerTruck ? r.qty / (loadsPerTruck * p.perPallet) : null, each, total, perPc, truck };
   });
   const fewest = withTrailer.slice(0, 3);
-  const coverage = [...withTrailer].sort((p, q) => (p.oversize - q.oversize) || q.footprintUse - p.footprintUse || q.pcsPerTruck - p.pcsPerTruck).slice(0, 3);
+  // Best trailer use: most pieces per truck (floor fit side by side + double stacking), then cheaper pallets.
+  const trailerBest = [...withTrailer].sort((p, q) => (p.oversize - q.oversize) || q.truck.pcsPerTruck - p.truck.pcsPerTruck || (p.each ?? 1e9) - (q.each ?? 1e9)).slice(0, 3)
+    .map((p) => ({ ...p, perPallet: p.truck.perPallet, pallets: p.truck.pallets, loadsPerTruck: p.truck.loadsPerTruck, pcsPerTruck: p.truck.pcsPerTruck, shortH: p.truck.shortH, trucks: p.truck.trucks,
+      total: p.each !== null && r.qty ? p.each * p.truck.pallets : null }));
   const costKey = (p) => (r.qty ? p.total : p.perPc);
   const cheapest = withTrailer.filter((p) => costKey(p) !== null)
     .sort((p, q) => (p.oversize - q.oversize) || costKey(p) - costKey(q) || p.pallets - q.pallets).slice(0, 3);
@@ -285,11 +303,11 @@ function update() {
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pallet</th><th>${r.two ? 'Pcs/load' : 'Pcs/pallet'}</th>${r.qty ? '<th>Pallets</th>' : ''}<th>Coverage</th><th>Per trailer</th><th>${r.qty ? 'Pallet cost' : '$/pallet'}</th><th></th></tr></thead><tbody>
     ${rows.map((p, i) => {
       const sel = pallet.w === p.w && pallet.l === p.l;
-      return `<tr class="${sel ? 'best' : ''}"><td style="white-space:nowrap">${r.two ? '2 × ' : ''}${p.w} × ${p.l}${i === 0 ? ' <span class="pill star">Best</span>' : ''}${r.two && p.base ? `<br><span class="hint">${p.base.w} × ${p.base.l} base</span>` : ''}${p.oversize ? '<br><span class="pill warn">overhang</span>' : ''}</td><td>${fmtNum(p.perPallet)}</td>${r.qty ? `<td>${p.pallets}</td>` : ''}<td>${fmtNum(p.footprintUse * 100)}%</td><td style="white-space:nowrap">${fmtNum(p.pcsPerTruck)} pcs<br><span class="hint">${p.loadsPerTruck} ${r.two ? 'loads' : 'pallets'}</span></td><td style="white-space:nowrap">${p.each === null ? '<span class="hint">no price</span>' : r.qty ? `<b>${money(p.total)}</b><br><span class="hint">${money(p.each)} ea</span>` : money(p.each)}</td><td><button class="btn small" type="button" data-pick="${p.w}x${p.l}" ${sel ? 'disabled' : ''}>Use</button></td></tr>`;
+      return `<tr class="${sel ? 'best' : ''}"><td style="white-space:nowrap">${r.two ? '2 × ' : ''}${p.w} × ${p.l}${i === 0 ? ' <span class="pill star">Best</span>' : ''}${r.two && p.base ? `<br><span class="hint">${p.base.w} × ${p.base.l} base</span>` : ''}${p.oversize ? '<br><span class="pill warn">overhang</span>' : ''}</td><td>${fmtNum(p.perPallet)}</td>${r.qty ? `<td>${p.pallets}</td>` : ''}<td>${fmtNum(p.footprintUse * 100)}%</td><td style="white-space:nowrap">${fmtNum(p.pcsPerTruck)} pcs<br><span class="hint">${p.loadsPerTruck} ${r.two ? 'loads' : 'pallets'}${p.trucks ? ` · ${fmtNum(p.trucks, 2)} truck${p.trucks > 1 ? 's' : ''}` : ''}</span>${p.shortH ? `<br><span class="pill info">${fmtIn(p.shortH)} tall, double stacked</span>` : ''}</td><td style="white-space:nowrap">${p.each === null ? '<span class="hint">no price</span>' : r.qty ? `<b>${money(p.total)}</b><br><span class="hint">${money(p.each)} ea</span>` : money(p.each)}</td><td><button class="btn small" type="button" data-pick="${p.w}x${p.l}" ${sel ? 'disabled' : ''}>Use</button></td></tr>`;
     }).join('')}</tbody></table></div>`;
   recBox.innerHTML = `<h2>Pallet options</h2>
     ${table(fewest, 'Fewest pallets', r.qty ? `Least pallets for ${fmtNum(r.qty)} pcs, then the smallest pallet.` : 'Enter an order quantity to rank by pallet count.')}
-    ${table(coverage, 'Best coverage', 'Fills the most of the pallet deck, so the most product ships per trailer. Pallet count not considered.')}
+    ${table(trailerBest, 'Best trailer use', 'Most pieces per truck: pallets that fit side by side across the trailer and double stack. A load may be built shorter so two stack under the roof. Pallet count not considered.')}
     ${cheapest.length ? table(cheapest, 'Lowest pallet cost', r.qty ? `Cheapest total pallet cost for ${fmtNum(r.qty)} pcs (pallets needed × price).` : 'Lowest pallet cost per piece. Enter an order quantity to see the total.') : ''}
     <p class="hint" style="margin:8px 0 0">Per trailer = 53' van, about 100" × 630" × 108" inside, double stacked when two fit under the roof.</p>`;
   $$('#palRecs [data-pick]').forEach((b) => b.addEventListener('click', () => { state.pallet = b.dataset.pick; $('#pPal').value = state.pallet; update(); }));
