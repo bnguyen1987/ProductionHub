@@ -309,7 +309,7 @@ function update() {
     ${table(fewest, 'Fewest pallets', r.qty ? `Least pallets for ${fmtNum(r.qty)} pcs, then the smallest pallet.` : 'Enter an order quantity to rank by pallet count.')}
     ${table(trailerBest, 'Best trailer use', 'Most pieces per truck: pallets that fit side by side across the trailer and double stack. A load may be built shorter so two stack under the roof. Pallet count not considered.')}
     ${cheapest.length ? table(cheapest, 'Lowest pallet cost', r.qty ? `Cheapest total pallet cost for ${fmtNum(r.qty)} pcs (pallets needed × price).` : 'Lowest pallet cost per piece. Enter an order quantity to see the total.') : ''}
-    <p class="hint" style="margin:8px 0 0">Per trailer = 53' van, about 100" × 630" × 108" inside, double stacked when two fit under the roof.</p>`;
+    <p class="hint" style="margin:8px 0 0">Per trailer = 53' van: 96" usable width, 630" long, 108" high inside; double stacked when two fit under the roof.</p>`;
   $$('#palRecs [data-pick]').forEach((b) => b.addEventListener('click', () => { state.pallet = b.dataset.pick; $('#pPal').value = state.pallet; update(); }));
 
   $('#topView').innerHTML = topViewSvg(r.base, load);

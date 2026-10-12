@@ -195,9 +195,9 @@ export function loadTwo({ piece, pallet, overhang = 0, maxStack, bundle, mode = 
   return opts[0];
 }
 
-// How many loads fit on a 53' dry van floor. Inside size is an ASSUMPTION: 100" wide x 630" long x 108" high.
+// How many loads fit on a 53' dry van floor. Usable floor 96" wide (max, so pallets are not squeezed in) x 630" long x 108" high - ASSUMPTION for length/height.
 // Loads are double stacked when two fit under the roof. Footprint includes any overhang.
-export const TRAILER = { w: 100, l: 630, h: 108 };
+export const TRAILER = { w: 96, l: 630, h: 108 };
 export function perTrailer({ footW, footL, loadH }) {
   if (!(footW > 0 && footL > 0 && loadH > 0)) return 0;
   const floor = bestPattern(TRAILER.l, TRAILER.w, footL, footW).count;
