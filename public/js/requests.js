@@ -1,7 +1,7 @@
 // Change Requests: anyone on the floor can suggest a change to a job (pallet size, count, pattern,
 // plate or die repair...). A posted QR code opens this page straight to the form. Managers review in the list.
 // English / Spanish toggle: only the screen text changes; saved values (type, status, repair/replace) stay in English.
-import { $, $$, esc, api, MACHINES_7, saveForm, loadForm, fileToPayload, getLang, setLang, langToggle } from './common.js';
+import { $, $$, esc, api, MACHINES_7, saveForm, loadForm, fileToPayload, getLang } from './common.js';
 import qrcode from '../vendor/qrcode.js';
 
 export const TYPES = [
@@ -128,20 +128,15 @@ const toolWord = (t) => (isPlate(t) ? T.plate : T.die);
 export function render(el) {
   view = el;
   T = TXT[getLang()];
-  document.documentElement.lang = getLang();
-  view.innerHTML = `
-    <div class="page-head rq-head"><div><h1>${T.title}</h1><p>${T.intro}</p></div><div class="no-print">${langToggle('rqLang')}</div></div>
+  // this page has its own English/Spanish wording, so the site-wide translator leaves it alone
+  view.innerHTML = `<div data-no-i18n>
+    <div class="page-head"><h1>${T.title}</h1><p>${T.intro}</p></div>
     <div class="btn-row no-print" style="margin-bottom:14px">
       <button class="btn primary" id="rqNewBtn" type="button">${T.newBtn}</button>
       <button class="btn" id="rqListBtn" type="button">${T.listBtn} <span id="rqNewCount"></span></button>
     </div>
     <div id="rqForm"></div>
-    <div id="rqList" class="hidden"></div>`;
-  $$('#rqLang [data-lang]', view).forEach((b) => b.addEventListener('click', () => {
-    if (b.dataset.lang === getLang()) return;
-    setLang(b.dataset.lang);
-    render(view); // the draft and any photo are kept
-  }));
+    <div id="rqList" class="hidden"></div></div>`;
   $('#rqNewBtn', view).addEventListener('click', () => showTab('form'));
   $('#rqListBtn', view).addEventListener('click', () => showTab('list'));
   paintForm(true);
@@ -150,7 +145,8 @@ export function render(el) {
   refreshCount();
 }
 
-export function destroy() { document.documentElement.lang = 'en'; }
+// called by the top-bar language switch; the draft and any photo are kept
+export function onLang() { render(view); }
 
 function showTab(t) {
   ssSet('requests_tab', t);
@@ -407,7 +403,7 @@ async function del(id) {
 function openPrint(html, wait) {
   let sheet = document.getElementById('printSheet');
   if (!sheet) { sheet = document.createElement('div'); sheet.id = 'printSheet'; document.body.appendChild(sheet); }
-  sheet.innerHTML = html;
+  sheet.innerHTML = `<div data-no-i18n>${html}</div>`; // office copy stays in English
   document.body.classList.add('printing');
   const done = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
   window.addEventListener('afterprint', done);
@@ -433,7 +429,7 @@ function printQr() {
       <p class="qr-lead" style="font-size:20px">¿Mejor manera de correr un trabajo? ¿Placa o suaje necesita reparación? <b>Escanee para enviar una solicitud.</b></p>
       <ol class="qr-steps">
         <li>Scan with your phone camera / Escanee con la cámara de su teléfono</li>
-        <li>Pick English or Español at the top / Escoja English o Español arriba</li>
+        <li>Tap ES at the top for Spanish / Toque ES arriba para español</li>
         <li>Enter the customer name and spec # / Escriba el cliente y el # de spec</li>
         <li>Tell us what to change and why / Diga qué cambiar y por qué</li>
       </ol>

@@ -1,4 +1,5 @@
 import { ICONS, $, esc, getCode, setCode, clearCode, api, refreshInchHints, getLang, setLang, langToggle } from './common.js';
+import { applyLang, prune } from './i18n.js';
 
 const PAGES = [
   { id: 'ink', title: 'Ink Calculator', short: 'Ink', desc: 'Snap a photo of the printed sample and get buckets to order.', load: () => import('./ink.js') },
@@ -38,7 +39,7 @@ function renderLogin(msgKey = '') {
       </form>
       <div style="display:flex;justify-content:center;margin-top:14px">${langToggle('loginLang')}</div>
     </div>`;
-  document.querySelectorAll('#loginLang [data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang); renderLogin(msgKey); }));
+  document.querySelectorAll('#loginLang [data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang); applyLang(); renderLogin(msgKey); }));
   $('#code').focus();
   $('#loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -63,6 +64,7 @@ function renderShell() {
         <a class="brand" href="#home"><span class="brand-mark">${ICONS.logo}</span>
           <span class="brand-text">Production Hub<small>GoldenWest · Ontario</small></span></a>
         <span class="spacer"></span>
+        <div class="seg lang-toggle top-lang" id="topLang" role="group" aria-label="Language / Idioma"><button type="button" data-lang="en">EN</button><button type="button" data-lang="es">ES</button></div>
         <button class="icon-btn" id="themeBtn" title="Light / dark" aria-label="Switch light or dark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
         <button class="icon-btn" id="logoutBtn" title="Sign out">Sign out</button>
       </div>
@@ -73,6 +75,15 @@ function renderShell() {
     </header>
     <main id="view"></main>`;
   $('#themeBtn').onclick = themeToggle;
+  const paintLang = () => document.querySelectorAll('#topLang [data-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === getLang())));
+  document.querySelectorAll('#topLang [data-lang]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.lang === getLang()) return;
+    setLang(b.dataset.lang);
+    paintLang();
+    applyLang();
+    if (current && current.onLang) current.onLang(); // pages with their own wording (Change Requests)
+  }));
+  paintLang();
   $('#logoutBtn').onclick = () => { clearCode(); location.hash = ''; renderLogin(); };
   route();
 }
@@ -96,6 +107,7 @@ async function route() {
     view.innerHTML = '';
     current = mod;
     mod.render(view);
+    prune();
     refreshInchHints(view);
     // rows added later (stock sizes, blanks) get hints too
     if (!view._inchObs) { view._inchObs = new MutationObserver(() => { clearTimeout(view._inchT); view._inchT = setTimeout(() => refreshInchHints(view), 50); }); view._inchObs.observe(view, { childList: true, subtree: true }); }
@@ -139,4 +151,5 @@ function renderHome(view) {
 }
 
 window.addEventListener('hashchange', route);
+applyLang();
 if (getCode()) renderShell(); else renderLogin();
