@@ -330,7 +330,7 @@ function topViewSvg(pallet, load) {
     ${pallet.join === 'length' ? `<line x1="${tx(pallet.l / 2)}" y1="${ty(0)}" x2="${tx(pallet.l / 2)}" y2="${ty(pallet.w)}" stroke="#7a5a33" stroke-width=".6" stroke-dasharray="2 1"/>` : ''}
     ${load.rects.map((r, i) => `<rect x="${tx(r.x) + 0.15}" y="${ty(r.y) + 0.15}" width="${r.w - 0.3}" height="${r.l - 0.3}" fill="#d9b88a" stroke="#6b4e2c" stroke-width=".35"/>
       <text x="${tx(r.x + r.w / 2)}" y="${ty(r.y + r.l / 2) + fs * 0.35}" font-size="${fs}" text-anchor="middle" fill="#4a3519" font-family="sans-serif">${i + 1}</text>`).join('')}
-    ${load.chimney && load.chimney.w > 0.01 && load.chimney.l > 0.01 ? `<rect x="${tx(load.chimney.x)}" y="${ty(load.chimney.y)}" width="${load.chimney.w}" height="${load.chimney.l}" fill="none" stroke="#c4651a" stroke-width=".5" stroke-dasharray="1.2 .8"/>` : ''}
+    ${load.chimney && load.chimney.w > 0.01 && load.chimney.l > 0.01 ? `<rect x="${tx(load.chimney.x)}" y="${ty(load.chimney.y)}" width="${load.chimney.w}" height="${load.chimney.l}" fill="none" stroke="#00694b" stroke-width=".5" stroke-dasharray="1.2 .8"/>` : ''}
     ${load.oversize || load.overhangX > 0.01 || load.overhangY > 0.01 ? `<rect x="${tx(0)}" y="${ty(0)}" width="${pallet.l}" height="${pallet.w}" fill="none" stroke="#b3261e" stroke-width=".6" stroke-dasharray="2 1.2"/><text x="${tx(pallet.l / 2)}" y="${ty(0) - 1}" font-size="${fs * 0.8}" text-anchor="middle" fill="#b3261e" font-family="sans-serif">pallet edge</text>` : ''}
     <text x="${tx(pallet.l / 2)}" y="${H - 1}" font-size="${fs * 0.9}" text-anchor="middle" fill="currentColor" font-family="sans-serif" opacity=".7">${fmtNum(pallet.l, pallet.l % 1 ? 2 : 0)}" length</text>
   </svg>`;

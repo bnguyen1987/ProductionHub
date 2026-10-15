@@ -165,7 +165,7 @@ function printSchedule() {
   openPrint(`
     <div class="ps-head"><div><h1>Machine Clean-Up Schedule</h1><div class="ps-sub">GoldenWest Packaging · Ontario · Programa de limpieza de máquinas</div></div><div class="ps-date">Printed ${esc(new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}</div></div>
     <table class="ps-kv"><tr><th style="width:22%">Date / Fecha</th><th style="width:14%">Shift / Turno</th><th>Machines / Máquinas</th><th style="width:26%">Note / Nota</th></tr>
-    ${rows.map((p) => { const m = monthOf(p.date), head = m !== month ? `<tr><td colspan="4" style="background:#f3f1ec;font-weight:700">${m}</td></tr>` : ''; month = m;
+    ${rows.map((p) => { const m = monthOf(p.date), head = m !== month ? `<tr><td colspan="4" style="background:#eef5f2;font-weight:700">${m}</td></tr>` : ''; month = m;
       return `${head}<tr><td>${dayName(p.date)} ${fmtD(p.date)}</td><td>${p.shift}</td><td>${esc(machinesText(p.machines))}</td><td>${esc(p.note || '')}</td></tr>`; }).join('')}
     </table>`);
 }
