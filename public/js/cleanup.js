@@ -58,14 +58,13 @@ function paintBoard() {
       <span class="pill ok">${count('ok')} on track</span><span class="pill info">${count('none')} not logged</span>
       ${pend ? `<span class="pill star">${pend} waiting for supervisor</span>` : ''}
     </div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Machine</th><th>Status</th><th>Last clean-up</th><th>Next due</th><th>Shift</th><th>Supervisor</th><th></th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Machine</th><th>Status</th><th>Last clean-up</th><th>Next due</th><th>Shift</th><th></th></tr></thead><tbody>
     ${rows.map(({ m, st }) => `<tr>
       <td style="white-space:nowrap"><b>${esc(machineLabel(m))}</b><br><span class="hint">${esc(m.type)} · ${m.tasks.length} tasks</span></td>
       <td><span class="pill ${st.cls}">${st.label}</span>${st.pending && st.pending.length ? '<br><span class="pill star" style="margin-top:4px">Needs supervisor</span>' : ''}</td>
       <td style="white-space:nowrap">${st.last ? `${fmtDay(st.last.date)}<br><span class="hint">${esc(st.last.shift)} shift</span>` : '–'}</td>
       <td style="white-space:nowrap">${st.next ? `${fmtDay(st.next)}<br><span class="hint">${st.left < 0 ? `${-st.left} days late` : st.left === 0 ? 'today' : `in ${st.left} days`}</span>` : '–'}</td>
       <td>${st.shift ? `<span class="pill info">${esc(st.shift)}</span>` : '–'}</td>
-      <td>${st.last && st.last.supervisor ? esc(st.last.supervisor) : '–'}</td>
       <td style="white-space:nowrap"><a class="btn small primary" href="#cleanup/${encodeURIComponent(m.id)}">Checklist</a></td>
     </tr>`).join('')}
     </tbody></table></div>`;
