@@ -100,8 +100,8 @@ async function route() {
   window.scrollTo(0, 0);
 
   const page = PAGES.find((p) => p.id === id);
-  if (!page) { renderHome(view); document.title = 'Production Hub'; return; }
-  document.title = `${page.title} · Production Hub`;
+  if (!page) { renderHome(view); document.title = 'GWPG Production Hub'; return; }
+  document.title = `GWPG Production Hub · ${page.title}`;
   view.innerHTML = '<div class="hint"><span class="spinner"></span> Loading…</div>';
   try {
     const mod = await page.load();
