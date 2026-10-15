@@ -310,10 +310,8 @@ function paintList(q = ($('#rqSearch', view) || {}).value || '') {
     <div class="btn-row no-print" style="margin-bottom:12px;align-items:center">
       <div class="seg" id="rqFilter">${['New', 'Approved', 'Done', 'Rejected', 'Tooling', 'All'].map((s) => `<button type="button" data-s="${s}" aria-pressed="${s === filter}">${label(s)} (${counts[s]})</button>`).join('')}</div>
       <input id="rqSearch" type="search" placeholder="${T.search}" value="${esc(q)}" style="flex:1;min-width:180px">
-      <button class="btn ghost" id="rqQrBtn" type="button" title="${T.qrTitle}">${T.qr}</button>
     </div>
     ${shown.length ? shown.map(itemHtml).join('') : `<p class="hint">${esc(T.none(noneWhat, needle))}</p>`}`;
-  $('#rqQrBtn', box).addEventListener('click', printQr);
   $$('#rqFilter button', box).forEach((b) => b.addEventListener('click', () => { filter = b.dataset.s; paintList($('#rqSearch', view).value); }));
   const search = $('#rqSearch', box);
   search.addEventListener('input', () => { const pos = search.selectionStart; paintList(search.value); const s2 = $('#rqSearch', view); s2.focus(); s2.setSelectionRange(pos, pos); });
@@ -400,7 +398,7 @@ async function del(id) {
 }
 
 // ---------- printing (always English + Spanish poster; request printout in English for the office) ----------
-function printQr() {
+export function printQr() {
   const url = `${location.origin}${location.pathname}#requests`;
   openPrint(`
     <div class="qr-poster">

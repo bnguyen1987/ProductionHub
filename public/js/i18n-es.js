@@ -236,6 +236,12 @@ export const ES = {
   'Delete this handoff for everyone? This cannot be undone.': '¿Borrar esta entrega para todos? No se puede deshacer.',
   'Date, shift and supervisor are required': 'Fecha, turno y supervisor son obligatorios',
 
+  // ---- settings ----
+  Settings: 'Ajustes', 'QR codes to print for change requests and machine clean-up.': 'Códigos QR para imprimir: solicitudes de cambio y limpieza de máquinas.',
+  'QR codes for the floor. Print a poster and post it where people will scan it. Each code opens the page straight away (the access code is needed the first time on each phone).': 'Códigos QR para la planta. Imprima un póster y péguelo donde la gente lo vaya a escanear. Cada código abre la página directo (se necesita el código de acceso la primera vez en cada teléfono).',
+  'One poster for the whole floor: employees suggest a change to a job, or report a plate or die that needs repair.': 'Un póster para toda la planta: los empleados sugieren un cambio a un trabajo o reportan una placa o suaje que necesita reparación.',
+  'Print poster': 'Imprimir póster', "One poster per machine. Scanning it opens that machine's bi-weekly clean-up checklist.": 'Un póster por máquina. Al escanearlo se abre la lista de limpieza quincenal de esa máquina.',
+  'Machine clean-up': 'Limpieza de máquinas',
   // ---- machine clean-up ----
   'Machine Clean-Up': 'Limpieza de máquinas', 'Clean-Up': 'Limpieza',
   'Bi-weekly clean-up sign-off for each machine. Scan the QR code on the machine.': 'Firma de la limpieza quincenal de cada máquina. Escanee el código QR en la máquina.',
@@ -388,6 +394,7 @@ export const PATTERNS = [
   [/^(.+)\. Your entry is still here\. Try again\.$/, (_, e) => `${tr1(e)}. Su información sigue aquí. Intente otra vez.`],
   [/^(.+): (Running|Issue|Down|Idle)$/, (_, m, s) => `${m}: ${ES[s]}`],
   // machine clean-up
+  [/^Print all machines \((\d+) pages\)$/, 'Imprimir todas las máquinas ($1 páginas)'],
   [/^every (\d+) days$/, 'cada $1 días'],
   [/^(\d+) overdue$/, '$1 atrasadas'], [/^(\d+) due soon$/, '$1 pronto'], [/^(\d+) on track$/, '$1 al día'], [/^(\d+) not logged$/, '$1 sin registro'],
   [/^(\d+) waiting for supervisor$/, '$1 esperando al supervisor'],

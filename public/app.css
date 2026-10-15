@@ -257,3 +257,11 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeri
 .cl-seg{flex-wrap:nowrap;gap:4px}
 .cl-seg button{min-height:42px;padding:0 12px}
 @media (max-width:600px){.cl-task{grid-template-columns:22px minmax(0,1fr)}.cl-seg{grid-column:2}}
+
+/* Settings: QR codes */
+.qr-set{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.qr-tile{width:150px;background:#fff;padding:6px;border-radius:8px;border:1px solid var(--line)}
+.qr-tile.small{width:110px}
+.qr-tile svg{width:100%;height:auto;display:block}
+.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.qr-card{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;border:1px solid var(--line);border-radius:var(--radius);padding:12px;background:var(--panel-2)}

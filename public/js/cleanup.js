@@ -50,12 +50,8 @@ async function load() {
 function renderBoard() {
   view.innerHTML = `
     <div class="page-head"><h1>Machine Clean-Up</h1><p>Bi-weekly clean-up for every machine. Scan the QR code on the machine to open its checklist, mark each task, and sign. The supervisor verifies and accepts.</p></div>
-    <div class="btn-row no-print" style="margin-bottom:14px">
-      <button class="btn" type="button" id="clQrAll">Print QR codes (all machines)</button>
-    </div>
     <section class="card" id="clBoard"><div class="hint"><span class="spinner"></span> Loading…</div></section>
     <section class="card" id="clHist" style="margin-top:16px"></section>`;
-  $('#clQrAll').addEventListener('click', () => printQr(CLEANUP_MACHINES));
 }
 
 function paintBoard() {
@@ -78,10 +74,9 @@ function paintBoard() {
       <td style="white-space:nowrap">${st.last ? `${fmtDay(st.last.date)}<br><span class="hint">${esc(st.last.shift)} shift</span>` : '–'}</td>
       <td style="white-space:nowrap">${st.next ? `${fmtDay(st.next)}<br><span class="hint">${st.left < 0 ? `${-st.left} days late` : st.left === 0 ? 'today' : `in ${st.left} days`}</span>` : '–'}</td>
       <td>${st.last && st.last.supervisor ? esc(st.last.supervisor) : '–'}</td>
-      <td style="white-space:nowrap"><a class="btn small primary" href="#cleanup/${encodeURIComponent(m.id)}">Checklist</a> <button class="btn small" type="button" data-qr="${esc(m.id)}">QR</button></td>
+      <td style="white-space:nowrap"><a class="btn small primary" href="#cleanup/${encodeURIComponent(m.id)}">Checklist</a></td>
     </tr>`).join('')}
     </tbody></table></div>`;
-  $$('[data-qr]', box).forEach((b) => b.addEventListener('click', () => printQr([byId(b.dataset.qr)])));
   paintHistory();
 }
 
@@ -292,7 +287,7 @@ async function send() {
 }
 
 // ---------- printing ----------
-function printQr(list) {
+export function printQr(list) {
   const base = `${location.origin}${location.pathname}#cleanup/`;
   openPrint(list.map((m, i) => `
     <div class="qr-poster" style="${i ? 'page-break-before:always;break-before:page' : ''}">

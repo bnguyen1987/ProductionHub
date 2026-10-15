@@ -9,6 +9,7 @@ const PAGES = [
   { id: 'order', title: 'New Order Checker', short: 'Order Check', desc: 'Upload a quote and see which machines can run it.', load: () => import('./order.js') },
   { id: 'cleanup', title: 'Machine Clean-Up', short: 'Clean-Up', desc: 'Bi-weekly clean-up sign-off for each machine. Scan the QR code on the machine.', load: () => import('./cleanup.js') },
   { id: 'requests', title: 'Change Requests', short: 'Requests', desc: 'Suggest a change to a job, like a better pallet size. Scan the QR code on the floor.', load: () => import('./requests.js') },
+  { id: 'settings', title: 'Settings', short: 'Settings', desc: 'QR codes to print for change requests and machine clean-up.', load: () => import('./settings.js') },
 ];
 
 const app = $('#app');
