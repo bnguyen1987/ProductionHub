@@ -24,7 +24,7 @@ export function render(el, sub) {
   if (machineId) renderMachine(); else renderBoard();
   load();
 }
-export function onLang() { if (machineId) paintTasks(); }
+export function onLang() { if (machineId) { paintTasks(); if (loaded) paintMachineHead(); } }
 
 async function load() {
   try {
@@ -222,7 +222,10 @@ function paintMachineHead() {
       <h2>Supervisor sign-off needed</h2>
       <p style="margin:0 0 10px">Clean-up from <b>${fmtDay(e.date)}</b> (${esc(e.shift)} shift) by ${esc((e.crew || []).join(', '))}: ${(e.tasks || []).filter((t) => t.status === 'done').length} done, ${(e.tasks || []).filter((t) => t.status === 'na').length} N/A.
         ${e.issuesFound === 'Y' ? `<br><span class="pill bad">Issues found</span> ${esc(e.issues || '')}${e.repairNo ? ` · RepairTracker #${esc(e.repairNo)}` : ''}` : ''}</p>
-      <div class="row">
+      <div class="lbl" style="margin:4px 0 2px">Check each line <span class="hint" data-supcount="${esc(e.id)}">0 / ${(e.tasks || []).length}</span></div>
+      <div class="sup-lines" data-suplines="${esc(e.id)}">${(e.tasks || []).map((t, i) => `
+        <label class="sup-line"><input type="checkbox" data-supok="${i}"><span class="cl-n">${i + 1}</span><span data-no-i18n>${esc(taskText(t.task))}</span><span class="pill ${t.status === 'done' ? 'ok' : 'info'}">${t.status === 'done' ? '✓ Done' : 'N/A'}</span></label>`).join('')}</div>
+      <div class="row" style="margin-top:10px">
         <div class="field"><label>Supervisor</label><select data-sup="${esc(e.id)}"><option value="">Select…</option>${[...SUPERVISORS, 'Israel Sanchez', 'Other'].map((s) => `<option>${esc(s)}</option>`).join('')}</select></div>
         <div class="field hidden" data-supo-wrap="${esc(e.id)}"><label>Name</label><input type="text" data-supo="${esc(e.id)}"></div>
       </div>
@@ -232,13 +235,21 @@ function paintMachineHead() {
     </section>`).join('')}`;
   const pick = (attr, id) => $$(`[${attr}]`, box).find((el) => el.getAttribute(attr) === id);
   $$('[data-sup]', box).forEach((sel) => sel.addEventListener('change', () => pick('data-supo-wrap', sel.dataset.sup).classList.toggle('hidden', sel.value !== 'Other')));
+  $$('[data-suplines]', box).forEach((wrap) => wrap.addEventListener('change', () => {
+    const n = $$('[data-supok]', wrap).filter((c) => c.checked).length, all = $$('[data-supok]', wrap).length;
+    pick('data-supcount', wrap.dataset.suplines).textContent = `${n} / ${all}`;
+    const m = pick('data-vmsg', wrap.dataset.suplines); if (m) m.innerHTML = '';
+  }));
   $$('[data-verify]', box).forEach((b) => b.addEventListener('click', async () => {
     const id = b.dataset.verify, msg = pick('data-vmsg', id);
     const sel = pick('data-sup', id).value, name = sel === 'Other' ? pick('data-supo', id).value.trim() : sel;
+    const checks = $$('[data-supok]', pick('data-suplines', id)).map((c) => c.checked);
+    const missing = checks.map((c, i) => (c ? 0 : i + 1)).filter(Boolean);
+    if (missing.length) { msg.innerHTML = `<div class="alert err">Check line${missing.length > 1 ? 's' : ''} ${missing.join(', ')} before accepting.</div>`; return; }
     if (!name) { msg.innerHTML = '<div class="alert err">Pick the supervisor name.</div>'; return; }
     b.disabled = true;
     try {
-      const upd = await api('/api/cleanup?id=' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ supervisor: name, supNote: pick('data-supn', id).value }) });
+      const upd = await api('/api/cleanup?id=' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ supervisor: name, supNote: pick('data-supn', id).value, supChecks: checks }) });
       entries = entries.map((x) => (x.id === id ? upd : x));
       paintMachineHead();
       $('#clHead', view).insertAdjacentHTML('afterbegin', `<div class="alert ok" style="margin-bottom:14px">Verified by ${esc(name)}. Clean-up complete.</div>`);
@@ -304,7 +315,7 @@ function printEntry(e) {
     <div class="ps-head"><div><h1>Bi-Weekly Machine Clean-Up</h1><div class="ps-sub">GoldenWest Packaging · Ontario</div></div><div class="ps-date">Submitted ${esc(fmtWhen(e.savedAt))}</div></div>
     <table class="ps-kv ps-top"><tr><th>Machine</th><td>${esc(e.machineName || e.machine)}</td></tr><tr><th>Date / shift</th><td>${esc(fmtDay(e.date))} · ${esc(e.shift)} shift</td></tr>
       <tr><th>Start / end</th><td>${esc(e.start || '–')} – ${esc(e.end || '–')}${mins ? ` (${mins} min)` : ''}</td></tr><tr><th>Crew</th><td>${esc((e.crew || []).join(', '))}</td></tr></table>
-    <table class="ps-kv ps-top"><caption>Tasks</caption>${(e.tasks || []).map((t, i) => `<tr><th style="width:8%">${i + 1}</th><td>${esc(t.task)}</td><td style="width:12%;text-align:center"><b>${t.status === 'done' ? '✓' : 'N/A'}</b></td></tr>`).join('')}</table>
+    <table class="ps-kv ps-top"><caption>Tasks</caption>${(e.tasks || []).map((t, i) => `<tr><th style="width:8%">${i + 1}</th><td>${esc(t.task)}</td><td style="width:12%;text-align:center"><b>${t.status === 'done' ? '✓' : 'N/A'}</b></td><td style="width:12%;text-align:center">${e.supChecks && e.supChecks[i] ? 'Sup ✓' : ''}</td></tr>`).join('')}</table>
     <table class="ps-kv ps-top"><caption>Issues</caption><tr><th>Issues found</th><td>${e.issuesFound === 'Y' ? 'Yes' : 'No'}</td></tr>
       ${e.issuesFound === 'Y' ? `<tr><th>Tagged out of service</th><td>${e.taggedOut === 'Y' ? 'Yes' : 'No'}</td></tr><tr><th>Maintenance notified</th><td>${e.maintNotified === 'Y' ? 'Yes' : 'No'}</td></tr><tr><th>RepairTracker #</th><td>${esc(e.repairNo || '')}</td></tr><tr><th>Describe</th><td>${esc(e.issues || '')}</td></tr>` : ''}</table>
     <table class="ps-kv ps-top"><caption>Supervisor verification</caption><tr><th>Supervisor</th><td>${esc(e.supervisor || 'Not verified yet')}</td></tr><tr><th>Verified</th><td>${esc(e.verifiedAt ? fmtWhen(e.verifiedAt) : '')}</td></tr>${e.supNote ? `<tr><th>Note</th><td>${esc(e.supNote)}</td></tr>` : ''}</table>`);

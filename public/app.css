@@ -273,3 +273,9 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeri
 .sched-tbl select,.sched-tbl input{min-height:36px;padding:4px 8px}
 .sched-tbl tr.past td{opacity:.55}
 .sched-month td{background:var(--panel-2);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:12px;color:var(--dim)}
+
+.sup-lines{border:1px solid var(--line);border-radius:var(--radius);max-height:none}
+.sup-line{display:grid;grid-template-columns:24px 24px minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px 10px;border-top:1px solid var(--line);font-weight:500;cursor:pointer}
+.sup-line:first-child{border-top:0}
+.sup-line input{width:22px;height:22px}
+.sup-line:has(input:checked){background:var(--good-soft)}

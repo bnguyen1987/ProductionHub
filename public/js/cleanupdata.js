@@ -100,7 +100,8 @@ export const planFor = (plan, id) => (plan || []).filter((p) => p.machines === '
 // Next due: the first scheduled date not yet covered by a clean-up; without a schedule, last clean-up + 14 days.
 export function machineStatus(m, entries, plan, today = todayYmd()) {
   const mine = (entries || []).filter((e) => e.machine === m.id).sort((a, b) => (b.date + b.savedAt).localeCompare(a.date + a.savedAt));
-  const last = mine[0] || null;
+  // only clean-ups the supervisor signed off count; unsigned ones are listed as pending
+  const last = mine.find((e) => e.status === 'Verified') || null;
   const pending = mine.filter((e) => e.status === 'Pending');
   const sched = planFor(plan, m.id);
   let next = null, shift = '', scheduled = false;

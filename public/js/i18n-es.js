@@ -409,6 +409,7 @@ export const PATTERNS = [
   [/^(.+): (Running|Issue|Down|Idle)$/, (_, m, s) => `${m}: ${ES[s]}`],
   // machine clean-up
   [/^Print all machines \((\d+) pages\)$/, 'Imprimir todas las máquinas ($1 páginas)'],
+  [/^Check lines? (.+) before accepting\.$/, 'Revise la(s) línea(s) $1 antes de aceptar.'],
   [/^Show past days(?: \((\d+)\))?$/, (_, n) => `Mostrar días pasados${n ? ` (${n})` : ''}`],
   [/^Added (\d+) days?\.$/, 'Se agregaron $1 día(s).'],
   [/^Saved for everyone · (.+)$/, 'Guardado para todos · $1'],

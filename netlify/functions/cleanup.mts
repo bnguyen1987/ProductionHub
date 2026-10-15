@@ -93,7 +93,11 @@ export default async (req: Request) => {
       const b = JSON.parse(await req.text());
       const supervisor = s(b.supervisor, 80);
       if (!supervisor) return Response.json({ error: "Supervisor name is required" }, { status: 400 });
-      const next = { ...cur, status: "Verified", supervisor, supNote: s(b.supNote, 1000), verifiedAt: new Date().toISOString() };
+      const supChecks = Array.isArray(b.supChecks) ? b.supChecks.map((x: any) => x === true) : [];
+      if (supChecks.length !== (cur.tasks || []).length || supChecks.some((x: boolean) => !x)) {
+        return Response.json({ error: "The supervisor must check every line" }, { status: 400 });
+      }
+      const next = { ...cur, status: "Verified", supervisor, supChecks, supNote: s(b.supNote, 1000), verifiedAt: new Date().toISOString() };
       await blobs.setJSON(id, next);
       return Response.json({ id, ...next });
     }
