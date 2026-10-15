@@ -244,6 +244,8 @@ export const ES = {
   'Machine clean-up': 'Limpieza de máquinas',
   'Plan the machine clean-up schedule, and print QR codes for the floor.': 'Planee el programa de limpieza de máquinas e imprima códigos QR para la planta.',
   'QR codes': 'Códigos QR',
+  'Expand all': 'Abrir todo', 'Collapse all': 'Cerrar todo', 'QR code · Change requests': 'Código QR · Solicitudes de cambio',
+  'QR codes · Machine clean-up': 'Códigos QR · Limpieza de máquinas', 'Nothing scheduled': 'Nada programado',
   'Print a poster and post it where people will scan it. Each code opens the page straight away (the access code is needed the first time on each phone).': 'Imprima un póster y péguelo donde la gente lo vaya a escanear. Cada código abre la página directo (se necesita el código de acceso la primera vez en cada teléfono).',
   'Clean-up schedule': 'Programa de limpieza',
   "Plan the clean-up days and the shift responsible. The Clean-Up board and each machine's page show the next scheduled day, and a scheduled day that passes with no clean-up logged shows as overdue.": 'Planee los días de limpieza y el turno responsable. El tablero de limpieza y la página de cada máquina muestran el próximo día programado, y un día programado que pasa sin limpieza registrada aparece como atrasado.',
@@ -410,6 +412,8 @@ export const PATTERNS = [
   // machine clean-up
   [/^Print all machines \((\d+) pages\)$/, 'Imprimir todas las máquinas ($1 páginas)'],
   [/^Check lines? (.+) before accepting\.$/, 'Revise la(s) línea(s) $1 antes de aceptar.'],
+  [/^(\d+) machines$/, '$1 máquinas'],
+  [/^Next: (\w{3}) (\w{3}) (\d+), (1st|2nd) shift · (\d+) upcoming$/, (_, d, m, n, s, u) => `Próxima: ${{ Sun: 'dom', Mon: 'lun', Tue: 'mar', Wed: 'mié', Thu: 'jue', Fri: 'vie', Sat: 'sáb' }[d]} ${n} ${MONTHS[m] || m}, turno ${shiftEs[s]} · ${u} próximas`],
   [/^Show past days(?: \((\d+)\))?$/, (_, n) => `Mostrar días pasados${n ? ` (${n})` : ''}`],
   [/^Added (\d+) days?\.$/, 'Se agregaron $1 día(s).'],
   [/^Saved for everyone · (.+)$/, 'Guardado para todos · $1'],

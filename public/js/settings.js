@@ -8,11 +8,14 @@ const base = () => `${location.origin}${location.pathname}#`;
 export function render(view) {
   view.innerHTML = `
     <div class="page-head"><h1>Settings</h1><p>Plan the machine clean-up schedule, and print QR codes for the floor.</p></div>
-    <section class="card" id="schedCard"><div class="hint"><span class="spinner"></span> Loading…</div></section>
-    <h2 style="margin:22px 0 4px;font-size:18px">QR codes</h2>
-    <p class="hint" style="margin:0 0 12px">Print a poster and post it where people will scan it. Each code opens the page straight away (the access code is needed the first time on each phone).</p>
-    <section class="card">
-      <h2>Change requests</h2>
+    <div class="btn-row" style="margin-bottom:10px"><button class="btn small" type="button" id="foldOpen">Expand all</button><button class="btn small" type="button" id="foldClose">Collapse all</button></div>
+    <details class="card fold" data-fold="schedule">
+      <summary><h2>Clean-up schedule</h2><span class="hint" id="schedSum"></span></summary>
+      <div id="schedCard"><div class="hint"><span class="spinner"></span> Loading…</div></div>
+    </details>
+    <details class="card fold" data-fold="qrReq">
+      <summary><h2>QR code · Change requests</h2></summary>
+      <p class="hint" style="margin:0 0 12px">Print a poster and post it where people will scan it. Each code opens the page straight away (the access code is needed the first time on each phone).</p>
       <div class="qr-set">
         <div class="qr-tile" data-no-i18n>${qrSvg(base() + 'requests')}</div>
         <div>
@@ -21,9 +24,9 @@ export function render(view) {
           <button class="btn primary" type="button" id="qrReq">Print poster</button>
         </div>
       </div>
-    </section>
-    <section class="card" style="margin-top:16px">
-      <h2>Machine clean-up</h2>
+    </details>
+    <details class="card fold" data-fold="qrClean">
+      <summary><h2>QR codes · Machine clean-up</h2><span class="hint">${CLEANUP_MACHINES.length} machines</span></summary>
       <p style="margin:0 0 10px">One poster per machine. Scanning it opens that machine's bi-weekly clean-up checklist.</p>
       <button class="btn primary" type="button" id="qrAll" style="margin-bottom:14px">Print all machines (${CLEANUP_MACHINES.length} pages)</button>
       <div class="qr-grid">
@@ -33,7 +36,16 @@ export function render(view) {
           <button class="btn small" type="button" data-qr="${esc(m.id)}">Print</button>
         </div>`).join('')}
       </div>
-    </section>`;
+    </details>`;
+  // open/closed state is remembered on this device
+  let folds = {}; try { folds = JSON.parse(localStorage.getItem('gwprod_settings_folds') || '{}'); } catch {}
+  const folders = $$('details.fold', view);
+  folders.forEach((d) => {
+    d.open = folds[d.dataset.fold] ?? d.dataset.fold === 'schedule';
+    d.addEventListener('toggle', () => { folds[d.dataset.fold] = d.open; try { localStorage.setItem('gwprod_settings_folds', JSON.stringify(folds)); } catch {} });
+  });
+  $('#foldOpen', view).addEventListener('click', () => folders.forEach((d) => (d.open = true)));
+  $('#foldClose', view).addEventListener('click', () => folders.forEach((d) => (d.open = false)));
   loadSchedule();
   $('#qrReq', view).addEventListener('click', async () => (await import('./requests.js')).printQr());
   const cl = () => import('./cleanup.js');
@@ -76,8 +88,9 @@ function paintSchedule() {
   const rows = plan.map((p, i) => ({ p, i })).filter(({ p }) => showPast || p.date >= today);
   const past = plan.filter((p) => p.date < today).length;
   let month = '';
+  const nx = plan.find((p) => p.date >= today), sum = $('#schedSum');
+  if (sum) sum.textContent = nx ? `Next: ${dayName(nx.date)} ${fmtD(nx.date)}, ${nx.shift} shift · ${plan.filter((p) => p.date >= today).length} upcoming` : 'Nothing scheduled';
   box.innerHTML = `
-    <h2>Clean-up schedule</h2>
     <p style="margin:0 0 12px">Plan the clean-up days and the shift responsible. The Clean-Up board and each machine's page show the next scheduled day, and a scheduled day that passes with no clean-up logged shows as overdue.</p>
     <div class="sched-gen">
       <div class="row">
