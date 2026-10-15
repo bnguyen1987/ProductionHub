@@ -60,6 +60,12 @@ export default async (req: Request) => {
       return new Response("Method not allowed", { status: 405 });
     }
 
+    if (req.method === "GET" && url.searchParams.get("photos")) {
+      const id = url.searchParams.get("photos") || "";
+      if (!id.startsWith("log/")) return Response.json({ error: "Bad id" }, { status: 400 });
+      return Response.json((await blobs.get("photos/" + id, { type: "json" })) || { photos: [] });
+    }
+
     if (req.method === "GET") {
       const { blobs: list } = await blobs.list({ prefix: "log/" });
       const keys = list.map((b) => b.key).sort().reverse().slice(0, 600);
@@ -72,15 +78,19 @@ export default async (req: Request) => {
 
     if (req.method === "POST") {
       const raw = await req.text();
-      if (raw.length > 100_000) return Response.json({ error: "Entry too large" }, { status: 413 });
-      const e = cleanNew(JSON.parse(raw));
+      if (raw.length > 4_000_000) return Response.json({ error: "Photos are too large. Try fewer photos." }, { status: 413 });
+      const body = JSON.parse(raw);
+      const e = cleanNew(body);
       if (!e.machine || !e.date || !e.tasks.length || !e.crew.length) {
         return Response.json({ error: "Machine, date, tasks and crew names are required" }, { status: 400 });
       }
       if (e.tasks.some((t: any) => !t.status)) return Response.json({ error: "Every task must be marked Done or N/A" }, { status: 400 });
       const savedAt = new Date().toISOString();
       const id = `log/${savedAt}-${Math.random().toString(36).slice(2, 8)}`;
-      await blobs.setJSON(id, { ...e, status: "Pending", supervisor: "", supNote: "", verifiedAt: "", savedAt });
+      const photos = (Array.isArray(body.photos) ? body.photos : []).slice(0, 3)
+        .filter((p: any) => p && typeof p.data === "string" && p.mediaType === "image/jpeg").map((p: any) => ({ data: p.data, mediaType: "image/jpeg" }));
+      if (photos.length) await blobs.setJSON("photos/" + id, { photos });
+      await blobs.setJSON(id, { ...e, photoCount: photos.length, status: "Pending", supervisor: "", supNote: "", verifiedAt: "", savedAt });
       return Response.json({ id, savedAt });
     }
 
@@ -106,6 +116,7 @@ export default async (req: Request) => {
       const id = url.searchParams.get("id") || "";
       if (!id.startsWith("log/")) return Response.json({ error: "Bad id" }, { status: 400 });
       await blobs.delete(id);
+      await blobs.delete("photos/" + id);
       return Response.json({ ok: true });
     }
 

@@ -1,9 +1,10 @@
 // Bi-weekly machine clean-up. Board of all machines (due / overdue), and a sign-off checklist per machine.
 // Each machine has its own QR code that opens #cleanup/<machine id> straight to its checklist.
-import { $, $$, esc, api, SUPERVISORS, saveForm, loadForm, getLang } from './common.js';
+import { $, $$, esc, api, SUPERVISORS, saveForm, loadForm, getLang, fileToPayload } from './common.js';
 import { CLEANUP_MACHINES, TASK_ES, CYCLE_DAYS, isSafetyTask, machineLabel, machineStatus as statusOf } from './cleanupdata.js';
 import { openPrint, qrSvg } from './printkit.js';
 
+let photos = []; // photos for the issue, kept in memory until sent
 let view, entries = [], plan = [], loaded = false, machineId = null, histFilter = '';
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -81,6 +82,7 @@ function paintHistory() {
     ${shown.length ? shown.map(entryHtml).join('') : '<p class="hint">No clean-ups logged yet.</p>'}`;
   const s = $('#clSearch', box);
   s.addEventListener('input', () => { const pos = s.selectionStart; histFilter = s.value; paintHistory(); const s2 = $('#clSearch'); s2.focus(); s2.setSelectionRange(pos, pos); });
+  $$('details.entry', box).forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadPhotos(d); }));
   $$('[data-print]', box).forEach((b) => b.addEventListener('click', () => printEntry(entries.find((e) => e.id === b.dataset.print))));
   $$('[data-del]', box).forEach((b) => b.addEventListener('click', () => delEntry(b.dataset.del)));
 }
@@ -94,7 +96,7 @@ function entryHtml(e) {
       ${e.issuesFound === 'Y' ? '<span class="pill bad">Issues found</span>' : ''}${e.taggedOut === 'Y' ? '<span class="pill bad">Tagged out</span>' : ''}</summary>
     <div class="body">
       <p>${done} done${na ? `, ${na} N/A` : ''} of ${(e.tasks || []).length} tasks${mins ? ` · ${mins} min` : ''}${e.start ? ` (${esc(e.start)}–${esc(e.end || '?')})` : ''}</p>
-      ${e.issuesFound === 'Y' ? `<h4>Issues</h4><p>${esc(e.issues || '')}${e.repairNo ? ` · RepairTracker #${esc(e.repairNo)}` : ''}${e.maintNotified === 'Y' ? ' · Maintenance notified' : e.maintNotified === 'N' ? ' · <b>Maintenance not notified</b>' : ''}</p>` : ''}
+      ${e.issuesFound === 'Y' ? `<h4>Issues</h4>${photoSlot(e)}<p>${esc(e.issues || '')}${e.repairNo ? ` · RepairTracker #${esc(e.repairNo)}` : ''}${e.maintNotified === 'Y' ? ' · Maintenance notified' : e.maintNotified === 'N' ? ' · <b>Maintenance not notified</b>' : ''}</p>` : ''}
       ${e.supervisor ? `<h4>Supervisor</h4><p>${esc(e.supervisor)} · ${esc(fmtWhen(e.verifiedAt))}${e.supNote ? ` · ${esc(e.supNote)}` : ''}</p>` : ''}
       <div class="btn-row no-print" style="margin-top:10px;justify-content:space-between"><span class="hint">Submitted ${esc(fmtWhen(e.savedAt))}</span>
         <span class="btn-row"><button class="btn small" type="button" data-print="${esc(e.id)}">Print</button><button class="btn small ghost danger" type="button" data-del="${esc(e.id)}">Delete</button></span></div>
@@ -151,6 +153,9 @@ function renderMachine() {
             ${ynRow('maintNotified', 'Maintenance notified? (Jess Goodrich)')}
             <div class="field"><label for="clRT">RepairTracker #</label><input type="text" id="clRT" data-d="repairNo" autocomplete="off"></div>
             <div class="field"><label for="clIss">Describe</label><textarea id="clIss" data-d="issues" rows="3" placeholder="What is wrong, where on the machine"></textarea></div>
+            <div class="field"><label>Photos (up to 3)</label>
+              <label class="drop" id="clDrop" style="display:block;padding:14px"><input type="file" accept="image/*" capture="environment" hidden><span>Tap to take or add a photo</span></label>
+              <div id="clPhotos" class="cl-photos"></div></div>
           </div>
         </section>
         <section class="card">
@@ -168,6 +173,15 @@ function renderMachine() {
   $$('[data-yn]', view).forEach((b) => b.addEventListener('click', () => { draft[b.dataset.yn] = b.dataset.v; persist(); paintYN(); }));
   $('#clAddCrew', view).addEventListener('click', () => { if (draft.crew.length < 8) { draft.crew.push(''); persist(); paintCrew(); } });
   $('#clSend', view).addEventListener('click', send);
+  const fin = $('#clDrop input', view);
+  fin.addEventListener('change', async () => {
+    const f = fin.files[0]; fin.value = '';
+    if (!f) return;
+    if (photos.length >= 3) { $('#clPhotos', view).insertAdjacentHTML('beforeend', '<div class="alert warn">Up to 3 photos.</div>'); return; }
+    try { if (!f.type.startsWith('image/')) throw new Error('That is not a photo.'); photos.push(await fileToPayload(f)); paintPhotos(); }
+    catch (e) { $('#clPhotos', view).insertAdjacentHTML('beforeend', `<div class="alert err">${esc(e.message)}</div>`); }
+  });
+  paintPhotos();
   paintShift(); paintYN(); paintTasks(); paintCrew();
 }
 
@@ -202,6 +216,30 @@ function paintTasks() {
   $('#clCount', view).textContent = `${n} / ${m.tasks.length}`;
 }
 
+function paintPhotos() {
+  const box = $('#clPhotos', view);
+  if (!box) return;
+  box.innerHTML = photos.map((p, i) => `<div class="cl-photo"><img src="data:image/jpeg;base64,${p.data}" alt=""><button class="btn small ghost" type="button" data-rmph="${i}">Remove</button></div>`).join('');
+  $$('[data-rmph]', box).forEach((b) => b.addEventListener('click', () => { photos.splice(+b.dataset.rmph, 1); paintPhotos(); }));
+  const d = $('#clDrop', view); if (d) d.classList.toggle('hidden', photos.length >= 3);
+}
+
+const photoCache = {};
+function getPhotos(id) {
+  if (!photoCache[id]) photoCache[id] = api('/api/cleanup?photos=' + encodeURIComponent(id)).then((r) => r.photos || []).catch((e) => { delete photoCache[id]; throw e; });
+  return photoCache[id];
+}
+// fills every [data-photos="<id>"] slot inside root
+function loadPhotos(root) {
+  $$('[data-photos]', root).forEach(async (slot) => {
+    if (slot.dataset.done) return;
+    slot.dataset.done = '1';
+    try { const ph = await getPhotos(slot.dataset.photos); slot.innerHTML = ph.map((p) => `<a href="data:${p.mediaType};base64,${p.data}" target="_blank" rel="noopener"><img src="data:${p.mediaType};base64,${p.data}" alt="Issue photo"></a>`).join(''); }
+    catch { slot.innerHTML = '<span class="hint">Could not load the photos.</span>'; }
+  });
+}
+const photoSlot = (e) => (e.photoCount ? `<div class="cl-photos view" data-photos="${esc(e.id)}"><span class="hint"><span class="spinner"></span> Loading photos…</span></div>` : '');
+
 function paintCrew() {
   const box = $('#clCrew', view);
   box.innerHTML = draft.crew.map((c, i) => `<div class="field"><label>Name ${i + 1}${i === 0 ? ' *' : ''}</label><input type="text" data-c="${i}" value="${esc(c)}" autocomplete="name" placeholder="Print name"></div>`).join('');
@@ -221,6 +259,7 @@ function paintMachineHead() {
       <h2>Supervisor sign-off needed</h2>
       <p style="margin:0 0 10px">Clean-up from <b>${fmtDay(e.date)}</b> (${esc(e.shift)} shift) by ${esc((e.crew || []).join(', '))}: ${(e.tasks || []).filter((t) => t.status === 'done').length} done, ${(e.tasks || []).filter((t) => t.status === 'na').length} N/A.
         ${e.issuesFound === 'Y' ? `<br><span class="pill bad">Issues found</span> ${esc(e.issues || '')}${e.repairNo ? ` · RepairTracker #${esc(e.repairNo)}` : ''}` : ''}</p>
+      ${photoSlot(e)}
       <div class="lbl" style="margin:4px 0 2px">Check each line <span class="hint" data-supcount="${esc(e.id)}">0 / ${(e.tasks || []).length}</span></div>
       <div class="sup-lines" data-suplines="${esc(e.id)}">${(e.tasks || []).map((t, i) => `
         <label class="sup-line"><input type="checkbox" data-supok="${i}"><span class="cl-n">${i + 1}</span><span data-no-i18n>${esc(taskText(t.task))}</span><span class="pill ${t.status === 'done' ? 'ok' : 'info'}">${t.status === 'done' ? '✓ Done' : 'N/A'}</span></label>`).join('')}</div>
@@ -233,6 +272,7 @@ function paintMachineHead() {
       <div data-vmsg="${esc(e.id)}" aria-live="polite" style="margin-top:8px"></div>
     </section>`).join('')}`;
   const pick = (attr, id) => $$(`[${attr}]`, box).find((el) => el.getAttribute(attr) === id);
+  loadPhotos(box);
   $$('[data-sup]', box).forEach((sel) => sel.addEventListener('change', () => pick('data-supo-wrap', sel.dataset.sup).classList.toggle('hidden', sel.value !== 'Other')));
   $$('[data-suplines]', box).forEach((wrap) => wrap.addEventListener('change', () => {
     const n = $$('[data-supok]', wrap).filter((c) => c.checked).length, all = $$('[data-supok]', wrap).length;
@@ -271,12 +311,12 @@ async function send() {
   try {
     await api('/api/cleanup', { method: 'POST', body: JSON.stringify({
       machine: m.id, machineName: machineLabel(m), date: draft.date, shift: draft.shift, start: draft.start, end: draft.end,
-      tasks: m.tasks.map((t, i) => ({ task: t, status: draft.status[i] })), crew,
+      tasks: m.tasks.map((t, i) => ({ task: t, status: draft.status[i] })), crew, photos: issues ? photos : [],
       issuesFound: draft.issuesFound, taggedOut: issues ? draft.taggedOut : 'N', maintNotified: issues ? draft.maintNotified : '',
       repairNo: issues ? draft.repairNo : '', issues: issues ? draft.issues : '', lang: getLang(),
     }) });
     const keepCrew = crew.length ? [...crew, ''] : ['', ''];
-    draft = newDraft(m); draft.crew = keepCrew.slice(0, 8);
+    draft = newDraft(m); draft.crew = keepCrew.slice(0, 8); photos = [];
     persist();
     await load();
     renderMachine(); paintMachineHead();
@@ -307,9 +347,11 @@ export function printQr(list) {
     </div>`).join(''));
 }
 
-function printEntry(e) {
+async function printEntry(e) {
   if (!e) return;
   const mins = minutes(e.start, e.end);
+  let ph = [];
+  if (e.photoCount) { try { ph = await getPhotos(e.id); } catch {} }
   openPrint(`
     <div class="ps-head"><div><h1>Bi-Weekly Machine Clean-Up</h1><div class="ps-sub">GoldenWest Packaging · Ontario</div></div><div class="ps-date">Submitted ${esc(fmtWhen(e.savedAt))}</div></div>
     <table class="ps-kv ps-top"><tr><th>Machine</th><td>${esc(e.machineName || e.machine)}</td></tr><tr><th>Date / shift</th><td>${esc(fmtDay(e.date))} · ${esc(e.shift)} shift</td></tr>
@@ -317,5 +359,6 @@ function printEntry(e) {
     <table class="ps-kv ps-top"><caption>Tasks</caption>${(e.tasks || []).map((t, i) => `<tr><th style="width:8%">${i + 1}</th><td>${esc(t.task)}</td><td style="width:12%;text-align:center"><b>${t.status === 'done' ? '✓' : 'N/A'}</b></td><td style="width:12%;text-align:center">${e.supChecks && e.supChecks[i] ? 'Sup ✓' : ''}</td></tr>`).join('')}</table>
     <table class="ps-kv ps-top"><caption>Issues</caption><tr><th>Issues found</th><td>${e.issuesFound === 'Y' ? 'Yes' : 'No'}</td></tr>
       ${e.issuesFound === 'Y' ? `<tr><th>Tagged out of service</th><td>${e.taggedOut === 'Y' ? 'Yes' : 'No'}</td></tr><tr><th>Maintenance notified</th><td>${e.maintNotified === 'Y' ? 'Yes' : 'No'}</td></tr><tr><th>RepairTracker #</th><td>${esc(e.repairNo || '')}</td></tr><tr><th>Describe</th><td>${esc(e.issues || '')}</td></tr>` : ''}</table>
-    <table class="ps-kv ps-top"><caption>Supervisor verification</caption><tr><th>Supervisor</th><td>${esc(e.supervisor || 'Not verified yet')}</td></tr><tr><th>Verified</th><td>${esc(e.verifiedAt ? fmtWhen(e.verifiedAt) : '')}</td></tr>${e.supNote ? `<tr><th>Note</th><td>${esc(e.supNote)}</td></tr>` : ''}</table>`);
+    <table class="ps-kv ps-top"><caption>Supervisor verification</caption><tr><th>Supervisor</th><td>${esc(e.supervisor || 'Not verified yet')}</td></tr><tr><th>Verified</th><td>${esc(e.verifiedAt ? fmtWhen(e.verifiedAt) : '')}</td></tr>${e.supNote ? `<tr><th>Note</th><td>${esc(e.supNote)}</td></tr>` : ''}</table>
+    ${ph.length ? `<div class="ps-pics">${ph.map((p) => `<figure><img src="data:${p.mediaType};base64,${p.data}" alt="Issue photo"><figcaption>Issue photo</figcaption></figure>`).join('')}</div>` : ''}`, ph.length > 0);
 }
