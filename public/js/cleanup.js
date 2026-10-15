@@ -1,10 +1,10 @@
 // Bi-weekly machine clean-up. Board of all machines (due / overdue), and a sign-off checklist per machine.
 // Each machine has its own QR code that opens #cleanup/<machine id> straight to its checklist.
 import { $, $$, esc, api, SUPERVISORS, saveForm, loadForm, getLang } from './common.js';
-import { CLEANUP_MACHINES, TASK_ES, CYCLE_DAYS, DUE_SOON_DAYS, isSafetyTask, machineLabel } from './cleanupdata.js';
+import { CLEANUP_MACHINES, TASK_ES, CYCLE_DAYS, isSafetyTask, machineLabel, machineStatus as statusOf } from './cleanupdata.js';
 import { openPrint, qrSvg } from './printkit.js';
 
-let view, entries = [], loaded = false, machineId = null, histFilter = '';
+let view, entries = [], plan = [], loaded = false, machineId = null, histFilter = '';
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const guessShift = () => { const d = new Date(), m = d.getHours() * 60 + d.getMinutes(); return m >= 14 * 60 + 30 || m < 4 * 60 ? '2nd' : '1st'; };
@@ -16,16 +16,7 @@ const minutes = (a, b) => { if (!a || !b) return 0; const [h1, m1] = a.split(':'
 const byId = (id) => CLEANUP_MACHINES.find((m) => m.id === id);
 const taskText = (t) => (getLang() === 'es' && TASK_ES[t] ? TASK_ES[t] : t);
 
-// Last clean-up per machine and where it stands against the 14-day cycle.
-function machineStatus(m) {
-  const mine = entries.filter((e) => e.machine === m.id).sort((a, b) => (b.date + b.savedAt).localeCompare(a.date + a.savedAt));
-  const last = mine[0];
-  if (!last) return { key: 'none', label: 'Not logged', cls: 'info', last: null };
-  const next = addDays(last.date, CYCLE_DAYS);
-  const left = dayNum(next) - dayNum(today());
-  const s = left < 0 ? { key: 'over', label: 'Overdue', cls: 'bad' } : left <= DUE_SOON_DAYS ? { key: 'soon', label: 'Due soon', cls: 'warn' } : { key: 'ok', label: 'On track', cls: 'ok' };
-  return { ...s, last, next, left, pending: mine.filter((e) => e.status === 'Pending') };
-}
+const machineStatus = (m) => statusOf(m, entries, plan, today());
 
 export function render(el, sub) {
   view = el;
@@ -37,8 +28,8 @@ export function onLang() { if (machineId) paintTasks(); }
 
 async function load() {
   try {
-    const r = await api('/api/cleanup');
-    entries = r.entries || []; loaded = true;
+    const [r, sc] = await Promise.all([api('/api/cleanup'), api('/api/cleanup?schedule').catch(() => ({ plan: [] }))]);
+    entries = r.entries || []; plan = sc.plan || []; loaded = true;
     if (machineId) paintMachineHead(); else paintBoard();
   } catch (e) {
     const box = $('#clBoard') || $('#clHead');
@@ -61,18 +52,19 @@ function paintBoard() {
   const count = (k) => rows.filter((r) => r.st.key === k).length;
   const pend = rows.reduce((a, r) => a + (r.st.pending ? r.st.pending.length : 0), 0);
   box.innerHTML = `
-    <h2>Status board <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:500">every ${CYCLE_DAYS} days</span></h2>
+    <h2>Status board <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:500">${plan.length ? 'by the clean-up schedule (Settings)' : `every ${CYCLE_DAYS} days`}</span></h2>
     <div class="chips" style="margin-bottom:12px">
       <span class="pill bad">${count('over')} overdue</span><span class="pill warn">${count('soon')} due soon</span>
       <span class="pill ok">${count('ok')} on track</span><span class="pill info">${count('none')} not logged</span>
       ${pend ? `<span class="pill star">${pend} waiting for supervisor</span>` : ''}
     </div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Machine</th><th>Status</th><th>Last clean-up</th><th>Next due</th><th>Supervisor</th><th></th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Machine</th><th>Status</th><th>Last clean-up</th><th>Next due</th><th>Shift</th><th>Supervisor</th><th></th></tr></thead><tbody>
     ${rows.map(({ m, st }) => `<tr>
       <td style="white-space:nowrap"><b>${esc(machineLabel(m))}</b><br><span class="hint">${esc(m.type)} · ${m.tasks.length} tasks</span></td>
       <td><span class="pill ${st.cls}">${st.label}</span>${st.pending && st.pending.length ? '<br><span class="pill star" style="margin-top:4px">Needs supervisor</span>' : ''}</td>
       <td style="white-space:nowrap">${st.last ? `${fmtDay(st.last.date)}<br><span class="hint">${esc(st.last.shift)} shift</span>` : '–'}</td>
       <td style="white-space:nowrap">${st.next ? `${fmtDay(st.next)}<br><span class="hint">${st.left < 0 ? `${-st.left} days late` : st.left === 0 ? 'today' : `in ${st.left} days`}</span>` : '–'}</td>
+      <td>${st.shift ? `<span class="pill info">${esc(st.shift)}</span>` : '–'}</td>
       <td>${st.last && st.last.supervisor ? esc(st.last.supervisor) : '–'}</td>
       <td style="white-space:nowrap"><a class="btn small primary" href="#cleanup/${encodeURIComponent(m.id)}">Checklist</a></td>
     </tr>`).join('')}
@@ -224,7 +216,7 @@ function paintMachineHead() {
   const pend = st.pending || [];
   box.innerHTML = `
     <div class="alert ${st.key === 'over' ? 'err' : st.key === 'soon' ? 'warn' : st.key === 'ok' ? 'ok' : 'info'}" style="margin-bottom:14px">
-      ${st.last ? `<b>${st.label}.</b> Last clean-up ${fmtDay(st.last.date)} (${esc(st.last.shift)} shift). Next due ${fmtDay(st.next)}.` : '<b>Not logged.</b> No clean-up recorded for this machine yet.'}
+      ${st.last ? `<b>${st.label}.</b> Last clean-up ${fmtDay(st.last.date)} (${esc(st.last.shift)} shift). Next due ${fmtDay(st.next)}.` : '<b>Not logged.</b> No clean-up recorded for this machine yet.'}${st.scheduled ? ` <b>Scheduled ${fmtDay(st.next)}, ${esc(st.shift)} shift.</b>` : ''}
     </div>
     ${pend.map((e) => `<section class="card" style="margin-bottom:14px;border-color:var(--accent)">
       <h2>Supervisor sign-off needed</h2>

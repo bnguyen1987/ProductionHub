@@ -89,3 +89,26 @@ export const CLEANUP_MACHINES = [
 
 export const isSafetyTask = (t) => /^SAFETY:/.test(t);
 export const machineLabel = (m) => (/^\d+$/.test(m.id) ? `${m.id} – ${m.name}` : m.name);
+
+// ---------- status (shared by the Clean-Up board, machine pages and the home page) ----------
+export const EARLY_DAYS = 7; // a clean-up done up to a week before a scheduled date counts for that date
+const dn = (ymd) => Math.round(new Date(ymd + 'T12:00:00').getTime() / 86400000);
+export const addDays = (ymd, n) => { const d = new Date(ymd + 'T12:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export const todayYmd = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export const planFor = (plan, id) => (plan || []).filter((p) => p.machines === 'all' || (Array.isArray(p.machines) && p.machines.includes(id)));
+
+// Next due: the first scheduled date not yet covered by a clean-up; without a schedule, last clean-up + 14 days.
+export function machineStatus(m, entries, plan, today = todayYmd()) {
+  const mine = (entries || []).filter((e) => e.machine === m.id).sort((a, b) => (b.date + b.savedAt).localeCompare(a.date + a.savedAt));
+  const last = mine[0] || null;
+  const pending = mine.filter((e) => e.status === 'Pending');
+  const sched = planFor(plan, m.id);
+  let next = null, shift = '', scheduled = false;
+  const nextPlan = sched.find((p) => !last || dn(p.date) - EARLY_DAYS > dn(last.date));
+  if (nextPlan) { next = nextPlan.date; shift = nextPlan.shift; scheduled = true; }
+  else if (last) next = addDays(last.date, CYCLE_DAYS);
+  if (!next) return { key: 'none', label: 'Not logged', cls: 'info', last, pending, next: null, shift: '', scheduled: false };
+  const left = dn(next) - dn(today);
+  const s = left < 0 ? { key: 'over', label: 'Overdue', cls: 'bad' } : left <= DUE_SOON_DAYS ? { key: 'soon', label: 'Due soon', cls: 'warn' } : { key: 'ok', label: last ? 'On track' : 'Scheduled', cls: last ? 'ok' : 'info' };
+  return { ...s, last, pending, next, left, shift, scheduled };
+}

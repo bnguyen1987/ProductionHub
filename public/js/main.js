@@ -127,16 +127,15 @@ function renderHome(view) {
     </div>
     <div id="newRequests"></div><div id="cleanupDue"></div>
     <div class="latest card" id="latestHandoff"><h2>Latest shift handoff</h2><div class="hint"><span class="spinner"></span> Loading…</div></div>`;
-  Promise.all([api('/api/cleanup'), import('./cleanupdata.js')]).then(([{ entries }, d]) => {
-    const today = Math.round(Date.now() / 86400000);
-    let over = 0, pend = 0;
-    for (const m of d.CLEANUP_MACHINES) {
-      const mine = (entries || []).filter((e) => e.machine === m.id).sort((a, b) => b.date.localeCompare(a.date));
-      if (mine[0] && Math.round(new Date(mine[0].date + 'T12:00:00').getTime() / 86400000) + d.CYCLE_DAYS < today) over++;
-      pend += mine.filter((e) => e.status === 'Pending').length;
-    }
+  Promise.all([api('/api/cleanup'), api('/api/cleanup?schedule').catch(() => ({ plan: [] })), import('./cleanupdata.js')]).then(([{ entries }, { plan }, d]) => {
+    const st = d.CLEANUP_MACHINES.map((m) => ({ m, s: d.machineStatus(m, entries, plan) }));
+    const over = st.filter((x) => x.s.key === 'over').length;
+    const pend = st.reduce((a, x) => a + x.s.pending.length, 0);
+    const today = d.todayYmd(), tmw = d.addDays(today, 1);
+    const soon = (plan || []).filter((p) => p.date === today || p.date === tmw);
+    const what = (p) => `${p.date === today ? 'Today' : 'Tomorrow'}: ${p.shift} shift, ${p.machines === 'all' ? 'all machines' : p.machines.join(', ')}`;
     const box = $('#cleanupDue');
-    if (box && (over || pend)) box.innerHTML = `<div class="alert ${over ? 'warn' : 'info'}" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>${over ? `<b>${over} machine clean-up${over > 1 ? 's' : ''} overdue.</b> ` : ''}${pend ? `${pend} clean-up${pend > 1 ? 's' : ''} waiting for supervisor sign-off.` : ''}</span><a class="btn small" href="#cleanup">Open clean-up</a></div>`;
+    if (box && (over || pend || soon.length)) box.innerHTML = `<div class="alert ${over ? 'warn' : 'info'}" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>${soon.map((p) => `<b>Clean-up ${esc(what(p))}.</b> `).join('')}${over ? `<b>${over} machine clean-up${over > 1 ? 's' : ''} overdue.</b> ` : ''}${pend ? `${pend} clean-up${pend > 1 ? 's' : ''} waiting for supervisor sign-off.` : ''}</span><a class="btn small" href="#cleanup">Open clean-up</a></div>`;
   }).catch(() => {});
   api('/api/requests').then(({ requests }) => {
     const n = (requests || []).filter((r) => r.status === 'New').length;

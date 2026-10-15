@@ -41,6 +41,25 @@ export default async (req: Request) => {
   const blobs = store();
 
   try {
+    // Planned clean-up schedule (whole year): [{ date, shift, machines: "all" | [ids], note }]
+    if (url.searchParams.has("schedule")) {
+      if (req.method === "GET") return Response.json((await blobs.get("schedule", { type: "json" })) || { plan: [], updatedAt: null });
+      if (req.method === "PUT") {
+        const raw = await req.text();
+        if (raw.length > 300_000) return Response.json({ error: "Schedule too large" }, { status: 413 });
+        const b = JSON.parse(raw);
+        const plan = (Array.isArray(b.plan) ? b.plan : []).slice(0, 2000).map((p: any) => ({
+          date: ymd(p?.date), shift: p?.shift === "2nd" ? "2nd" : "1st",
+          machines: Array.isArray(p?.machines) ? p.machines.map((m: any) => s(m, 40)).filter(Boolean).slice(0, 40) : "all",
+          note: s(p?.note, 200),
+        })).filter((p: any) => p.date).sort((a: any, b: any) => a.date.localeCompare(b.date));
+        const doc = { plan, updatedAt: new Date().toISOString() };
+        await blobs.setJSON("schedule", doc);
+        return Response.json(doc);
+      }
+      return new Response("Method not allowed", { status: 405 });
+    }
+
     if (req.method === "GET") {
       const { blobs: list } = await blobs.list({ prefix: "log/" });
       const keys = list.map((b) => b.key).sort().reverse().slice(0, 600);
