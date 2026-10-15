@@ -7,6 +7,7 @@ const PAGES = [
   { id: 'stock', title: 'Stock Sheet Calculator', short: 'Stock Sheet', desc: 'Outs, trim waste and sheets needed for a stock size.', load: () => import('./stock.js') },
   { id: 'handoff', title: 'Shift Handoff Log', short: 'Handoff', desc: 'Machine status, open jobs, quality/safety and maintenance notes for the next shift.', load: () => import('./handoff.js') },
   { id: 'order', title: 'New Order Checker', short: 'Order Check', desc: 'Upload a quote and see which machines can run it.', load: () => import('./order.js') },
+  { id: 'cleanup', title: 'Machine Clean-Up', short: 'Clean-Up', desc: 'Bi-weekly clean-up sign-off for each machine. Scan the QR code on the machine.', load: () => import('./cleanup.js') },
   { id: 'requests', title: 'Change Requests', short: 'Requests', desc: 'Suggest a change to a job, like a better pallet size. Scan the QR code on the floor.', load: () => import('./requests.js') },
 ];
 
@@ -91,7 +92,7 @@ function renderShell() {
 async function route() {
   const view = $('#view');
   if (!view) return;
-  const id = (location.hash || '#home').slice(1);
+  const [id, sub] = (location.hash || '#home').slice(1).split('/');
   document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-current', t.dataset.id === id ? 'page' : 'false'));
   if (current && current.destroy) { try { current.destroy(); } catch {} }
   current = null;
@@ -103,10 +104,10 @@ async function route() {
   view.innerHTML = '<div class="hint"><span class="spinner"></span> Loading…</div>';
   try {
     const mod = await page.load();
-    if ((location.hash || '#home').slice(1) !== id) return; // user navigated away while loading
+    if ((location.hash || '#home').slice(1).split('/')[0] !== id) return; // user navigated away while loading
     view.innerHTML = '';
     current = mod;
-    mod.render(view);
+    mod.render(view, sub);
     prune();
     refreshInchHints(view);
     // rows added later (stock sizes, blanks) get hints too
@@ -123,8 +124,19 @@ function renderHome(view) {
     <div class="home-grid">
       ${PAGES.map((p) => `<a class="home-card" href="#${p.id}"><span class="ic">${ICONS[p.id]}</span><h3>${p.title}</h3><p>${p.desc}</p></a>`).join('')}
     </div>
-    <div id="newRequests"></div>
+    <div id="newRequests"></div><div id="cleanupDue"></div>
     <div class="latest card" id="latestHandoff"><h2>Latest shift handoff</h2><div class="hint"><span class="spinner"></span> Loading…</div></div>`;
+  Promise.all([api('/api/cleanup'), import('./cleanupdata.js')]).then(([{ entries }, d]) => {
+    const today = Math.round(Date.now() / 86400000);
+    let over = 0, pend = 0;
+    for (const m of d.CLEANUP_MACHINES) {
+      const mine = (entries || []).filter((e) => e.machine === m.id).sort((a, b) => b.date.localeCompare(a.date));
+      if (mine[0] && Math.round(new Date(mine[0].date + 'T12:00:00').getTime() / 86400000) + d.CYCLE_DAYS < today) over++;
+      pend += mine.filter((e) => e.status === 'Pending').length;
+    }
+    const box = $('#cleanupDue');
+    if (box && (over || pend)) box.innerHTML = `<div class="alert ${over ? 'warn' : 'info'}" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>${over ? `<b>${over} machine clean-up${over > 1 ? 's' : ''} overdue.</b> ` : ''}${pend ? `${pend} clean-up${pend > 1 ? 's' : ''} waiting for supervisor sign-off.` : ''}</span><a class="btn small" href="#cleanup">Open clean-up</a></div>`;
+  }).catch(() => {});
   api('/api/requests').then(({ requests }) => {
     const n = (requests || []).filter((r) => r.status === 'New').length;
     const box = $('#newRequests');

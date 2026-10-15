@@ -2,7 +2,7 @@
 // plate or die repair...). A posted QR code opens this page straight to the form. Managers review in the list.
 // English / Spanish toggle: only the screen text changes; saved values (type, status, repair/replace) stay in English.
 import { $, $$, esc, api, MACHINES_7, saveForm, loadForm, fileToPayload, getLang } from './common.js';
-import qrcode from '../vendor/qrcode.js';
+import { openPrint, qrSvg } from './printkit.js';
 
 export const TYPES = [
   'Pallet size',
@@ -400,25 +400,6 @@ async function del(id) {
 }
 
 // ---------- printing (always English + Spanish poster; request printout in English for the office) ----------
-function openPrint(html, wait) {
-  let sheet = document.getElementById('printSheet');
-  if (!sheet) { sheet = document.createElement('div'); sheet.id = 'printSheet'; document.body.appendChild(sheet); }
-  sheet.innerHTML = `<div data-no-i18n>${html}</div>`; // office copy stays in English
-  document.body.classList.add('printing');
-  const done = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
-  window.addEventListener('afterprint', done);
-  const im = wait && sheet.querySelector('img');
-  const go = () => setTimeout(() => window.print(), 50);
-  if (im && !im.complete) { im.onload = go; im.onerror = go; } else go();
-}
-
-export function qrSvg(text) {
-  const q = qrcode(0, 'M');
-  q.addData(text);
-  q.make();
-  return q.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
-}
-
 function printQr() {
   const url = `${location.origin}${location.pathname}#requests`;
   openPrint(`
