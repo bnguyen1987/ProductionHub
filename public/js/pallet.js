@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { $, $$, esc, api, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
+import { readDieline } from './dieline.js';
 import { perTrailer, TRAILER, CALIPER, FOLD_ALLOWANCE, GRADES_BY_FLUTE, boardSpec, DEFAULT_PALLET_PRICES, palletCatalog, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
 
 let PALLET_H = 5; // wood pallet height (in), set from the form
@@ -31,6 +32,11 @@ export function render(view) {
             <div class="field"><label for="pL">Length (in)</label><input id="pL" data-f="L" type="text" inputmode="decimal" placeholder="16"></div>
             <div class="field"><label for="pW">Width (in)</label><input id="pW" data-f="W" type="text" inputmode="decimal" placeholder="12"></div>
             <div class="field"><label for="pD">Depth (in)</label><input id="pD" data-f="D" type="text" inputmode="decimal" placeholder="10"></div>
+          </div>
+          <div id="dlWrap">
+            <label class="drop" id="dlDrop" style="display:block;padding:12px;margin-bottom:10px"><input type="file" accept=".pdf,.dxf,image/*" hidden>
+              <b>Upload die line</b><br><span class="hint">PDF, DXF or a photo of the drawing. Fills in the sheet size and board.</span></label>
+            <div id="dlInfo"></div>
           </div>
           <div class="row" id="sheetDims">
             <div class="field"><label for="pSW">Sheet width (in)</label><input id="pSW" data-f="sheetW" type="text" inputmode="decimal" placeholder="33"></div>
@@ -144,6 +150,51 @@ export function render(view) {
 
   $('#palPrint').addEventListener('click', printSheet);
 
+  // ---- die line upload (Sheet / blank) ----
+  const setField = (k, v) => { state[k] = v; const el = $(`[data-f="${k}"]`, view); if (el) el.value = v; };
+  const applyDlMode = () => {
+    const d = state.dl;
+    if (!d) return;
+    if (d.mode === 'piece' && d.pieceW && d.pieceL) { setField('sheetW', String(d.pieceW)); setField('sheetL', String(d.pieceL)); }
+    else if (d.sheetW && d.sheetL) { setField('sheetW', String(d.sheetW)); setField('sheetL', String(d.sheetL)); }
+  };
+  const paintDl = (msg = '') => {
+    const box = $('#dlInfo', view), d = state.dl;
+    if (!box) return;
+    if (!d) { box.innerHTML = msg; return; }
+    const multi = d.out > 1;
+    box.innerHTML = `${msg}<div class="alert ${d.warn ? 'warn' : 'ok'}" style="margin-bottom:10px"><b>${esc(d.file || 'Die line')}</b>
+      ${[d.customer, d.design, d.board].filter(Boolean).map(esc).join(' · ')}<br>
+      Blank ${fmtIn(d.sheetW)} × ${fmtIn(d.sheetL)}${multi ? ` · ${d.out} out` : ''}${d.rule ? ` · ${fmtNum(d.rule, 2)}" of rule` : ''}${d.source === 'dxf' ? ` · read from DXF (${esc(d.units)})` : ''}
+      ${d.warn ? `<br>${esc(d.warn)}` : '<br><span class="hint">Check the numbers below before using them.</span>'}</div>
+      ${multi ? `<div class="lbl" style="margin:0 0 6px">Palletize</div><div class="seg" id="dlMode" style="margin-bottom:10px">
+        <button type="button" data-k="sheet" aria-pressed="${d.mode !== 'piece'}">Full sheets<small>${fmtIn(d.sheetW)} × ${fmtIn(d.sheetL)}</small></button>
+        <button type="button" data-k="piece" aria-pressed="${d.mode === 'piece'}">Separated pieces<small>${d.out} out${d.pieceW && d.pieceL ? `, ${fmtIn(d.pieceW)} × ${fmtIn(d.pieceL)}` : ''}</small></button></div>
+        ${d.mode === 'piece' && !(d.pieceW && d.pieceL) ? '<div class="alert warn" style="margin-bottom:10px">The piece size wasn\'t on the drawing. Type one piece\'s width and length below.</div>' : ''}
+        <p class="hint" style="margin:-4px 0 10px">${d.mode === 'piece' ? `Order quantity = pieces. One sheet makes ${d.out}.` : `Order quantity = sheets. One sheet makes ${d.out} pieces.`}</p>` : ''}`;
+    $$('#dlMode button', box).forEach((b) => b.addEventListener('click', () => { d.mode = b.dataset.k; applyDlMode(); paintDl(); update(); }));
+  };
+  const dlDrop = $('#dlDrop', view), dlIn = dlDrop.querySelector('input');
+  dlIn.addEventListener('change', async () => {
+    const f = dlIn.files[0]; dlIn.value = '';
+    if (!f) return;
+    paintDl('<div class="alert info" style="margin-bottom:10px"><span class="spinner"></span> Reading the die line…</div>');
+    try {
+      const r = await readDieline(f);
+      if (!(r.sheetW > 0 && r.sheetL > 0)) throw new Error('Could not find the blank size on that drawing. Type it in below.');
+      const warn = r.source === 'ai' && !r.flute ? 'Board grade not found on the drawing. Pick the flute and grade below.' : '';
+      state.dl = { ...r, file: f.name, mode: 'sheet', warn };
+      if (r.flute) { state.flute = r.flute; if (r.grade) state.grade = r.grade; else state.grade = state.grade.replace(/(BC|B|C|E|D)$/, ''); applyBoard(); }
+      if (r.color === 'WHITE' && state.board !== 'white') state.board = 'white';
+      if (r.customer && !state.customer) setField('customer', r.customer);
+      if (r.design && !state.job) setField('job', r.design);
+      applyDlMode(); paintDl(); update();
+    } catch (e) {
+      paintDl(`<div class="alert err" style="margin-bottom:10px">${esc(e.message)}</div>`);
+    }
+  });
+  paintDl();
+
   initThree($('#viewer'));
   update();
 }
@@ -213,6 +264,7 @@ function update() {
   $$('#showSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state.show)));
   $('#boxDims').classList.toggle('hidden', state.style === 'SHEET');
   $('#sheetDims').classList.toggle('hidden', state.style !== 'SHEET');
+  $('#dlWrap').classList.toggle('hidden', state.style !== 'SHEET');
   $('#customWrap').classList.toggle('hidden', state.pallet !== 'custom');
 
   const r = compute();

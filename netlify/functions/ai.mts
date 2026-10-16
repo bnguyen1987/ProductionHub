@@ -27,6 +27,16 @@ Return strict JSON only, no markdown fences, no commentary:
 "rule_in":number|null,"notes":"one or two short sentences: anything unusual (glue, stitching, special print, tight tolerances)"}
 For flute: use BC for any double wall (BC, DW, 2-wall). Use SF for single face. If something is not in the document use null.`;
 
+const DIELINE_PROMPT = `You are reading a die line / CAD drawing (e.g. Esko ArtiosCAD or a customer DXF printout) for a corrugated box plant.
+Header fields often read like "Blank width: 34.0193", "Blank height: 44+1/2" (44+1/2 means 44.5), "Pieces Per: 4 OUT", "Board: 200 C Kraft", "Rules per inches: 866.8".
+Return the overall blank (sheet) size in inches as decimals. If the drawing shows dimension lines for a single piece of a multi-out layout (e.g. 34 across for 2 pieces, 17 for one), also return one piece's width and length.
+Return strict JSON only, no markdown fences, no commentary:
+{"customer":string|null,"design":string|null,"description":string|null,"board":string|null,
+"grade_number":number|null,"grade_ect":boolean,"flute":"E|B|C|BC|A|SF"|null,"color":"KRAFT|WHITE"|null,
+"blank_width_in":number|null,"blank_length_in":number|null,"pieces_out":number|null,
+"piece_width_in":number|null,"piece_length_in":number|null,"rule_in":number|null,"notes":"one short sentence or empty"}
+grade_number: the number in the board grade (200 in "200 C Kraft", 32 in "32 ECT B"); grade_ect true when the grade is ECT. Flute BC for any double wall (BC, DW). Use null when a value is not in the document.`;
+
 export default async (req: Request) => {
   const denied = checkAccess(req);
   if (denied) return denied;
@@ -35,7 +45,7 @@ export default async (req: Request) => {
   let body: any;
   try { body = await req.json(); } catch { return Response.json({ error: "Bad request" }, { status: 400 }); }
   const { task, data, mediaType } = body || {};
-  if (!["ink", "quote"].includes(task) || typeof data !== "string" || !mediaType) {
+  if (!["ink", "quote", "dieline"].includes(task) || typeof data !== "string" || !mediaType) {
     return Response.json({ error: "Missing file or task" }, { status: 400 });
   }
   if (!process.env.ANTHROPIC_BASE_URL && !process.env.ANTHROPIC_API_KEY) {
@@ -55,7 +65,7 @@ export default async (req: Request) => {
     const msg = await client.messages.create({
       model: MODEL,
       max_tokens: 1200,
-      messages: [{ role: "user", content: [fileBlock, { type: "text", text: task === "ink" ? INK_PROMPT : QUOTE_PROMPT }] }],
+      messages: [{ role: "user", content: [fileBlock, { type: "text", text: task === "ink" ? INK_PROMPT : task === "dieline" ? DIELINE_PROMPT : QUOTE_PROMPT }] }],
     });
     const text = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
     const match = text.match(/\{[\s\S]*\}/);
