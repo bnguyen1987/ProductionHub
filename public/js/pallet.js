@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { $, $$, esc, api, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
-import { readDieline } from './dieline.js';
+import { readDieline, renderDxf, pageCanvas, guessBox, cropImage, pieceImage } from './dieline.js';
 
 // Stacking pattern buttons (matches the pallet stacking pattern chart)
 const PAT_BTNS = [
@@ -19,6 +19,11 @@ import { perTrailer, TRAILER, CALIPER, FOLD_ALLOWANCE, GRADES_BY_FLUTE, boardSpe
 
 let PALLET_H = 5; // wood pallet height (in), set from the form
 let state, three = null, last = null;
+// die line picture: full blank and one piece ({ url, w, h }); the page canvas is kept in memory so the crop can be adjusted
+let dlImgs = {}, dlPage = null;
+try { dlImgs = JSON.parse(localStorage.getItem('gwprod_pallet_dlimg') || '{}') || {}; } catch {}
+const saveImgs = () => { try { localStorage.setItem('gwprod_pallet_dlimg', JSON.stringify(dlImgs)); } catch {} };
+const dlImage = () => (state.style === 'SHEET' && state.dl && state.dl.showImg !== false ? (state.dl.mode === 'piece' ? dlImgs.piece : dlImgs.full) || null : null);
 // Pallet price list (shared upload, else the built-in 7/1/26 list) and the per-size catalog built from it.
 let prices = { items: DEFAULT_PALLET_PRICES, fileName: 'Pallet Costs and Sizes (7/1/26 list)', uploadedAt: null };
 let catalog = palletCatalog(prices.items);
@@ -186,6 +191,43 @@ export function render(view) {
         ${d.mode === 'piece' && !(d.pieceW && d.pieceL) ? '<div class="alert warn" style="margin-bottom:10px">The piece size wasn\'t on the drawing. Type one piece\'s width and length below.</div>' : ''}
         <p class="hint" style="margin:-4px 0 10px">${d.mode === 'piece' ? `Order quantity = pieces. One sheet makes ${d.out}.` : `Order quantity = sheets. One sheet makes ${d.out} pieces.`}</p>` : ''}`;
     $$('#dlMode button', box).forEach((b) => b.addEventListener('click', () => { d.mode = b.dataset.k; applyDlMode(); paintDl(); update(); }));
+    // picture of the die line on the pallet
+    if (dlImgs.full) {
+      box.insertAdjacentHTML('beforeend', `<div class="dl-pic">
+        <img src="${(d.mode === 'piece' && dlImgs.piece ? dlImgs.piece : dlImgs.full).url}" alt="Die line picture">
+        <div><b>Die line picture</b><br><span class="hint">Shown on top of each stack in the 3D view and layer pattern.</span>
+          <div class="btn-row" style="margin-top:6px">${dlPage ? `<button class="btn small" type="button" id="dlCropBtn">${d.editing ? 'Done' : 'Adjust crop'}</button>` : ''}
+          <button class="btn small" type="button" id="dlShowBtn">${d.showImg === false ? 'Show picture' : 'Hide picture'}</button></div></div></div>`);
+      const cb = $('#dlCropBtn', box); if (cb) cb.addEventListener('click', () => { d.editing = !d.editing; paintDl(); });
+      $('#dlShowBtn', box).addEventListener('click', () => { d.showImg = d.showImg === false; paintDl(); update(); });
+      if (d.editing && dlPage) cropEditor(box, d);
+    }
+  };
+  const makeImgs = async (d) => {
+    if (dlPage && d.box) dlImgs.full = cropImage(dlPage, d.box);
+    dlImgs.piece = dlImgs.full && d.out > 1 && d.pieceW && d.pieceL ? await pieceImage(dlImgs.full, { w: d.sheetW, l: d.sheetL }, { w: d.pieceW, l: d.pieceL }, d.out) : null;
+    saveImgs();
+  };
+  // drag a box around the blank on the page
+  const cropEditor = (box, d) => {
+    box.insertAdjacentHTML('beforeend', `<div class="dl-crop"><p class="hint" style="margin:0 0 6px">Drag a box around the blank (outer cut lines). Leave out the title block and dimensions.</p>
+      <div class="dl-crop-area" id="dlArea"><div class="dl-crop-box" id="dlBox"></div></div>
+      <div class="btn-row" style="margin-top:6px"><button class="btn small" type="button" id="dlGuess">Use first guess</button><button class="btn small primary" type="button" id="dlDone">Done</button></div></div>`);
+    const area = $('#dlArea', box), bx = $('#dlBox', box);
+    dlPage.style.width = '100%'; dlPage.style.display = 'block'; area.prepend(dlPage);
+    const show = () => { const [a, b, c, e] = d.box; Object.assign(bx.style, { left: a * 100 + '%', top: b * 100 + '%', width: (c - a) * 100 + '%', height: (e - b) * 100 + '%' }); };
+    show();
+    let start = null;
+    const pos = (ev) => { const rc = area.getBoundingClientRect(); return [Math.min(1, Math.max(0, (ev.clientX - rc.left) / rc.width)), Math.min(1, Math.max(0, (ev.clientY - rc.top) / rc.height))]; };
+    area.addEventListener('pointerdown', (ev) => { ev.preventDefault(); area.setPointerCapture(ev.pointerId); start = pos(ev); });
+    area.addEventListener('pointermove', (ev) => { if (!start) return; const p2 = pos(ev); d.box = [Math.min(start[0], p2[0]), Math.min(start[1], p2[1]), Math.max(start[0], p2[0]), Math.max(start[1], p2[1])]; show(); });
+    area.addEventListener('pointerup', async () => {
+      if (!start) return; start = null;
+      if (d.box[2] - d.box[0] < 0.02 || d.box[3] - d.box[1] < 0.02) return;
+      await makeImgs(d); const im = $('.dl-pic img', box); if (im) im.src = (d.mode === 'piece' && dlImgs.piece ? dlImgs.piece : dlImgs.full).url; update();
+    });
+    $('#dlGuess', box).addEventListener('click', async () => { d.box = d.guess || d.box; show(); await makeImgs(d); paintDl(); update(); });
+    $('#dlDone', box).addEventListener('click', () => { d.editing = false; paintDl(); });
   };
   const dlDrop = $('#dlDrop', view), dlIn = dlDrop.querySelector('input');
   dlIn.addEventListener('change', async () => {
@@ -196,7 +238,22 @@ export function render(view) {
       const r = await readDieline(f);
       if (!(r.sheetW > 0 && r.sheetL > 0)) throw new Error('Could not find the blank size on that drawing. Type it in below.');
       const warn = r.source === 'ai' && !r.flute ? 'Board grade not found on the drawing. Pick the flute and grade below.' : '';
-      state.dl = { ...r, file: f.name, mode: 'sheet', warn };
+      const { draw, ...rest } = r;
+      state.dl = { ...rest, file: f.name, mode: 'sheet', warn };
+      dlImgs = {}; dlPage = null;
+      try {
+        if (draw) dlImgs.full = renderDxf(draw);
+        else {
+          dlPage = await pageCanvas(f);
+          const raw = guessBox(dlPage, 0), rr = ((raw[2] - raw[0]) * dlPage.width) / Math.max(1, (raw[3] - raw[1]) * dlPage.height);
+          const asp = r.sheetW / r.sheetL, aspect = Math.abs(Math.log(rr / asp)) < Math.abs(Math.log(rr * asp)) ? asp : 1 / asp;
+          state.dl.guess = r.box || guessBox(dlPage, aspect);
+          state.dl.box = state.dl.guess.slice();
+          state.dl.editing = true; // show the crop box once so it can be checked
+          dlImgs.full = cropImage(dlPage, state.dl.box);
+        }
+        await makeImgs(state.dl);
+      } catch (err) { console.warn('die line picture', err); dlImgs = {}; }
       if (r.flute) { state.flute = r.flute; if (r.grade) state.grade = r.grade; else state.grade = state.grade.replace(/(BC|B|C|E|D)$/, ''); applyBoard(); }
       if (r.color === 'WHITE' && state.board !== 'white') state.board = 'white';
       if (r.customer && !state.customer) setField('customer', r.customer);
@@ -378,13 +435,21 @@ function update() {
   $$('#palRecs [data-pick]').forEach((b) => b.addEventListener('click', () => { state.pallet = b.dataset.pick; $('#pPal').value = state.pallet; update(); }));
 
   $('#topView').innerHTML = load.rectsAlt
-    ? `<div class="tv-pair"><figure>${topViewSvg(r.base, load)}<figcaption class="hint">Layer 1, 3, 5…</figcaption></figure><figure>${topViewSvg(r.base, { ...load, rects: load.rectsAlt })}<figcaption class="hint">Layer 2, 4, 6… (flipped)</figcaption></figure></div>`
-    : topViewSvg(r.base, load);
-  drawScene({ pallet: r.base, load, piece: r.piece, pieces: shownPieces, board: state.board });
+    ? `<div class="tv-pair"><figure>${topViewSvg(r.base, load, dlImage())}<figcaption class="hint">Layer 1, 3, 5…</figcaption></figure><figure>${topViewSvg(r.base, { ...load, rects: load.rectsAlt }, dlImage())}<figcaption class="hint">Layer 2, 4, 6… (flipped)</figcaption></figure></div>`
+    : topViewSvg(r.base, load, dlImage());
+  drawScene({ pallet: r.base, load, piece: r.piece, pieces: shownPieces, board: state.board, img: dlImage() });
 }
 
 // ---------- top view ----------
-function topViewSvg(pallet, load) {
+// the picture's long side follows the piece's long side
+const picTurned = (img, r) => (img.w >= img.h) !== (r.w >= r.l);
+function picUses(img, rects, tx, ty) {
+  if (!img) return '';
+  return `<defs><image id="dlpic" href="${img.url}" width="1" height="1" preserveAspectRatio="none"/></defs>` + rects.map((r) => picTurned(img, r)
+    ? `<use href="#dlpic" transform="translate(${tx(r.x) + r.w} ${ty(r.y)}) rotate(90) scale(${r.l} ${r.w})" style="mix-blend-mode:multiply" opacity=".9"/>`
+    : `<use href="#dlpic" transform="translate(${tx(r.x)} ${ty(r.y)}) scale(${r.w} ${r.l})" style="mix-blend-mode:multiply" opacity=".9"/>`).join('');
+}
+function topViewSvg(pallet, load, img = null) {
   const pad = 6;
   const minX = Math.min(0, ...load.rects.map((r) => r.x)), minY = Math.min(0, ...load.rects.map((r) => r.y));
   const maxX = Math.max(pallet.l, ...load.rects.map((r) => r.x + r.w)), maxY = Math.max(pallet.w, ...load.rects.map((r) => r.y + r.l));
@@ -396,7 +461,8 @@ function topViewSvg(pallet, load) {
     ${pallet.join === 'width' ? `<line x1="${tx(0)}" y1="${ty(pallet.w / 2)}" x2="${tx(pallet.l)}" y2="${ty(pallet.w / 2)}" stroke="#7a5a33" stroke-width=".6" stroke-dasharray="2 1"/>` : ''}
     ${pallet.join === 'length' ? `<line x1="${tx(pallet.l / 2)}" y1="${ty(0)}" x2="${tx(pallet.l / 2)}" y2="${ty(pallet.w)}" stroke="#7a5a33" stroke-width=".6" stroke-dasharray="2 1"/>` : ''}
     ${load.rects.map((r, i) => `<rect x="${tx(r.x) + 0.15}" y="${ty(r.y) + 0.15}" width="${r.w - 0.3}" height="${r.l - 0.3}" fill="#d9b88a" stroke="#6b4e2c" stroke-width=".35"/>
-      <text x="${tx(r.x + r.w / 2)}" y="${ty(r.y + r.l / 2) + fs * 0.35}" font-size="${fs}" text-anchor="middle" fill="#4a3519" font-family="sans-serif">${i + 1}</text>`).join('')}
+      ${img ? '' : `<text x="${tx(r.x + r.w / 2)}" y="${ty(r.y + r.l / 2) + fs * 0.35}" font-size="${fs}" text-anchor="middle" fill="#4a3519" font-family="sans-serif">${i + 1}</text>`}`).join('')}
+    ${picUses(img, load.rects, tx, ty)}
     ${load.chimney && load.chimney.w > 0.01 && load.chimney.l > 0.01 ? `<rect x="${tx(load.chimney.x)}" y="${ty(load.chimney.y)}" width="${load.chimney.w}" height="${load.chimney.l}" fill="none" stroke="#00694b" stroke-width=".5" stroke-dasharray="1.2 .8"/>` : ''}
     ${load.oversize || load.overhangX > 0.01 || load.overhangY > 0.01 ? `<rect x="${tx(0)}" y="${ty(0)}" width="${pallet.l}" height="${pallet.w}" fill="none" stroke="#b3261e" stroke-width=".6" stroke-dasharray="2 1.2"/><text x="${tx(pallet.l / 2)}" y="${ty(0) - 1}" font-size="${fs * 0.8}" text-anchor="middle" fill="#b3261e" font-family="sans-serif">pallet edge</text>` : ''}
     <text x="${tx(pallet.l / 2)}" y="${H - 1}" font-size="${fs * 0.9}" text-anchor="middle" fill="currentColor" font-family="sans-serif" opacity=".7">${fmtNum(pallet.l, pallet.l % 1 ? 2 : 0)}" length</text>
@@ -445,6 +511,23 @@ function box(w, h, d, x, y, z, mat) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
   m.position.set(x, y, z);
   return m;
+}
+
+// picture blended onto the board color (white page → kraft or white board, lines stay dark)
+const texCache = new Map();
+function picTexture(img, board) {
+  const key = img.url.length + ':' + img.url.slice(-64) + board;
+  if (texCache.has(key)) return texCache.get(key);
+  const c = document.createElement('canvas'); c.width = img.w; c.height = img.h;
+  const g = c.getContext('2d');
+  g.fillStyle = board === 'white' ? '#f1efe9' : '#c9a06d'; g.fillRect(0, 0, c.width, c.height);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const im = new Image();
+  im.onload = () => { g.globalCompositeOperation = 'multiply'; g.drawImage(im, 0, 0, c.width, c.height); tex.needsUpdate = true; };
+  im.src = img.url;
+  if (texCache.size > 6) { const [k0, t0] = texCache.entries().next().value; t0.dispose(); texCache.delete(k0); }
+  texCache.set(key, tex);
+  return tex;
 }
 
 function drawScene(data) {
@@ -505,6 +588,22 @@ function drawScene(data) {
     for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]]) edgePts.push(...P[a], ...P[b]);
   }
   meshes.forEach((m, i) => { m.count = counters[i]; m.instanceMatrix.needsUpdate = true; g.add(m); });
+  // die line picture on the top face of each stack
+  if (data.img) {
+    const tops = new Map();
+    for (const s of slots) { const r = (s.t % 2 && load.rectsAlt ? load.rectsAlt : load.rects)[s.c]; const top = PALLET_H + s.t * load.tierHeight + s.n * piece.h; const k = s.c; if (!tops.has(k) || tops.get(k).top < top) tops.set(k, { r, top }); }
+    const tex = picTexture(data.img, board);
+    const pg = new THREE.PlaneGeometry(1, 1); pg.rotateX(-Math.PI / 2);
+    const pm = new THREE.InstancedMesh(pg, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -2 }), tops.size);
+    let i = 0;
+    for (const { r, top } of tops.values()) {
+      const cx = r.x + r.w / 2 - L / 2, cz = r.y + r.l / 2 - W / 2, sx = r.w - gap, sz = r.l - gap, turn = picTurned(data.img, r);
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), turn ? -Math.PI / 2 : 0);
+      mtx.compose(new THREE.Vector3(cx, top - gap * 0.25 + 0.02, cz), q, turn ? new THREE.Vector3(sz, 1, sx) : new THREE.Vector3(sx, 1, sz));
+      pm.setMatrixAt(i++, mtx);
+    }
+    pm.instanceMatrix.needsUpdate = true; g.add(pm);
+  }
   if (edgePts.length) {
     const eg = new THREE.BufferGeometry();
     eg.setAttribute('position', new THREE.Float32BufferAttribute(edgePts, 3));
@@ -583,7 +682,7 @@ function printSheet() {
     </div>
     <div class="ps-pics">
       ${img ? `<figure><img src="${img}" alt="3D view of the load"><figcaption>${showLast ? 'Last pallet' : 'Full pallet'}</figcaption></figure>` : ''}
-      <figure>${topViewSvg(r.base, load)}<figcaption>Layer pattern (top view), ${load.cols} stacks, ${esc(patternText(load))}</figcaption></figure>${load.rectsAlt ? `<figure>${topViewSvg(r.base, { ...load, rects: load.rectsAlt })}<figcaption>Every other layer: flipped end for end</figcaption></figure>` : ''}
+      <figure>${topViewSvg(r.base, load, dlImage())}<figcaption>Layer pattern (top view), ${load.cols} stacks, ${esc(patternText(load))}</figcaption></figure>${load.rectsAlt ? `<figure>${topViewSvg(r.base, { ...load, rects: load.rectsAlt }, dlImage())}<figcaption>Every other layer: flipped end for end</figcaption></figure>` : ''}
     </div>
     ${state.notes ? `<div class="ps-notes"><b>Notes:</b> ${esc(state.notes)}</div>` : ''}
     <div class="ps-sign"><span>Built by: ______________________</span><span>Checked by: ______________________</span></div>`;

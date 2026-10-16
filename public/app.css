@@ -301,3 +301,10 @@ details.fold[open]{padding-bottom:16px}
 .tv-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .tv-pair figure{margin:0;text-align:center}
 @media (max-width:600px){.tv-pair{grid-template-columns:1fr}}
+
+/* die line picture + crop box */
+.dl-pic{display:flex;gap:10px;align-items:center;margin:0 0 10px;padding:8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel-2)}
+.dl-pic img{width:72px;height:72px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:6px;flex:none}
+.dl-crop{margin:0 0 12px}
+.dl-crop-area{position:relative;border:1px solid var(--line-2);border-radius:6px;overflow:hidden;touch-action:none;cursor:crosshair;background:#fff}
+.dl-crop-box{position:absolute;border:2px solid var(--accent);background:color-mix(in oklab,var(--accent) 12%,transparent);box-shadow:0 0 0 9999px rgba(0,0,0,.25);pointer-events:none}

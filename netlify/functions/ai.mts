@@ -34,7 +34,9 @@ Return strict JSON only, no markdown fences, no commentary:
 {"customer":string|null,"design":string|null,"description":string|null,"board":string|null,
 "grade_number":number|null,"grade_ect":boolean,"flute":"E|B|C|BC|A|SF"|null,"color":"KRAFT|WHITE"|null,
 "blank_width_in":number|null,"blank_length_in":number|null,"pieces_out":number|null,
-"piece_width_in":number|null,"piece_length_in":number|null,"rule_in":number|null,"notes":"one short sentence or empty"}
+"piece_width_in":number|null,"piece_length_in":number|null,"rule_in":number|null,
+"drawing_box":[left,top,right,bottom]|null,"notes":"one short sentence or empty"}
+drawing_box: where the outer cut lines of the whole blank (all pieces) sit on the page, as fractions of the page width/height from the top-left (0 to 1). Leave out the title block, dimension lines and border.
 grade_number: the number in the board grade (200 in "200 C Kraft", 32 in "32 ECT B"); grade_ect true when the grade is ECT. Flute BC for any double wall (BC, DW). Use null when a value is not in the document.`;
 
 export default async (req: Request) => {
