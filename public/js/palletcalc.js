@@ -73,7 +73,7 @@ function grid(x0, y0, w, l, a, b) {
 //   A (top-left, a×b)  | B (right, turned)
 //   D (left, turned)   | C (bottom-right, a×b)
 // Each block can hold more than one piece. Tries both spin directions and every block size.
-export function chimneyPattern(X, Y, a, b) {
+export function chimneyPattern(X, Y, a, b, fillCenter = false) {
   let best = null;
   for (const [p, q] of [[a, b], [b, a]]) {
     const maxAx = fit(X, p), maxAy = fit(Y, q), maxBy = fit(Y, p), maxDx = fit(X, q);
@@ -89,7 +89,13 @@ export function chimneyPattern(X, Y, a, b) {
           if (!((xD <= xA + 1e-9 && yB >= yA - 1e-9) || (xD >= xA - 1e-9 && yB <= yA + 1e-9))) continue;
           const nCx = fit(X - xD, p), nCy = fit(Y - yB, q);
           if (!nCx || !nCy) continue;
-          const count = nAx * nAy + nBx * nBy + nDx * nDy + nCx * nCy;
+          let count = nAx * nAy + nBx * nBy + nDx * nDy + nCx * nCy;
+          if (fillCenter) {
+            const hw = Math.abs(xA - xD), hl = Math.abs(yB - yA);
+            const inner = Math.max(fit(hw, p) * fit(hl, q), fit(hw, q) * fit(hl, p));
+            if (!inner) continue; // brick needs pieces in the middle
+            count += inner;
+          }
           if (!best || count > best.count) best = { count, p, q, nAx, nAy, nBx, nBy, nDx, nDy, nCx, nCy, xA, yA, yB, xD };
         }
       }
@@ -108,13 +114,109 @@ export function chimneyPattern(X, Y, a, b) {
   return { rects, count: rects.length, usedX, usedY, chimney: hole };
 }
 
-// mode: 'auto' (most pieces of any pattern), 'straight' (straight / two-block columns), 'chimney'
+// ---------- stacking patterns ----------
+// Block: one orientation, every layer the same. Row: rows turned both ways (two blocks), every layer the same.
+// Split row: rows staggered like bricks. Pinwheel: four blocks around an open center (chimney).
+// Hybrid pinwheel: a turned band between two outer bands. Brick: pinwheel with the center filled.
+// Split row, pinwheel, hybrid and brick interlock: every other layer is flipped end for end.
+export const PATTERNS = ['block', 'row', 'splitrow', 'hybrid', 'brick', 'pinwheel'];
+export const INTERLOCK = { splitrow: true, hybrid: true, brick: true, pinwheel: true };
+const LEGACY = { straight: 'row', chimney: 'pinwheel' };
+
+const usedOf = (rects) => ({ usedX: rects.length ? Math.max(...rects.map((r) => r.x + r.w)) : 0, usedY: rects.length ? Math.max(...rects.map((r) => r.y + r.l)) : 0 });
+
+export function blockPattern(X, Y, a, b) {
+  const g1 = grid(0, 0, X, Y, a, b), g2 = grid(0, 0, X, Y, b, a);
+  const rects = g2.length > g1.length ? g2 : g1;
+  return { rects, count: rects.length, ...usedOf(rects) };
+}
+
+// Rows of one orientation; every other row slides over so the seams don't line up.
+export function splitRowPattern(X, Y, a, b) {
+  let best = null;
+  for (const [p, q] of [[a, b], [b, a]]) for (const alongX of [true, false]) {
+    const LEN = alongX ? X : Y, DEP = alongX ? Y : X;
+    const n = fit(LEN, p), rows = fit(DEP, q);
+    if (!n || !rows) continue;
+    const slack = LEN - n * p;
+    // full rows that slide by up to half a piece, or (no room) every other row one piece short and centered
+    const opts = [{ shift: Math.min(slack, p / 2), short: 0 }];
+    if (n > 1) opts.push({ shift: p / 2, short: 1 });
+    for (const o of opts) {
+      if (o.short === 0 && o.shift < Math.min(p / 4, 2)) continue; // not enough stagger to tie the rows
+      // parity 0: odd rows staggered; parity 1 (next layer): even rows staggered, so seams cross layer to layer
+      const build = (parity) => { const rects = [];
+      for (let r = 0; r < rows; r++) {
+        const odd = r % 2 !== parity, cnt = odd ? n - o.short : n;
+        const start = o.short ? (odd ? p / 2 : 0) : (odd ? o.shift : 0);
+        for (let i = 0; i < cnt; i++) {
+          const u = start + i * p, v = r * q;
+          rects.push(alongX ? { x: u, y: v, w: p, l: q } : { x: v, y: u, w: q, l: p });
+        }
+      }
+      return rects; };
+      const rects = build(0), alt = build(1);
+      const c = { rects, rectsAlt: alt.length === rects.length ? alt : null, count: rects.length, stagger: o.shift };
+      if (!best || c.count > best.count || (c.count === best.count && c.stagger > best.stagger)) best = c;
+    }
+  }
+  if (!best) return { rects: [], count: 0, usedX: 0, usedY: 0 };
+  // both layers share one footprint so they center the same way
+  const u = usedOf([...best.rects, ...(best.rectsAlt || [])]);
+  return { rects: best.rects, rectsAlt: best.rectsAlt, count: best.count, ...u };
+}
+
+// Hybrid pinwheel: outer band | turned middle band | outer band (bands can run either way).
+export function hybridPattern(X, Y, a, b) {
+  let best = null;
+  for (const [p, q] of [[a, b], [b, a]]) for (const alongX of [true, false]) {
+    const LEN = alongX ? X : Y, DEP = alongX ? Y : X;
+    const outerRows = fit(DEP, q);
+    for (let top = 1; top < outerRows; top++) for (let bot = 1; top + bot < outerRows + 1; bot++) {
+      const midDep = DEP - (top + bot) * q;
+      if (midDep < p - 1e-9) continue;
+      const nOut = fit(LEN, p), nMid = fit(LEN, q), midRows = fit(midDep, p);
+      if (!nOut || !nMid || !midRows) continue;
+      const rects = [];
+      const put = (u, v, w, l) => rects.push(alongX ? { x: u, y: v, w, l } : { x: v, y: u, w: l, l: w });
+      const cOut = (LEN - nOut * p) / 2, cMid = (LEN - nMid * q) / 2;
+      for (let r = 0; r < top; r++) for (let i = 0; i < nOut; i++) put(cOut + i * p, r * q, p, q);
+      for (let r = 0; r < midRows; r++) for (let i = 0; i < nMid; i++) put(cMid + i * q, top * q + r * p, q, p);
+      for (let r = 0; r < bot; r++) for (let i = 0; i < nOut; i++) put(cOut + i * p, top * q + midRows * p + r * q, p, q);
+      if (!best || rects.length > best.count) best = { rects, count: rects.length };
+    }
+  }
+  if (!best) return { rects: [], count: 0, usedX: 0, usedY: 0 };
+  return { rects: best.rects, count: best.count, ...usedOf(best.rects) };
+}
+
+// Brick: a pinwheel ring with the open center filled by a straight block.
+export function brickPattern(X, Y, a, b) {
+  const ring = chimneyPattern(X, Y, a, b, true);
+  if (!ring.count || !ring.chimney) return { rects: [], count: 0, usedX: 0, usedY: 0 };
+  const h = ring.chimney;
+  const g = blockPattern(h.w, h.l, a, b);
+  const dx = h.x + (h.w - g.usedX) / 2, dy = h.y + (h.l - g.usedY) / 2;
+  const rects = [...ring.rects, ...g.rects.map((q) => ({ ...q, x: q.x + dx, y: q.y + dy }))];
+  return { rects, count: rects.length, ...usedOf(rects) };
+}
+
+export function patternOf(kind, X, Y, a, b) {
+  if (kind === 'block') return blockPattern(X, Y, a, b);
+  if (kind === 'row') return bestPattern(X, Y, a, b);
+  if (kind === 'splitrow') return splitRowPattern(X, Y, a, b);
+  if (kind === 'hybrid') return hybridPattern(X, Y, a, b);
+  if (kind === 'brick') return brickPattern(X, Y, a, b);
+  return chimneyPattern(X, Y, a, b);
+}
+
+// mode: 'auto' (most pieces; simplest pattern wins a tie) or one of PATTERNS
 export function patternFor(X, Y, a, b, mode = 'auto') {
-  if (mode === 'chimney') return { ...chimneyPattern(X, Y, a, b), kind: 'chimney' };
-  const straight = { ...bestPattern(X, Y, a, b), kind: 'straight' };
-  if (mode === 'straight') return straight;
-  const ch = chimneyPattern(X, Y, a, b);
-  return ch.count > straight.count ? { ...ch, kind: 'chimney' } : straight;
+  mode = LEGACY[mode] || mode;
+  if (PATTERNS.includes(mode)) return { ...patternOf(mode, X, Y, a, b), kind: mode };
+  let best = null;
+  for (const k of PATTERNS) { const p = patternOf(k, X, Y, a, b); if (!best || p.count > best.count) best = { ...p, kind: k }; }
+  return best;
 }
 
 export function bestPattern(X, Y, a, b) {
@@ -167,6 +269,10 @@ function loadOn({ piece, pallet, overhang = 0, maxStack, bundle, mode = 'auto', 
   // center the pattern on the pallet (x along pallet length, y along width; origin = pallet corner)
   const offX = (pallet.l - pat.usedX) / 2, offY = (pallet.w - pat.usedY) / 2;
   const rects = pat.rects.map((r) => ({ ...r, x: r.x + offX, y: r.y + offY }));
+  // interlocking patterns: every other layer flipped end for end (mirror along the pallet length)
+  const rectsAlt = pat.rectsAlt ? pat.rectsAlt.map((r) => ({ ...r, x: r.x + offX, y: r.y + offY }))
+    : INTERLOCK[pat.kind] ? rects.map((r) => ({ ...r, x: pallet.l - r.x - r.w })) : null;
+  const sameLayers = !rectsAlt || rects.every((r) => rectsAlt.some((q) => Math.abs(q.x - r.x) < 1e-6 && Math.abs(q.y - r.y) < 1e-6 && Math.abs(q.w - r.w) < 1e-6));
   const perStackMax = Math.floor((maxStack + 1e-9) / piece.h);
   // Stacks are filled to the height limit; the top bundle can be partial unless fullBundles is set.
   let tierPieces, tiers, perStack;
@@ -181,7 +287,7 @@ function loadOn({ piece, pallet, overhang = 0, maxStack, bundle, mode = 'auto', 
   const rawPerPallet = pat.count * perStack;
   const perPallet = bundle > 0 && rawPerPallet > 0 ? Math.max(bundle, Math.round(rawPerPallet / bundle) * bundle) : rawPerPallet;
   return {
-    rects, cols: pat.count, kind: pat.kind, chimney: pat.chimney ? { ...pat.chimney, x: pat.chimney.x + offX, y: pat.chimney.y + offY } : null, tiers, fullTiers, loose, tierPieces, perStack, perPallet, rawPerPallet, bundlesPerPallet: bundle > 0 ? perPallet / bundle : 0,
+    rects, rectsAlt: sameLayers ? null : rectsAlt, cols: pat.count, kind: pat.kind, chimney: pat.kind === 'pinwheel' && pat.chimney ? { ...pat.chimney, x: pat.chimney.x + offX, y: pat.chimney.y + offY } : null, tiers, fullTiers, loose, tierPieces, perStack, perPallet, rawPerPallet, bundlesPerPallet: bundle > 0 ? perPallet / bundle : 0,
     tierHeight: tierPieces * piece.h,
     stackHeight: perStack * piece.h,
     footprintUse: pat.count ? Math.min(1, (pat.count * piece.a * piece.b) / (pallet.l * pallet.w)) : 0,

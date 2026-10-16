@@ -296,3 +296,8 @@ details.fold > summary::before{content:'';width:9px;height:9px;border-right:2px 
 details.fold[open] > summary::before{transform:rotate(45deg)}
 details.fold > :not(summary){margin-left:16px;margin-right:16px}
 details.fold[open]{padding-bottom:16px}
+
+#patSeg button.pat-btn{min-height:auto;padding:6px 10px}
+.tv-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tv-pair figure{margin:0;text-align:center}
+@media (max-width:600px){.tv-pair{grid-template-columns:1fr}}

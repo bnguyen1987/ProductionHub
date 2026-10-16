@@ -2,6 +2,19 @@ import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { $, $$, esc, api, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
 import { readDieline } from './dieline.js';
+
+// Stacking pattern buttons (matches the pallet stacking pattern chart)
+const PAT_BTNS = [
+  ['block', 'Block', 'all one way'], ['row', 'Row', 'rows turned'], ['splitrow', 'Split row', 'staggered rows'],
+  ['brick', 'Brick', 'interlocked'], ['pinwheel', 'Pinwheel', 'open center'], ['hybrid', 'Hybrid pinwheel', 'turned middle'],
+];
+const PAT_NAME = Object.fromEntries(PAT_BTNS.map(([k, t]) => [k, t]));
+// little picture of each pattern for the button
+const PAT_ICON = (k) => {
+  const R = { block: [[0,0,6,4],[6,0,6,4],[0,4,6,4],[6,4,6,4]], row: [[0,0,4,8],[4,0,4,8],[8,0,4,8]], splitrow: [[0,0,5,4],[5,0,5,4],[2,4,5,4],[7,4,5,4]],
+    brick: [[0,0,8,3],[8,0,4,8],[4,8,8,3],[0,3,4,8],[4,3,4,5]], pinwheel: [[0,0,8,3],[8,0,4,8],[4,8,8,3],[0,3,4,8]], hybrid: [[0,0,12,3],[0,3,4,5],[4,3,4,5],[8,3,4,5],[0,8,12,3]] }[k] || [];
+  return `<svg viewBox="-.5 -.5 13 12" width="34" height="30" aria-hidden="true" style="display:block;margin:2px auto 3px">${R.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#d9b88a" stroke="#6b4e2c" stroke-width=".5"/>`).join('')}</svg>`;
+};
 import { perTrailer, TRAILER, CALIPER, FOLD_ALLOWANCE, GRADES_BY_FLUTE, boardSpec, DEFAULT_PALLET_PRICES, palletCatalog, flatPiece, loadFor, loadTwo, palletsNeeded, recommend } from './palletcalc.js';
 
 let PALLET_H = 5; // wood pallet height (in), set from the form
@@ -17,6 +30,7 @@ const DEFAULTS = { htOnly: false, two: '1', pattern: 'auto', customer: '', job: 
 export function render(view) {
   state = { ...DEFAULTS, ...(loadForm('pallet') || {}) };
   // these settings are hidden on screen, so always use the standard values
+  state.pattern = { straight: 'row', chimney: 'pinwheel' }[state.pattern] || state.pattern;
   state.foldPct = DEFAULTS.foldPct; state.thick = ''; state.palletH = DEFAULTS.palletH;
   state.lbsMsf = String(boardSpec(state.flute, state.grade).lbsMsf);
   view.innerHTML = `
@@ -83,8 +97,7 @@ export function render(view) {
           <div class="lbl" style="margin:2px 0 6px">Stacking pattern</div>
           <div class="seg" id="patSeg">
             <button type="button" data-k="auto">Most pieces<small>picks the best</small></button>
-            <button type="button" data-k="straight">Straight columns</button>
-            <button type="button" data-k="chimney">Chimney<small>pinwheel, open center</small></button>
+            ${PAT_BTNS.map(([k, t, sub]) => `<button type="button" data-k="${k}" class="pat-btn">${PAT_ICON(k)}${t}<small>${sub}</small></button>`).join('')}
           </div>
         </section>
         <section class="card no-print">
@@ -278,7 +291,7 @@ function update() {
   }
   const flat = `${fmtIn(r.piece.b)} × ${fmtIn(r.piece.a)}`;
   if (r.noFit || !r.load.perPallet) {
-    res.innerHTML = `<h2>Result</h2><div class="alert err">The piece (${flat} flat) does not fit ${r.noFit ? 'any standard pallet' : 'this pallet'} at this height and overhang. Try a bigger pallet, more overhang, ${state.two === '2' ? '' : '<b>2 side by side</b>, '}or fewer pieces per bundle.${state.pattern === 'chimney' ? ' A chimney needs room for four pieces turning around the center, so it also helps to try Straight columns.' : ''}</div>`;
+    res.innerHTML = `<h2>Result</h2><div class="alert err">The piece (${flat} flat) does not fit ${r.noFit ? 'any standard pallet' : 'this pallet'} at this height and overhang. Try a bigger pallet, more overhang, ${state.two === '2' ? '' : '<b>2 side by side</b>, '}or fewer pieces per bundle.${state.pattern !== 'auto' ? ` The ${PAT_NAME[state.pattern] || ''} pattern may not fit this piece, so also try "Most pieces".` : ''}</div>`;
     recBox.innerHTML = '';
     drawScene(null); $('#topView').innerHTML = '';
     return;
@@ -364,7 +377,9 @@ function update() {
     <p class="hint" style="margin:8px 0 0">Per trailer = 53' van: 96" usable width, 630" long, 108" high inside; double stacked when two fit under the roof.</p>`;
   $$('#palRecs [data-pick]').forEach((b) => b.addEventListener('click', () => { state.pallet = b.dataset.pick; $('#pPal').value = state.pallet; update(); }));
 
-  $('#topView').innerHTML = topViewSvg(r.base, load);
+  $('#topView').innerHTML = load.rectsAlt
+    ? `<div class="tv-pair"><figure>${topViewSvg(r.base, load)}<figcaption class="hint">Layer 1, 3, 5…</figcaption></figure><figure>${topViewSvg(r.base, { ...load, rects: load.rectsAlt })}<figcaption class="hint">Layer 2, 4, 6… (flipped)</figcaption></figure></div>`
+    : topViewSvg(r.base, load);
   drawScene({ pallet: r.base, load, piece: r.piece, pieces: shownPieces, board: state.board });
 }
 
@@ -476,7 +491,7 @@ function drawScene(data) {
   const mtx = new THREE.Matrix4();
   const gap = 0.12;
   for (const s of slots) {
-    const r = load.rects[s.c];
+    const r = (s.t % 2 && load.rectsAlt ? load.rectsAlt : load.rects)[s.c]; // interlocking: odd layers flipped
     const h = s.n * piece.h;
     const y0 = PALLET_H + s.t * load.tierHeight;
     const cx = r.x + r.w / 2 - L / 2, cz = r.y + r.l / 2 - W / 2;
@@ -568,7 +583,7 @@ function printSheet() {
     </div>
     <div class="ps-pics">
       ${img ? `<figure><img src="${img}" alt="3D view of the load"><figcaption>${showLast ? 'Last pallet' : 'Full pallet'}</figcaption></figure>` : ''}
-      <figure>${topViewSvg(r.base, load)}<figcaption>Layer pattern (top view), ${load.cols} stacks, ${load.kind === 'chimney' ? 'chimney' : 'straight'}</figcaption></figure>
+      <figure>${topViewSvg(r.base, load)}<figcaption>Layer pattern (top view), ${load.cols} stacks, ${esc(patternText(load))}</figcaption></figure>${load.rectsAlt ? `<figure>${topViewSvg(r.base, { ...load, rects: load.rectsAlt })}<figcaption>Every other layer: flipped end for end</figcaption></figure>` : ''}
     </div>
     ${state.notes ? `<div class="ps-notes"><b>Notes:</b> ${esc(state.notes)}</div>` : ''}
     <div class="ps-sign"><span>Built by: ______________________</span><span>Checked by: ______________________</span></div>`;
@@ -590,9 +605,9 @@ function weights(r) {
 }
 
 function patternText(load) {
-  if (load.kind !== 'chimney') return 'Straight columns';
-  const h = load.chimney;
-  return h && h.w > 0.01 && h.l > 0.01 ? `Chimney (${fmtIn(h.w)} × ${fmtIn(h.l)} open center)` : 'Chimney (pinwheel)';
+  const name = PAT_NAME[load.kind] || 'Block';
+  if (load.kind === 'pinwheel') { const h = load.chimney; return h && h.w > 0.01 && h.l > 0.01 ? `Pinwheel (${fmtIn(h.w)} × ${fmtIn(h.l)} open center)` : 'Pinwheel'; }
+  return load.rectsAlt ? `${name}, every other layer flipped` : name;
 }
 
 function palletLabel(r) {
