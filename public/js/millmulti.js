@@ -71,7 +71,7 @@ function run() {
   saveForm('millmulti', st);
   $$('#mmStep button', box).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === st.step)));
   const orders = st.rows.map((r, i) => ({ name: `Blank ${i + 1}`, w: parseInches(r.w), l: parseInches(r.l), qty: Math.floor(parseFloat(r.qty) || 0) }))
-    .filter((o) => o.w > 0 && o.l > 0);
+    .filter((o) => o.w >= 1 && o.l >= 1 && o.w <= 300 && o.l <= 300);
   const minW = parseInches(st.minW), maxW = parseInches(st.maxW), minL = parseInches(st.minL), maxL = parseInches(st.maxL);
   const res = $('#mmResult', box), det = $('#mmDetail', box);
   if (orders.length < 1) {

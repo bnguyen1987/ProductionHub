@@ -211,8 +211,23 @@ export function patternOf(kind, X, Y, a, b) {
 }
 
 // mode: 'auto' (most pieces; simplest pattern wins a tie) or one of PATTERNS
+// Guard against typos (0, negative, 99999"): too many pieces per layer would freeze the page.
+export const MAX_PER_LAYER = 3000;
+const EMPTY = { rects: [], count: 0, usedX: 0, usedY: 0 };
+const roughCount = (X, Y, a, b) => (X * Y) / (a * b);
+// the pinwheel/brick search grows fast, so skip it when it would take too long
+const chimneyCost = (X, Y, a, b) => [[a, b], [b, a]].reduce((n, [p, q]) => n + fit(X, p) * fit(Y, q) * fit(Y, p) * fit(X, q), 0);
 export function patternFor(X, Y, a, b, mode = 'auto') {
   mode = LEGACY[mode] || mode;
+  if (!(a > 0 && b > 0 && X > 0 && Y > 0 && isFinite(a) && isFinite(b) && isFinite(X) && isFinite(Y))) return { ...EMPTY, kind: PATTERNS.includes(mode) ? mode : 'block' };
+  if (roughCount(X, Y, a, b) > MAX_PER_LAYER) return { ...EMPTY, kind: PATTERNS.includes(mode) ? mode : 'block', tooMany: true };
+  // many small pieces: only the simple patterns (the interlocking searches get slow and add nothing)
+  const many = roughCount(X, Y, a, b) > 200, slowPin = many || chimneyCost(X, Y, a, b) > 2e5;
+  if (mode === 'auto' && (many || slowPin)) {
+    const kinds = many ? ['block', 'row'] : ['block', 'row', 'splitrow', 'hybrid'];
+    let best = null; for (const k of kinds) { const p = patternOf(k, X, Y, a, b); if (!best || p.count > best.count) best = { ...p, kind: k }; } return best;
+  }
+  if (slowPin && ['pinwheel', 'brick'].includes(mode)) return { ...EMPTY, kind: mode };
   if (PATTERNS.includes(mode)) return { ...patternOf(mode, X, Y, a, b), kind: mode };
   let best = null;
   for (const k of PATTERNS) { const p = patternOf(k, X, Y, a, b); if (!best || p.count > best.count) best = { ...p, kind: k }; }

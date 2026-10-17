@@ -159,8 +159,8 @@ function calc() {
   const qtyTxt = boxes ? (outs > 1 ? `${fmtNum(boxes)} boxes (${fmtNum(qty)} blanks)` : `${fmtNum(qty)} blanks`) : '';
   $('#sBlanks').textContent = boxes ? fmtNum(qty) : '–';
   const res = $('#stockResult'), mill = $('#millBox');
-  if (!(oW > 0 && oL > 0)) {
-    res.innerHTML = '<h2>Results</h2><p class="hint" style="margin:0">Enter the blank width and length.</p>';
+  if (!(oW >= 1 && oL >= 1 && oW <= 300 && oL <= 300)) {
+    res.innerHTML = `<h2>Results</h2><p class="hint" style="margin:0">${oW > 0 || oL > 0 ? 'Check the blank size. Width and length must be between 1" and 300".' : 'Enter the blank width and length.'}</p>`;
     mill.innerHTML = '';
     return;
   }

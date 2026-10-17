@@ -105,7 +105,9 @@ export function machineStatus(m, entries, plan, today = todayYmd()) {
   const pending = mine.filter((e) => e.status === 'Pending');
   const sched = planFor(plan, m.id);
   let next = null, shift = '', scheduled = false;
-  const nextPlan = sched.find((p) => !last || dn(p.date) - EARLY_DAYS > dn(last.date));
+  // never signed off yet: don't count dates from before the plan was in use (only the last cycle back)
+  const nextPlan = last ? sched.find((p) => dn(p.date) - EARLY_DAYS > dn(last.date))
+    : sched.find((p) => dn(p.date) >= dn(today) - CYCLE_DAYS);
   if (nextPlan) { next = nextPlan.date; shift = nextPlan.shift; scheduled = true; }
   else if (last) next = addDays(last.date, CYCLE_DAYS);
   if (!next) return { key: 'none', label: 'Not logged', cls: 'info', last, pending, next: null, shift: '', scheduled: false };

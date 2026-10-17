@@ -202,6 +202,7 @@ export const ES = {
   "Useful for sizes that aren't in the export yet.": 'Útil para tamaños que todavía no están en el export.',
   '+ Add size': '+ Agregar tamaño',
   'Enter the blank width and length.': 'Escriba el ancho y largo del blank.',
+  'Check the blank size. Width and length must be between 1" and 300".': 'Revise el tamaño del blank. El ancho y el largo deben estar entre 1" y 300".',
   'e.g. 275': 'ej. 275', 'e.g. 17 or 17 1/2': 'ej. 17 o 17 1/2', 'Upload stock export': 'Subir export de inventario',
   Item: 'Artículo', 'Pcs/sht': 'Pzs/lám', Waste: 'Desperdicio', Need: 'Necesita', Avail: 'Disp.', Pull: 'Sacar',
   Exact: 'Exacto', Upgrade: 'Mejor grado', 'Typed in': 'A mano',
