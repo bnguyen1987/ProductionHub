@@ -107,7 +107,9 @@ function run() {
       <dt>Sheet</dt><dd>${fmtIn(sheetW)} × ${fmtIn(sheetL)}${estimated ? ' <span class="pill warn">estimated</span>' : ''}</dd>
       <dt>Flute / colors</dt><dd>${esc(o.flute || '–')} · ${+o.colors ? esc(o.colors) + ' color' : 'no print'}</dd>
       ${+o.qty ? `<dt>Quantity</dt><dd>${fmtNum(+o.qty)}</dd>` : ''}
+      ${best && qty ? `<dt>Run time</dt><dd><b>${dur(runHours(best.machine, qty, up))}</b> on ${esc(best.machine.name)}</dd>` : ''}
     </dl>
+    ${!qty ? '<p class="hint" style="margin:0 0 10px">Enter the quantity to see how long it will take to run.</p>' : ''}
     ${results.map((r) => {
       const m = r.machine;
       const isBest = r === best;
@@ -117,8 +119,9 @@ function run() {
           <b>${esc(m.name)}</b>
           <span class="pill ${r.status === 'pass' ? 'ok' : r.status === 'warn' ? 'warn' : 'bad'}">${r.status === 'pass' ? 'Can run' : r.status === 'warn' ? 'Check' : 'Cannot run'}</span>
           ${isBest ? '<span class="pill star">Best fit</span>' : ''}
-          <span class="meta">#${m.id} · crew ${esc(m.crewTxt)}${m.speed ? ` · ${fmtNum(m.speed)}/hr${m.speedEst ? ' (est.)' : ''}` : ''} · setup ${m.setup} min${hrs ? ` · ~${fmtNum(hrs, 1)} hrs` : ''}</span>
+          <span class="meta">#${m.id} · crew ${esc(m.crewTxt)}${m.speed ? ` · ${fmtNum(m.speed)}/hr${m.speedEst ? ' (est.)' : ''}` : ''} · setup ${m.setup} min</span>
         </div>
+        ${hrs && r.status !== 'fail' ? `<div class="runtime">Run time: <b>${dur(hrs)}</b> <span class="hint">(${dur(m.setup / 60)} setup + ${dur(hrs - m.setup / 60)} running)</span>${hrs > 8 ? ` <span class="hint">≈ ${fmtNum(hrs / 8, 1)} shifts</span>` : ''}</div>` : ''}
         <ul>
           ${r.fails.map((t) => `<li class="bad">${esc(t)}</li>`).join('')}
           ${r.warns.map((t) => `<li class="warn">${esc(t)}</li>`).join('')}
@@ -127,7 +130,14 @@ function run() {
         </ul>
       </div>`;
     }).join('')}
-    <p class="note" style="margin:12px 0 0">Checks sheet size, flute, print colors, panel sizes, inches of rule, number-up and machine minimums against the machine spec sheets (${SPEC_REV}). It does not check die board size, tooling on hand, or schedule capacity. Hours = quantity at the DPR standard speed plus standard setup (setup times are estimates).</p>`;
+    <p class="note" style="margin:12px 0 0">Checks sheet size, flute, print colors, panel sizes, inches of rule, number-up and machine minimums against the machine spec sheets (${SPEC_REV}). It does not check die board size, tooling on hand, or schedule capacity. Run time = quantity at the DPR standard speed plus standard setup. Setup times are estimates; shifts are counted as 8 hours.</p>`;
+}
+
+// 2.25 → "2 hr 15 min"
+function dur(h) {
+  const m = Math.max(1, Math.round(h * 60));
+  const hh = Math.floor(m / 60), mm = m % 60;
+  return hh ? `${hh} hr${mm ? ` ${mm} min` : ''}` : `${mm} min`;
 }
 
 async function readQuote(file) {

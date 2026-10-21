@@ -19,6 +19,10 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Run time': 'Tiempo de corrida',
+  'Run time:': 'Tiempo de corrida:',
+  'Enter the quantity to see how long it will take to run.': 'Escriba la cantidad para ver cuánto tiempo tomará correrlo.',
+  'Run time = quantity at the DPR standard speed plus standard setup. Setup times are estimates; shifts are counted as 8 hours.': 'Tiempo de corrida = cantidad a la velocidad estándar del DPR más el arranque estándar. Los tiempos de arranque son aproximados; los turnos se cuentan de 8 horas.',
   // ---- shell / home ----
   'Production Hub': 'Production Hub',
   'Sign out': 'Salir',
@@ -349,6 +353,11 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  // order check run time
+  [/^(\d+) hr(?: (\d+) min)?$/, (_, h, m) => `${h} h${m ? ` ${m} min` : ''}`],
+  [/^\((.+) setup \+ (.+) running\)$/, (_, a, b) => `(${a.replace(/ hr/g, ' h')} de arranque + ${b.replace(/ hr/g, ' h')} corriendo)`],
+  [/^≈ ([\d.,]+) shifts$/, '≈ $1 turnos'],
+  [/^on (.+)$/, 'en $1'],
   // home
   [/^(\d+) new change requests?$/, (_, n) => (n === '1' ? '1 solicitud de cambio nueva' : `${n} solicitudes de cambio nuevas`)],
   [/^(\d{4}-\d{2}-\d{2}) · (1st|2nd) shift$/, (_, d, s) => `${d} · turno ${shiftEs[s]}`],
@@ -483,7 +492,7 @@ export const PATTERNS = [
   [/^Panels OK \(L \+ W (.+), within 11 13\/16"–47 1\/4"\)$/, 'Paneles OK (L + A $1, dentro de 11 13/16"–47 1/4")'],
   [/^Panels (.+) × (.+) are under the minimum slots of (.+) × (.+)$/, 'Paneles $1 × $2 son menores que las ranuras mínimas de $3 × $4'],
   [/^Under the machine minimum of (\d+) (pcs|sheets) \((\d+) (pcs|sheets)\)$/, (_, m, u, n) => `Menos del mínimo de la máquina de ${m} ${u === 'sheets' ? 'láminas' : 'pzs'} (${n})`],
-  [/^Checks sheet size, flute, print colors, panel sizes, inches of rule, number-up and machine minimums against the machine spec sheets \((.+)\)\. .*$/, 'Revisa tamaño de lámina, flauta, colores, tamaño de paneles, pulgadas de cuchilla, salidas y mínimos de máquina contra las hojas de especificación ($1). No revisa el tamaño de la tabla del suaje, la herramienta disponible ni la capacidad del programa. Horas = cantidad a la velocidad estándar del DPR más el arranque estándar (los tiempos de arranque son estimados).'],
+  [/^Checks sheet size, flute, print colors, panel sizes, inches of rule, number-up and machine minimums against the machine spec sheets \((.+)\)\. .*$/, 'Revisa tamaño de lámina, flauta, colores, tamaño de paneles, pulgadas de cuchilla, salidas y mínimos de máquina contra las hojas de especificación ($1). No revisa el tamaño de la tabla del suaje, la herramienta disponible ni la capacidad del programa. Tiempo de corrida = cantidad a la velocidad estándar del DPR más el arranque estándar. Los tiempos de arranque son aproximados; los turnos se cuentan de 8 horas.'],
   [/^about ([\d,]+) sq ft, under 2,000 sq ft\. Policy: run it on the slitter from stock sheets(?: \((.+)\))?\.( Anything under 12" goes to the bandsaw\.)?( Sheet is over the slitter limits \(80" × 142"\)\.)? Check the Stock Sheet tab for a sheet to cut from\.$/, (_, n, list, bs, over) => `unos ${n} pies², menos de 2,000 pies². Regla: correrla en la cortadora con láminas de inventario${list ? ` (${list.replace(/ or /g, ' o ').replace(/Slitter/g, 'cortadora')})` : ''}.${bs ? ' Lo de menos de 12" va a la sierra de cinta.' : ''}${over ? ' La lámina pasa los límites de la cortadora (80" × 142").' : ''} Revise la pestaña Láminas para encontrar una lámina para cortar.`],
   [/^Sheet (.+) × (.+) fits \((.+)\)$/, 'Lámina $1 × $2 cabe ($3)'],
   [/^Width (.+) is over (.+)\. Only runs with skip-feed \(up to (.+)\)$/, 'Ancho $1 pasa de $2. Solo corre con skip-feed (hasta $3)'],

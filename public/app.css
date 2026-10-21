@@ -308,3 +308,5 @@ details.fold[open]{padding-bottom:16px}
 .dl-crop{margin:0 0 12px}
 .dl-crop-area{position:relative;border:1px solid var(--line-2);border-radius:6px;overflow:hidden;touch-action:none;cursor:crosshair;background:#fff}
 .dl-crop-box{position:absolute;border:2px solid var(--accent);background:color-mix(in oklab,var(--accent) 12%,transparent);box-shadow:0 0 0 9999px rgba(0,0,0,.25);pointer-events:none}
+
+.mach .runtime { margin: 6px 0 2px; font-size: .95em; }
