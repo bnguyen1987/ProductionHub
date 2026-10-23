@@ -252,14 +252,14 @@ function build(wrap, focusId) {
   sun.position.set(-38, 70, 46);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -62, right: 62, top: 42, bottom: -42, near: 10, far: 200 });
+  Object.assign(sun.shadow.camera, { left: -64, right: 64, top: 58, bottom: -58, near: 10, far: 220 });
   sun.shadow.radius = 4; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
   scene.add(sun);
 
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -500, 1000);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true; controls.dampingFactor = 0.08;
-  controls.minZoom = 0.7; controls.maxZoom = 7;
+  controls.minZoom = 0.45; controls.maxZoom = 7;
   controls.minPolarAngle = 0.15; controls.maxPolarAngle = 1.3;
   controls.screenSpacePanning = true;
   controls.zoomToCursor = true;
@@ -272,8 +272,10 @@ function build(wrap, focusId) {
   buildMachines(scene, anims, machines, pickables);
   buildPeople(scene, anims, machines);
   buildForklifts(scene, anims);
+  buildTrucks(scene, anims);
 
   three = { renderer, scene, camera, controls, raf: 0, ro: null, cleanup: [], machines };
+  three.anims = anims;
   if (/[?&]debug\b/.test(location.search)) window.__floor = three; // for testing only
   // name tags keep about the same size on screen at any zoom
   const tags = [];
@@ -295,13 +297,14 @@ function build(wrap, focusId) {
     // tall screens (phones): turn the long building to run up the screen and look down a little more
     const tall = aspect < 0.9;
     const az = tall ? Math.PI / 2 : HOME.az, polar = tall ? THREE.MathUtils.degToRad(42) : HOME.polar;
-    camera.position.set(Math.sin(polar) * Math.sin(az) * dist, Math.cos(polar) * dist, Math.sin(polar) * Math.cos(az) * dist);
-    controls.target.set(0, 0, 0);
+    const zTop = tall ? Z(78) : YARD.far - 3; // phones frame the building only; the yard is a zoom-out away
+    controls.target.set((X(35) + X(1078)) / 2, 0, (zTop + Z(698)) / 2);
+    camera.position.set(Math.sin(polar) * Math.sin(az) * dist, Math.cos(polar) * dist, Math.sin(polar) * Math.cos(az) * dist).add(controls.target);
     camera.lookAt(controls.target);
     camera.updateMatrixWorld();
     const inv = camera.matrixWorldInverse;
     let mx = 0, my = 0;
-    for (const x of [X(35), X(1078)]) for (const z of [Z(78), Z(698)]) for (const y of [0, 2.5]) {
+    for (const x of [X(35), X(1078)]) for (const z of [zTop, Z(698)]) for (const y of [0, 2.5]) {
       const p = new THREE.Vector3(x, y, z).applyMatrix4(inv);
       mx = Math.max(mx, Math.abs(p.x)); my = Math.max(my, Math.abs(p.y - 0));
     }
@@ -462,16 +465,23 @@ function buildPlant(scene, anims) {
     sides.forEach((s, i) => { if (!open.includes(i)) wall(...s, h, 0.3, 0xf3f5f9); });
   };
   room(745, 92, 845, 150, 2.4, [0]);
-  room(935, 78, 1078, 160, 2.4, [0, 1]);
-  wall(880, 160, 880, 265, 2.4, 0.3, 0xf3f5f9); wall(880, 200, 1078, 200, 2.4, 0.3, 0xf3f5f9);
-  room(980, 268, 1078, 450, 2.4, [1]);
+  // offices block (drawing outline): L-shaped, restrooms off the hall, lunch room between offices and design
+  const iw = (pts, h = 2.4) => { for (let i = 0; i < pts.length - 1; i++) wall(...pts[i], ...pts[i + 1], h, 0.3, 0xf3f5f9); };
+  iw([[845, 125], [882, 125], [882, 264], [928, 264], [928, 227], [912, 227], [912, 212], [990, 212], [990, 187], [1004, 187], [1004, 227], [967, 227], [967, 270], [980, 270]]);
+  iw([[1004, 201], [1078, 201]]);
+  iw([[905, 212], [905, 264]]); // between the two restrooms
+  // front room with the curved wall (top of the offices)
+  iw([[940, 78], [940, 127], [967, 127], [967, 110]]);
+  { const a = V(967, 110), c = V(1022, 90), b = V(1078, 107), arc = new THREE.QuadraticBezierCurve3(a, c, b); const ps = arc.getPoints(8);
+    for (let i = 0; i < ps.length - 1; i++) { const p0 = ps[i], p1 = ps[i + 1], len = p0.distanceTo(p1); const m = mesh(rbox(len + 0.3, 2.4, 0.3, 0.1), smat(0xdfe8fb, { transparent: true, opacity: 0.85 }), (p0.x + p1.x) / 2, 1.2, (p0.z + p1.z) / 2); m.rotation.y = -Math.atan2(p1.z - p0.z, p1.x - p0.x); g.add(m); } }
+  room(980, 270, 1078, 450, 2.4, [1]);
   room(1032, 452, 1078, 515, 1.6, [1]);
   // room floors tinted, and their names
   const tint = (x1, y1, x2, y2, col) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(X(x2) - X(x1), Z(y2) - Z(y1)), smat(col)); p.rotation.x = -Math.PI / 2; p.position.set((X(x1) + X(x2)) / 2, 0.012, (Z(y1) + Z(y2)) / 2); p.receiveShadow = true; g.add(p); };
-  tint(745, 92, 845, 150, 0xe9edf6); tint(935, 78, 1078, 160, 0xeef1fb); tint(980, 268, 1078, 450, 0xeef1fb); tint(700, 85, 745, 150, 0xf4efe6); tint(1032, 452, 1078, 515, 0xf3ece2);
+  tint(745, 92, 845, 150, 0xe9edf6); tint(882, 80, 1078, 201, 0xeef1fb); tint(882, 212, 928, 264, 0xe6eef7); tint(967, 201, 1078, 270, 0xf6efe2); tint(980, 270, 1078, 450, 0xeef1fb); tint(700, 85, 745, 150, 0xf4efe6); tint(1032, 452, 1078, 515, 0xf3ece2);
   const tag = (txt, px, py, s = 0.75) => { const l = label(txt, '', s); l.position.copy(V(px, py, 3.2)); g.add(l); };
-  tag('Maintenance', 795, 120); tag('Offices', 1005, 120); tag('Design', 1030, 360); tag('Lunch', 722, 118, 0.6); tag('Die Cutting Materials', 1055, 482, 0.55);
-  tag('Cutting Die Rack', 402, 100, 0.6); tag('Printing Plate Rack', 504, 205, 0.55); tag('Printing Plate Rack', 596, 568, 0.55);
+  tag('Maintenance', 795, 120, 1.1); tag('Offices', 960, 175, 1.1); tag('Lunch Room', 1035, 238, 1.0); tag('Restrooms', 905, 240, 0.8); tag('Design', 1030, 360, 1.1); tag('Lunch Area', 722, 118, 0.8); tag('Die Cutting Materials', 1055, 482, 0.8);
+  tag('Cutting Die Rack', 402, 100, 0.9); tag('Printing Plate Rack', 504, 205, 0.8); tag('Printing Plate Rack', 596, 568, 0.8);
 
   // maintenance: workbench, red toolbox, parts shelf
   g.add(mesh(rbox(5, 1.1, 1.4), smat(C.wood), X(780), 0.55, Z(140)));
@@ -481,7 +491,15 @@ function buildPlant(scene, anims) {
   for (const py of [100, 118, 136]) { g.add(mesh(rbox(2.4, 0.9, 1.1), smat(0xffffff), X(726), 0.45, Z(py))); g.add(mesh(rbox(2.4, 0.5, 0.35), smat(C.blueSoft), X(726), 0.25, Z(py) - 0.9)); }
   // offices: desks with screens; design room drawing tables
   const desk = (px, py) => { g.add(mesh(rbox(2.2, 0.9, 1.1), smat(0xffffff), X(px), 0.45, Z(py))); const s = mesh(rbox(0.9, 0.6, 0.08), smat(C.navy, { emissive: 0x2b45d6, emissiveIntensity: 0.35 }), X(px), 1.25, Z(py) - 0.3); g.add(s); };
-  [[960, 100], [990, 100], [1040, 100], [960, 140], [1000, 300], [1045, 300], [1000, 360], [1045, 360], [1000, 420], [1045, 420]].forEach(([a, b]) => desk(a, b));
+  [[900, 140], [935, 140], [900, 165], [935, 165], [990, 140], [1030, 140], [1060, 140], [1000, 300], [1045, 300], [1000, 360], [1045, 360], [1000, 420], [1045, 420]].forEach(([a, b]) => desk(a, b));
+  // front room: conference table
+  g.add(mesh(rbox(6, 0.85, 1.8, 0.4), smat(C.wood), X(1022), 0.42, Z(100)));
+  // restrooms: stalls
+  for (const [a, b] of [[893, 250], [917, 250]]) { g.add(mesh(rbox(1.2, 1.9, 1.2, 0.08), smat(0xd9e1ef), X(a), 0.95, Z(b))); g.add(mesh(rbox(0.6, 0.45, 0.4, 0.15), smat(0xffffff), X(a), 0.22, Z(b) - 1)); }
+  // lunch room: tables with benches, fridge, first-aid cross on the wall
+  for (const [a, b] of [[1020, 240], [1055, 240], [1020, 260], [1055, 260]]) { g.add(mesh(rbox(2.2, 0.85, 1.0, 0.12), smat(0xffffff), X(a), 0.42, Z(b))); g.add(mesh(rbox(2.2, 0.45, 0.3, 0.1), smat(C.blueSoft), X(a), 0.22, Z(b) - 0.8)); g.add(mesh(rbox(2.2, 0.45, 0.3, 0.1), smat(C.blueSoft), X(a), 0.22, Z(b) + 0.8)); }
+  g.add(mesh(rbox(1.0, 2.1, 0.9, 0.12), smat(0xe9edf3), X(1072), 1.05, Z(215)));
+  { const fa = new THREE.Group(); fa.position.set(X(1035), 1.7, Z(201) + 0.2); fa.add(mesh(rbox(0.75, 0.75, 0.06, 0.04), smat(0xffffff), 0, 0, 0, false)); fa.add(mesh(rbox(0.5, 0.15, 0.08, 0.02), smat(C.red), 0, 0, 0.01, false)); fa.add(mesh(rbox(0.15, 0.5, 0.08, 0.02), smat(C.red), 0, 0, 0.01, false)); g.add(fa); }
   // die cutting materials: rolls of rule and rubber
   for (let i = 0; i < 4; i++) { const r = mesh(cylG(0.55, 1.8, 12), smat(i % 2 ? C.frame : C.red), X(1045 + (i % 2) * 18), 0.55, Z(462 + Math.floor(i / 2) * 28)); r.rotation.z = Math.PI / 2; g.add(r); }
 
@@ -582,16 +600,12 @@ function buildMachines(scene, anims, machines, pickables) {
     };
     fn(ctx);
     bake(group, mats);
-    // pick targets, bounds, halo, name tag
+    // pick targets, bounds, halo
     const bb = new THREE.Box3().setFromObject(group);
     const center = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3());
     group.traverse((o) => { if (o.isMesh) { o.userData.mid = id; pickables.push(o); } });
     const halo = new THREE.Mesh(new THREE.PlaneGeometry(sz.x + 4, sz.z + 4), new THREE.MeshBasicMaterial({ map: haloTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     halo.rotation.x = -Math.PI / 2; halo.position.set(center.x, 0.03, center.z); halo.visible = false; scene.add(halo);
-    const tag = label(name, `#${id}`, 1.25);
-    const lp = labelAt ? V(labelAt[0], labelAt[1]) : center.clone();
-    tag.position.set(lp.x, bb.max.y + 1.6, lp.z);
-    tag.userData.mid = id; pickables.push(tag); scene.add(tag);
     machines.set(id, { id, name, type, group, mats, halo, anchor: new THREE.Vector3(center.x, bb.max.y, center.z) });
   }
 
@@ -638,7 +652,7 @@ function buildMachines(scene, anims, machines, pickables) {
       if (t === 'print') { const ink = ctx.cyl(0.32, 0.7, C.blue, len * 0.25, 0.35, W / 2 + 0.6, 12, g); ctx.cyl(0.33, 0.06, C.line, len * 0.25, 0.72, W / 2 + 0.6, 12, g); ink.castShadow = true; }
     } else if (t === 'folder') {
       ctx.box(len * 0.98, 1.3, W * 0.86, C.body2, 0, 0, 0, 0.14, g);
-      for (const s of [-1, 1]) { const b = stripPlane(len * 0.96, W * 0.22, belt(), 0.4); b.position.set(0, 1.32, s * W * 0.22); b.scale.x = flow; g.add(b); }
+      for (const s of [-1, 1]) { const b = stripPlane(len * 0.96, W * 0.22, belt(), 0.4); b.position.set(0, 1.32, s * W * 0.22); if (flow < 0) b.rotation.y = Math.PI; g.add(b); }
       // folded boxes riding the belts
       const n = Math.max(2, Math.round(len / 3));
       const items = [];
@@ -711,13 +725,13 @@ function buildMachines(scene, anims, machines, pickables) {
     c.cyl(0.12, 0.12, C.red, X(560), 1.56, Z(399), 10);
   });
   machine('126', '86" Jumbo Press', 'PRESS', (c) => {
-    lineMachine(c, { x0: 485, x1: 635, yc: 520, wpx: 56, flow: 1, units: [{ t: 'table', len: 1.2 }, { t: 'feeder', len: 3 }, { t: 'print', len: 3 }, { t: 'slot', len: 3 }, { t: 'stack', len: 2 }] });
-    conveyor(c, [[637, 520], [678, 520]], 40);
+    lineMachine(c, { x0: 485, x1: 635, yc: 520, wpx: 56, flow: -1, units: [{ t: 'feeder', len: 3 }, { t: 'print', len: 3 }, { t: 'slot', len: 3 }, { t: 'stack', len: 2 }, { t: 'table', len: 1.2 }] });
+    conveyor(c, [[678, 520], [637, 520]], 40);
   }, [560, 520]);
   machine('132', '66" Shanghai RDC Slotter', 'PRESS', (c) => {
-    lineMachine(c, { x0: 485, x1: 657, yc: 650, wpx: 50, flow: 1, units: [{ t: 'table', len: 1.2 }, { t: 'feeder', len: 3 }, { t: 'print', len: 2.5 }, { t: 'print', len: 2.5 }, { t: 'die', len: 3 }, { t: 'stack', len: 2 }] });
-    conveyor(c, [[659, 648], [714, 648]], 34);
-    conveyor(c, [[572, 686], [642, 686]], 9, { h: 0.5, speed: 1.4 });
+    lineMachine(c, { x0: 485, x1: 657, yc: 650, wpx: 50, flow: -1, units: [{ t: 'feeder', len: 3 }, { t: 'print', len: 2.5 }, { t: 'print', len: 2.5 }, { t: 'die', len: 3 }, { t: 'stack', len: 2 }, { t: 'table', len: 1.2 }] });
+    conveyor(c, [[714, 648], [659, 648]], 34);
+    conveyor(c, [[642, 686], [572, 686]], 9, { h: 0.5, speed: 1.4 });
   }, [575, 650]);
   machine('149', 'Shanghai Juer Mini FFG', 'FFG', (c) => {
     lineMachine(c, { x0: 160, x1: 360, yc: 621, wpx: 40, flow: -1, units: [{ t: 'feeder', len: 3 }, { t: 'print', len: 2 }, { t: 'print', len: 2 }, { t: 'slot', len: 2 }, { t: 'folder', len: 7 }, { t: 'stack', len: 2.5 }] });
@@ -766,15 +780,15 @@ function buildMachines(scene, anims, machines, pickables) {
   });
   const gluer = (id, x0, x1, yc, wpx, along = 'x') => machine(id, `${id} Gluer`, 'Gluer', (c) => {
     const L = (x1 - x0) * SC, W = wpx * SC;
-    const grp = new THREE.Group(); grp.position.set(along === 'x' ? X((x0 + x1) / 2) : X(yc), 0, along === 'x' ? Z(yc) : Z((x0 + x1) / 2)); if (along === 'z') grp.rotation.y = Math.PI / 2; c.g.add(grp);
+    const grp = new THREE.Group(); grp.position.set(along === 'x' ? X((x0 + x1) / 2) : X(yc), 0, along === 'x' ? Z(yc) : Z((x0 + x1) / 2)); if (along === 'z') grp.rotation.y = -Math.PI / 2; c.g.add(grp);
     c.box(L, 1.2, W, C.body, 0, 0, 0, 0.16, grp);
-    c.box(L * 0.25, 1.4, W * 1.05, C.blue, -L * 0.32, 1.2, 0, 0.14, grp);
+    c.box(L * 0.25, 1.4, W * 1.05, C.blue, L * 0.32, 1.2, 0, 0.14, grp);
     const pot = D(c.cyl(0.3, 0.6, C.yellow, L * 0.05, 1.5, W / 2 + 0.1, 12, grp));
-    const b = stripPlane(L * 0.9, W * 0.5, belt(), 0.4); b.position.set(0, 1.22, 0); grp.add(b);
+    const b = stripPlane(L * 0.9, W * 0.5, belt(), 0.4); b.position.set(0, 1.22, 0); b.rotation.y = Math.PI; grp.add(b);
     const items = [0, 1, 2].map(() => D(c.box(1.0, 0.12, W * 0.55, C.kraft, 0, 1.25, 0, 0.03, grp)));
     const ph = Math.random();
-    c.anims.push((t) => { items.forEach((it, i) => { const u = (t * 0.3 + ph + i / 3) % 1; it.position.x = -L / 2 + 0.5 + u * (L - 1); }); pot.scale.y = 1 + 0.05 * Math.sin(t * 6); });
-    c.light(L * 0.38, 1.2, -W / 2 + 0.25, grp);
+    c.anims.push((t) => { items.forEach((it, i) => { const u = (t * 0.3 + ph + i / 3) % 1; it.position.x = L / 2 - 0.5 - u * (L - 1); }); pot.scale.y = 1 + 0.05 * Math.sin(t * 6); });
+    c.light(-L * 0.38, 1.2, -W / 2 + 0.25, grp);
   });
   gluer('150', 350, 405, 567, 28);
   gluer('151', 220, 262, 572, 19);
@@ -833,7 +847,8 @@ function buildPeople(scene, anims) {
     { pts: [[690, 470], [712, 470], [712, 598], [690, 598]], speed: 1.2 },
     { pts: [[70, 290], [118, 290], [118, 440], [70, 440]], speed: 1.5 },
     { pts: [[880, 520], [1020, 520], [1020, 545], [880, 545]], speed: 1.25 },
-    { pts: [[900, 230], [960, 230], [960, 252], [900, 252]], speed: 1.1 },
+    { pts: [[1010, 180], [1065, 180], [1065, 192], [1010, 192]], speed: 1.1 },
+    { pts: [[975, 235], [995, 235], [995, 262], [975, 262]], speed: 0.9 },
   ];
   loops.forEach((lp, i) => {
     const path = roundedPath(lp.pts, 0.6, true), L = path.getLength();
@@ -935,6 +950,110 @@ function buildForklifts(scene, anims) {
       f.car.position.y = 0.25 + lift;
       f.load.visible = carrying;
       f.beaconM.emissiveIntensity = 0.3 + 1.2 * Math.max(0, Math.sin(t * 8 + i));
+    });
+  });
+}
+
+// =====================================================================
+// Semi-trucks: back into a dock door, wait while loading, pull out and leave
+// =====================================================================
+// Truck yard north of the dock wall. Door k (1–12) sits at drawing x = 186 + (12 − k) × 39.45.
+const YARD = { wall: Z(78), near: Z(78) - 22, far: Z(78) - 26.5 };
+const doorX = (k) => X(186 + ((12 - k) * (620 - 186)) / 11);
+const TRAILER = 14, CAB = 3.4;
+
+function truck(scene, cabColor, withCab = true) {
+  const g = new THREE.Group(); scene.add(g);
+  // origin = middle of the trailer; the cab points along +x
+  const white = smat(0xf7f8fb), dark = smat(C.frame), cab = smat(cabColor), blue = smat(C.blue), glass = smat(0x8fb0d9, { roughness: 0.3 });
+  g.add(mesh(rbox(TRAILER, 3.3, 2.6, 0.18), white, 0, 1.0 + 1.65, 0));
+  g.add(mesh(rbox(TRAILER * 0.96, 0.32, 2.64, 0.06), blue, 0, 2.0, 0, false));
+  g.add(mesh(rbox(TRAILER, 0.25, 1.2, 0.05), dark, 0, 0.88, 0));
+  if (withCab) {
+  // cab with windshield
+  g.add(mesh(rbox(CAB, 2.6, 2.5, 0.35), cab, TRAILER / 2 + CAB / 2 + 0.3, 0.6 + 1.3, 0));
+  g.add(mesh(rbox(0.12, 1.0, 2.1, 0.04), glass, TRAILER / 2 + CAB + 0.32, 2.4, 0, false));
+  g.add(mesh(rbox(1.6, 0.9, 2.3, 0.25), cab, TRAILER / 2 + 0.8, 3.2, 0)); // sleeper roof fairing
+  g.add(mesh(rbox(TRAILER / 2 + CAB, 0.3, 1.0, 0.05), dark, TRAILER / 4 + CAB / 2, 0.75, 0));
+  } else {
+    // dropped trailer: landing legs instead of a tractor
+    g.add(mesh(rbox(0.25, 1.0, 2.2, 0.05), dark, TRAILER / 2 - 2.5, 0.5, 0));
+  }
+  const wheels = [];
+  for (const x of (withCab ? [-TRAILER / 2 + 1.0, -TRAILER / 2 + 2.3, TRAILER / 2 - 0.2, TRAILER / 2 + 1.0, TRAILER / 2 + CAB - 0.4] : [-TRAILER / 2 + 1.0, -TRAILER / 2 + 2.3])) for (const z of [1.05, -1.05]) {
+    const w = D(mesh(cylG(0.5, 0.45, 12), dark, x, 0.5, z)); w.rotation.x = Math.PI / 2; g.add(w); wheels.push(w);
+  }
+  // running lights
+  const lm = new THREE.MeshStandardMaterial({ color: C.amber, emissive: 0xff8a00, emissiveIntensity: 1 });
+  if (withCab) for (const z of [1.2, -1.2]) g.add(mesh(cylG(0.1, 0.12, 8), lm, TRAILER / 2 + CAB + 0.35, 1.2, z, false));
+  bake(g);
+  return { g, wheels, lm };
+}
+
+function buildTrucks(scene, anims) {
+  // asphalt yard, lane lines, dock stripes
+  const yard = new THREE.Group(); scene.add(yard);
+  const x0 = X(35) - 32, x1 = X(1078) + 32, z0 = YARD.far - 3.5, z1 = YARD.wall;
+  const asphalt = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), smat(0x6d7482, { roughness: 0.95 }));
+  asphalt.rotation.x = -Math.PI / 2; asphalt.position.set((x0 + x1) / 2, -0.28, (z0 + z1) / 2); asphalt.receiveShadow = true; yard.add(asphalt);
+  for (let x = x0 + 2; x < x1 - 2; x += 4) { const d = mesh(rbox(2, 0.02, 0.18, 0.01), smat(0xffd257), x + 1, -0.26, (YARD.near + YARD.far) / 2, false); d.receiveShadow = true; yard.add(d); }
+  for (let k = 1; k <= 13; k++) { const px = 186 + ((12 - k) * (620 - 186)) / 11 + (620 - 186) / 22; const st = mesh(rbox(0.16, 0.02, TRAILER + 1, 0.01), smat(0xffffff), X(px), -0.26, YARD.wall - (TRAILER + 1) / 2, false); yard.add(st); }
+  bake(yard);
+
+  // trailers already at the docks (no tractor)
+  for (const k of [12, 11, 2]) {
+    const t = truck(scene, C.red, false);
+    t.g.position.set(doorX(k), 0, YARD.wall - 0.35 - TRAILER / 2);
+    t.g.rotation.y = Math.PI / 2;
+  }
+  // two trucks taking turns at the free doors
+  const agents = [
+    { doors: [8, 4, 10, 6], color: C.blue, delay: 0 },
+    { doors: [3, 9, 5, 7], color: C.red, delay: 30 },
+  ];
+  agents.forEach((a) => {
+    const tk = truck(scene, a.color);
+    tk.g.visible = false;
+    let segs = [], si = 0, s = 0, di = 0, hold = a.delay;
+    const tan = new THREE.Vector3();
+    const line = (ax, az, bx, bz) => new THREE.LineCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(bx, 0, bz));
+    const plan = () => {
+      const xd = doorX(a.doors[di % a.doors.length]); di++;
+      const dock = YARD.wall - 0.35 - TRAILER / 2, turnX = xd - 15;
+      const startX = X(1078) + 30, endX = X(35) - 30;
+      segs = [
+        { c: line(startX, YARD.far, turnX, YARD.far), v: 7 },                                       // drive in along the far lane (heading west)
+        { wait: 1.0 },
+        { c: new THREE.QuadraticBezierCurve3(new THREE.Vector3(turnX, 0, YARD.far), new THREE.Vector3(xd, 0, YARD.far), new THREE.Vector3(xd, 0, dock)), v: 2.6, rev: true }, // back into the door
+        { wait: 12, docked: true },                                                                   // loading
+        { c: new THREE.QuadraticBezierCurve3(new THREE.Vector3(xd, 0, dock), new THREE.Vector3(xd, 0, YARD.near), new THREE.Vector3(xd - 15, 0, YARD.near)), v: 3.2 }, // pull out, turn west
+        { c: line(xd - 15, YARD.near, endX, YARD.near), v: 7 },                                    // leave
+        { wait: 4, hidden: true },
+      ];
+      segs.forEach((g) => { if (g.c) g.len = g.c.getLength(); });
+      si = 0; s = 0;
+    };
+    plan();
+    anims.push((t, dt) => {
+      if (hold > 0) { hold -= dt; return; }
+      let g = segs[si];
+      if (g.wait !== undefined) {
+        tk.g.visible = !g.hidden;
+        s += dt;
+        if (s >= g.wait) { si++; s = 0; if (si >= segs.length) plan(); }
+        tk.lm.emissiveIntensity = g.docked ? 0.2 : 0.6 + 0.6 * Math.max(0, Math.sin(t * 6));
+        return;
+      }
+      tk.g.visible = true;
+      s += g.v * dt;
+      const u = Math.min(1, s / g.len);
+      const p = g.c.getPointAt(u); g.c.getTangentAt(u, tan);
+      if (g.rev) tan.multiplyScalar(-1);
+      tk.g.position.set(p.x, 0, p.z);
+      tk.g.rotation.y = -Math.atan2(tan.z, tan.x);
+      tk.wheels.forEach((w) => (w.rotation.y += (g.rev ? -1 : 1) * dt * g.v * 2));
+      tk.lm.emissiveIntensity = g.rev ? 0.6 + 0.6 * Math.max(0, Math.sin(t * 9)) : 0.8;
+      if (u >= 1) { si++; s = 0; if (si >= segs.length) plan(); }
     });
   });
 }

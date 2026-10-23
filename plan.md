@@ -96,3 +96,16 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - Positions are measured by eye from the drawing, so they're close, not surveyed.
 - Forklift and walking routes are made up to look natural. They are not real traffic rules.
 - The Floor tab is a picture of the plant. It does not show live machine status. That could be a later step, e.g. from the shift handoff.
+
+## 10. Changes (Oct 22)
+
+- Machine name tags removed from the 3D view. Room labels, door numbers and EXIT signs stay.
+- The 86" Jumbo, the 66" Shanghai and the gluers now run right to left: they feed on the east side and deliver on the west.
+- The office corner is rebuilt to match the drawing:
+  - L-shaped offices, with the curved-wall front room and its conference table
+  - restrooms off the hallway
+  - the **lunch room** (with the first-aid station) between the offices and Design
+- Truck yard on the north side:
+  - three dropped trailers stay at doors 12, 11 and 2
+  - two semi-trucks take turns at the free doors: they pull in, back up to a door, wait while loading, pull out and leave
+- The opening view frames the building plus the yard. Phones frame just the building, and you can zoom out to see the trucks.
