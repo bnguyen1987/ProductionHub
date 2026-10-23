@@ -496,6 +496,22 @@ function buildPlant(scene, anims) {
   // outer walls (low, so the floor stays in view) with a dark cap like the drawing's linework
   const WALLS = []; // drawing px segments, for hanging extinguishers
   const wall = (x1, y1, x2, y2, h = 2.2, t = 0.5, color = C.wall) => {
+    // door opening? (DOORS = drawing px points on the wall line)
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+    for (const [qx, qy, side = 1] of DOORS) {
+      const u = ((qx - x1) * dx + (qy - y1) * dy) / (L * L), off = Math.abs((qx - x1) * dy - (qy - y1) * dx) / L;
+      if (off < 4 && u * L > 6 && (1 - u) * L > 6) {
+        const half = 5.5 / L; // ~1.1 units wide
+        wall(x1, y1, x1 + dx * (u - half), y1 + dy * (u - half), h, t, color);
+        wall(x1 + dx * (u + half), y1 + dy * (u + half), x2, y2, h, t, color);
+        // door leaf, hinged at one side of the opening and standing open
+        const hx = x1 + dx * (u - half), hy = y1 + dy * (u - half), ang = -Math.atan2(Z(y2) - Z(y1), X(x2) - X(x1));
+        const hinge = new THREE.Group(); hinge.position.set(X(hx), 0, Z(hy)); hinge.rotation.y = ang + side * 1.25; g.add(hinge);
+        hinge.add(mesh(rbox(1.0, 2.1, 0.08, 0.03), smat(0xc99a62), 0.52, 1.05, 0));
+        hinge.add(mesh(rbox(0.12, 0.05, 0.12, 0.02), smat(C.frame), 0.85, 1.0, 0.08, false));
+        return;
+      }
+    }
     WALLS.push([x1, y1, x2, y2, t]);
     const a = V(x1, y1), b = V(x2, y2), len = a.distanceTo(b);
     const m = mesh(rbox(len + t, h, t, 0.12), smat(color), (a.x + b.x) / 2, h / 2, (a.z + b.z) / 2);
@@ -546,8 +562,8 @@ function buildPlant(scene, anims) {
   const tint = (x1, y1, x2, y2, col) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(X(x2) - X(x1), Z(y2) - Z(y1)), smat(col)); p.rotation.x = -Math.PI / 2; p.position.set((X(x1) + X(x2)) / 2, 0.012, (Z(y1) + Z(y2)) / 2); p.receiveShadow = true; g.add(p); };
   tint(745, 92, 845, 150, 0xe9edf6);
   { const T = (a0, b0, a1, b1, col) => tint(...OF(a0, b0), ...OF(a1, b1), col);
-    T(107, 225, 805, 400, 0xeef1fb); T(235, 400, 805, 770, 0xeef1fb); T(235, 770, 565, 1115, 0xeef1fb); T(614, 770, 805, 965, 0xeef1fb);
-    T(290, 595, 565, 770, 0xe6eef7); T(614, 590, 805, 770, 0xf6efe2); }
+    T(107, 225, 805, 400, 0xeef1fb); T(235, 400, 805, 770, 0xeef1fb); T(235, 770, 565, 1115, 0xeef1fb);
+    T(290, 595, 565, 770, 0xe6eef7); T(614, 770, 805, 965, 0xf6efe2); }
   tint(980, OF(0, 965)[1], 1078, 450, 0xeef1fb); tint(700, 85, 745, 150, 0xf4efe6); tint(1032, 452, 1078, 515, 0xf3ece2);
   const tag = (txt, px, py, s = 0.75) => { const l = label(txt, '', s); l.position.copy(V(px, py, 3.2)); g.add(l); };
 
@@ -560,7 +576,15 @@ function buildPlant(scene, anims) {
   // offices: desks with screens; design room drawing tables
   const desk = (px, py) => { g.add(mesh(rbox(2.2, 0.9, 1.1), smat(0xffffff), X(px), 0.45, Z(py))); const s = mesh(rbox(0.9, 0.6, 0.08), smat(C.navy, { emissive: 0x2b45d6, emissiveIntensity: 0.35 }), X(px), 1.25, Z(py) - 0.3); g.add(s); };
   // office desks (east column offices, offices below the restrooms) and Design room drawing tables
-  [[1040, 158], [1062, 178], [1040, 272], [1062, 298], [918, 275], [975, 275], [918, 348], [1000, 345], [1045, 345], [1000, 395], [1045, 395], [1000, 432], [1045, 432]].forEach(([a, b]) => desk(a, b));
+  [[1048, 168], [1048, 222], [868, 102], [918, 275], [975, 275], [918, 348], [1000, 345], [1045, 345]].forEach(([a, b]) => desk(a, b));
+  // big table + chairs (Design room and lunch room)
+  const bigTable = (px, py, w, d, top, chairs) => {
+    g.add(mesh(rbox(w, 0.85, d, 0.3), smat(top), X(px), 0.42, Z(py)));
+    const n = Math.max(2, Math.round(w / 1.3));
+    for (let i = 0; i < n; i++) for (const sz of [-1, 1]) g.add(mesh(rbox(0.6, 0.55, 0.6, 0.12), smat(chairs), X(px) - w / 2 + 0.65 + (i * (w - 1.3)) / (n - 1), 0.28, Z(py) + sz * (d / 2 + 0.45)));
+  };
+  bigTable(1032, 410, 7.0, 2.6, 0xffffff, C.navy);   // Design room
+  bigTable(1048, 284, 4.4, 2.0, C.wood, C.blueSoft); // lunch room
   // reception desk in the hall
   g.add(mesh(rbox(3.2, 1.05, 1.0, 0.2), smat(0xffffff), X(992), 0.52, Z(180))); g.add(mesh(rbox(3.2, 0.1, 0.5, 0.05), smat(C.blue), X(992), 1.1, Z(180) + 0.3));
   // curved front room: conference table with chairs
@@ -570,14 +594,11 @@ function buildPlant(scene, anims) {
   { const [sx0, sz0] = OF(235, 400), [sx1, sz1] = OF(357, 236), n = 8, dz = (Z(sz0) - Z(sz1)) / n, w = X(sx1) - X(sx0) - 0.4;
     for (let i = 0; i < n; i++) g.add(mesh(rbox(w, 0.3 * (i + 1), dz, 0.04), smat(i % 2 ? 0xd5dbe5 : 0xe3e7ee), (X(sx0) + X(sx1)) / 2, 0.15 * (i + 1), Z(sz0) - dz * (i + 0.5)));
     g.add(mesh(rbox(0.12, 0.12, Z(sz0) - Z(sz1), 0.04), smat(C.frame), X(OF(297, 0)[0]), 3.0, (Z(sz0) + Z(sz1)) / 2)); }
-  // storage room shelves
-  g.add(mesh(rbox(3.4, 2.0, 0.8, 0.08), smat(C.body2), X(868), 1.0, Z(84)));
   // restrooms: a stall and a sink in each
   for (const [ax, ay] of [[347, 638], [470, 638], [347, 726], [470, 726]]) { const [a, b] = OF(ax, ay); g.add(mesh(rbox(1.0, 1.9, 1.0, 0.08), smat(0xd9e1ef), X(a) - 0.6, 0.95, Z(b))); g.add(mesh(rbox(0.6, 0.85, 0.45, 0.15), smat(0xffffff), X(a) + 0.9, 0.42, Z(b))); }
-  // lunch room: two tables with benches, fridge, first-aid station on the west wall
-  for (const b of [208, 234]) { g.add(mesh(rbox(2.2, 0.85, 1.0, 0.12), smat(0xffffff), X(1046), 0.42, Z(b))); g.add(mesh(rbox(2.2, 0.45, 0.3, 0.1), smat(C.blueSoft), X(1046), 0.22, Z(b) - 0.8)); g.add(mesh(rbox(2.2, 0.45, 0.3, 0.1), smat(C.blueSoft), X(1046), 0.22, Z(b) + 0.8)); }
-  g.add(mesh(rbox(0.9, 2.1, 0.9, 0.12), smat(0xe9edf3), X(1071), 1.05, Z(246)));
-  { const fa = new THREE.Group(); fa.position.set(X(1018) + 0.2, 1.7, Z(222)); fa.rotation.y = Math.PI / 2; fa.add(mesh(rbox(0.75, 0.75, 0.06, 0.04), smat(0xffffff), 0, 0, 0, false)); fa.add(mesh(rbox(0.5, 0.15, 0.08, 0.02), smat(C.red), 0, 0, 0.01, false)); fa.add(mesh(rbox(0.15, 0.5, 0.08, 0.02), smat(C.red), 0, 0, 0.01, false)); g.add(fa); }
+  // lunch room (third room of the east column): fridge and first-aid station
+  g.add(mesh(rbox(0.9, 2.1, 0.9, 0.12), smat(0xe9edf3), X(1071), 1.05, Z(310)));
+  { const fa = new THREE.Group(); fa.position.set(X(1018) + 0.2, 1.7, Z(266)); fa.rotation.y = Math.PI / 2; fa.add(mesh(rbox(0.75, 0.75, 0.06, 0.04), smat(0xffffff), 0, 0, 0, false)); fa.add(mesh(rbox(0.5, 0.15, 0.08, 0.02), smat(C.red), 0, 0, 0.01, false)); fa.add(mesh(rbox(0.15, 0.5, 0.08, 0.02), smat(C.red), 0, 0, 0.01, false)); g.add(fa); }
   // die cutting materials: rolls of rule and rubber
   for (let i = 0; i < 4; i++) { const r = mesh(cylG(0.55, 1.8, 12), smat(i % 2 ? C.frame : C.red), X(1045 + (i % 2) * 18), 0.55, Z(462 + Math.floor(i / 2) * 28)); r.rotation.z = Math.PI / 2; g.add(r); }
 
@@ -966,7 +987,7 @@ function buildPeople(scene, anims) {
   });
   // operators: standing at a machine, reaching and stepping side to side
   [[600, 274, 'z', 1], [590, 412, 'z', 1], [520, 478, 'z', 1], [520, 614, 'z', 1], [380, 318, 'z', 1], [570, 342, 'z', 1], [300, 586, 'z', 1],
-    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [1060, 221, 'z', -1], [245, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [492, 380, 'z', -1], [767, 676, 'x', -1]]
+    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [1062, 266, 'z', 1], [245, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [492, 380, 'z', -1], [767, 676, 'x', -1]]
     .forEach(([a, b, axis, face], i) => {
       const p = person(scene, { skin: SKINS[i % SKINS.length], hat: i % 2 ? C.blue : 0xffffff, vest: i % 5 === 2 ? 0xc6e03a : C.amber });
       const base = V(a, b);
@@ -1018,6 +1039,8 @@ function forklift(scene) {
 }
 // Pallet staging areas (the circled spots on the floor). Each slot holds one full pallet.
 // face = the way a forklift points when it picks from the slot.
+// door openings (drawing px on the wall line; last value = which way the door swings)
+const DOORS = [[845, 133, 1], [922, 127, 1], [909, 205, -1], [909, 238, -1], [1018, 302, -1], [980, 412, -1]];
 const OPEN_DOORS = [12, 11, 2]; // trailers parked here are loaded by the forklifts
 const FACE = { w: [-1, 0], e: [1, 0], n: [0, -1], s: [0, 1] };
 const REACH = 21, BACK = 45; // drawing px from the pallet center to the forklift center, and to its approach point

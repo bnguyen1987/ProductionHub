@@ -145,3 +145,8 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
   - east column: office, **lunch room** (tables, fridge, first aid), office
   - three offices below the restrooms
   - the Design room below the east column
+- Office updates:
+  - The lunch room moved to the third room of the east column, with one large table, a fridge and the first-aid station.
+  - The other two east-column rooms and the small room by the stairs are offices with one desk each.
+  - The Design room's four lower desks became one large table with chairs. The two desks above it stay.
+  - Doors added: Maintenance east wall, hall into the stairwell, the two left restrooms, the lunch room, and the Design room.
