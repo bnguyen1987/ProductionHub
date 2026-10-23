@@ -19,6 +19,8 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'No specs on file yet. Tap Edit to add them.': 'Todavía no hay especificaciones. Toque Editar para agregarlas.',
+  'Added on site by': 'Agregado en el sitio por',
   'Plant Floor': 'Planta',
   'Floor': 'Planta',
   'The plant floor in 3D. Tap a machine to see its specs.': 'La planta en 3D. Toque una máquina para ver sus especificaciones.',

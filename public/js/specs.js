@@ -54,7 +54,7 @@ export { SPEC_REV };
 let saved = {}, editing = null, query = '', group = '', focusId = '', scrolled = false;
 const NAME_KEY = 'gwprod_specs_name';
 const myName = () => { try { return localStorage.getItem(NAME_KEY) || ''; } catch { return ''; } };
-const base = () => `${location.origin}${location.pathname}#specs/`;
+const base = () => `${location.origin}${location.pathname}#floor/`; // QR opens the machine on the Floor tab
 
 export function render(view, sub) {
   focusId = sub ? decodeURIComponent(sub) : '';
@@ -73,7 +73,7 @@ export function render(view, sub) {
     <p class="note" style="margin:14px 0 0">Spec sheet numbers are also used by the Order Check. To change one of them, update the spec sheet and the hub together. Lines added here (<b>Added on site</b>) are for reference only.</p>`;
   $('#spQ', view).addEventListener('input', (e) => { query = e.target.value.trim().toLowerCase(); draw(); });
   $$('#spGroup button', view).forEach((b) => b.addEventListener('click', () => { group = b.dataset.g; draw(); }));
-  $('#spPrintAll', view).addEventListener('click', () => printSpecs(shown()));
+  $('#spPrintAll', view).addEventListener('click', () => printSpecs(shown(), saved));
   draw();
   api('/api/specs').then((d) => { saved = d.machines || {}; draw(); })
     .catch((e) => { $('#spMsg').innerHTML = `<div class="alert warn">Could not load the added spec lines (${esc(e.message)}). Spec sheet numbers are still shown.</div>`; });
@@ -95,7 +95,7 @@ function draw() {
     <h2 class="spec-group">${esc(g)}</h2>
     <div class="spec-grid">${list.filter((m) => m.group === g).map(card).join('')}</div>`).join('');
   $$('[data-edit]', box).forEach((b) => b.addEventListener('click', () => { editing = b.dataset.edit; draw(); }));
-  $$('[data-print]', box).forEach((b) => b.addEventListener('click', () => printSpecs([LIST.find((m) => m.id === b.dataset.print)])));
+  $$('[data-print]', box).forEach((b) => b.addEventListener('click', () => printSpecs([LIST.find((m) => m.id === b.dataset.print)], saved)));
   if (editing) wireEditor();
   // the machine opened from a QR code (or just saved) stays highlighted; scroll to it once
   if (focusId) {
@@ -159,7 +159,7 @@ function wireEditor() {
 }
 
 // One page per machine, to post on the machine. QR opens this machine's card.
-function printSpecs(list) {
+export function printSpecs(list, saved = {}) {
   list = list.filter(Boolean);
   if (!list.length) return;
   openPrint(list.map((m, i) => {

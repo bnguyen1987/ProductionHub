@@ -3,8 +3,8 @@
 // 10 px on the drawing = 1 unit (about 0.7 m). The drawing's x runs west→east, y runs north→south.
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
-import { $, esc, api } from './common.js';
-import { LIST, rowsOf } from './specs.js';
+import { $, $$, esc, api } from './common.js';
+import { LIST, rowsOf, printSpecs } from './specs.js';
 
 // ---------- drawing → world ----------
 const SC = 0.1, OX = 556, OY = 388;
@@ -378,11 +378,55 @@ function build(wrap, focusId) {
       <div class="floor-card-kicker">#${esc(m.id)} · ${esc(spec ? spec.type : m.type)}</div>
       <h3>${esc(spec ? spec.name : m.name)}</h3>
       ${rows.length ? `<dl class="floor-kv">${rows.map(([k, v, added]) => `<dt${added ? ' data-no-i18n' : ''}>${esc(k)}</dt><dd${added ? ' data-no-i18n' : ''}>${esc(v)}</dd>`).join('')}</dl>`
-        : '<p class="floor-card-empty">No specs on file yet. Add them on the Specs tab.</p>'}
+        : '<p class="floor-card-empty">No specs on file yet. Tap Edit to add them.</p>'}
       ${spec && spec.notes ? `<p class="floor-card-notes">${esc(spec.notes)}</p>` : ''}
       ${s.notes ? `<p class="floor-card-notes" data-no-i18n>${esc(s.notes)}</p>` : ''}
-      <a class="floor-card-link" href="#specs/${encodeURIComponent(m.id)}">Open in Specs →</a>`;
+      ${s.updatedBy ? `<p class="floor-card-by">Added on site by <span data-no-i18n>${esc(s.updatedBy)}</span> · ${esc(new Date(s.updatedAt).toLocaleDateString('en-US'))}</p>` : ''}
+      <div class="floor-card-btns"><button class="btn small" type="button" data-fc="edit">Edit</button><button class="btn small" type="button" data-fc="print">Print</button></div>`;
     card.querySelector('.floor-card-x').onclick = () => select(null);
+    card.querySelector('[data-fc=edit]').onclick = () => editCard(m);
+    card.querySelector('[data-fc=print]').onclick = () => spec && printSpecs([spec], saved);
+  }
+  // add or change the extra spec lines and notes (the spec sheet lines stay as they are)
+  const NAME_KEY = 'gwprod_specs_name';
+  const rowHtml = (r) => `<div class="fc-row"><input type="text" data-r="label" placeholder="Spec (e.g. Max blank length)" value="${esc(r.label)}"><input type="text" data-r="value" placeholder="Value" value="${esc(r.value)}"><button class="btn small" type="button" data-del aria-label="Remove line">✕</button></div>`;
+  function editCard(m) {
+    const spec = LIST.find((x) => x.id === m.id);
+    const s = saved[m.id] || {};
+    let name = ''; try { name = localStorage.getItem(NAME_KEY) || ''; } catch {}
+    const extra = s.extra && s.extra.length ? s.extra : [{ label: '', value: '' }];
+    card.innerHTML = `
+      <button class="floor-card-x" type="button" aria-label="Close">×</button>
+      <div class="floor-card-kicker">#${esc(m.id)} · ${esc(spec ? spec.type : m.type)}</div>
+      <h3>${esc(spec ? spec.name : m.name)}</h3>
+      ${spec && spec.base.length ? '<p class="floor-card-notes" style="margin:0 0 8px">The spec sheet lines (sizes, colors, rule, speed) stay as they are. Add other specs below, like glue type, max box size or bundle count.</p>' : ''}
+      <div class="fc-rows">${extra.map(rowHtml).join('')}</div>
+      <button class="btn small" type="button" data-fc="add" style="margin:4px 0 10px">+ Add a line</button>
+      <label class="fc-label">Notes<textarea data-fc="notes" rows="3">${esc(s.notes || '')}</textarea></label>
+      <label class="fc-label">Your name<input type="text" data-fc="name" autocomplete="name" value="${esc(name)}"></label>
+      <div class="floor-card-btns"><button class="btn small primary" type="button" data-fc="save">Save</button><button class="btn small" type="button" data-fc="cancel">Cancel</button></div>
+      <div data-fc="msg"></div>`;
+    const rows = card.querySelector('.fc-rows');
+    const wireDel = () => $$('[data-del]', rows).forEach((b) => (b.onclick = () => b.closest('.fc-row').remove()));
+    wireDel();
+    card.querySelector('.floor-card-x').onclick = () => select(null);
+    card.querySelector('[data-fc=add]').onclick = () => { rows.insertAdjacentHTML('beforeend', rowHtml({ label: '', value: '' })); wireDel(); rows.lastElementChild.querySelector('input').focus(); };
+    card.querySelector('[data-fc=cancel]').onclick = () => fillCard(m);
+    card.querySelector('[data-fc=save]').onclick = async (e) => {
+      const msg = card.querySelector('[data-fc=msg]'), btn = e.currentTarget;
+      const updatedBy = card.querySelector('[data-fc=name]').value.trim();
+      if (!updatedBy) { msg.innerHTML = '<div class="alert err" style="margin-top:8px">Enter your name.</div>'; return; }
+      try { localStorage.setItem(NAME_KEY, updatedBy); } catch {}
+      const lines = $$('.fc-row', rows).map((r) => ({ label: r.querySelector('[data-r=label]').value.trim(), value: r.querySelector('[data-r=value]').value.trim() })).filter((r) => r.label || r.value);
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+      try {
+        saved[m.id] = await api('/api/specs?id=' + encodeURIComponent(m.id), { method: 'PUT', body: JSON.stringify({ extra: lines, notes: card.querySelector('[data-fc=notes]').value, updatedBy }) });
+        if (selected === m) fillCard(m);
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Save';
+        msg.innerHTML = `<div class="alert err" style="margin-top:8px">Could not save: ${esc(err.message)}</div>`;
+      }
+    };
   }
   const tmp = new THREE.Vector3();
   function placeCard() {
@@ -759,8 +803,8 @@ function buildMachines(scene, anims, machines, pickables) {
     c.anims.push((t, dt) => blades.forEach((b) => (b.rotation.y += dt * 9)));
     const sheet = D(c.box(2.0, 0.05, 2.4, C.kraft, X(870), 1.1, z, 0.02));
     const ph = Math.random();
-    c.anims.push((t) => { const u = (t * 0.35 + ph) % 1; sheet.position.x = X(868) + u * 4.2; });
-    conveyor(c, [[917, yc], [970, yc]], 22, { speed: 1.8 });
+    c.anims.push((t) => { const u = (t * 0.35 + ph) % 1; sheet.position.x = X(912) - u * 4.4; }); // right to left: head → table
+    conveyor(c, [[944, yc], [917, yc]], 22, { speed: 1.6 });
     c.light(X(903) + 0.9, 2.0, z - 1.4);
   });
   slitter('110', '142" Slitter', 418);
