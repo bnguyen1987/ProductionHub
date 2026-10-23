@@ -513,20 +513,42 @@ function buildPlant(scene, anims) {
     sides.forEach((s, i) => { if (!open.includes(i)) wall(...s, h, 0.3, 0xf3f5f9); });
   };
   room(745, 92, 845, 150, 2.4, [0]);
-  // offices block (drawing outline): L-shaped, restrooms off the hall, lunch room between offices and design
-  const iw = (pts, h = 2.4) => { for (let i = 0; i < pts.length - 1; i++) wall(...pts[i], ...pts[i + 1], h, 0.3, 0xf3f5f9); };
-  iw([[845, 125], [882, 125], [882, 264], [928, 264], [928, 227], [912, 227], [912, 212], [990, 212], [990, 187], [1004, 187], [1004, 227], [967, 227], [967, 270], [980, 270]]);
-  iw([[1004, 201], [1078, 201]]);
-  iw([[905, 212], [905, 264]]); // between the two restrooms
-  // front room with the curved wall (top of the offices)
-  iw([[940, 78], [940, 127], [967, 127], [967, 110]]);
-  { const a = V(967, 110), c = V(1022, 90), b = V(1078, 107), arc = new THREE.QuadraticBezierCurve3(a, c, b); const ps = arc.getPoints(8);
+  // ---- front office, from the office floor plan ----
+  // OF(): office-plan coordinates → plant drawing px. Lined up on the double EXIT door and the curved front room;
+  // the stairwell lands right beside Maintenance, as on the plant drawing.
+  const OF = (ax, ay) => [Math.min(1078, 967 + (ax - 462) * 0.338), Math.max(78, 127 + (ay - 400) * 0.338)];
+  const ow = (...pts) => { for (let i = 0; i < pts.length - 1; i++) wall(...OF(...pts[i]), ...OF(...pts[i + 1]), 2.4, 0.3, 0xf3f5f9); };
+  // stairwell block: storage room | stairs, EXIT double door into the hall
+  ow([107, 225], [107, 400]); ow([235, 225], [235, 400]); ow([357, 225], [357, 400]);
+  ow([107, 400], [172, 400]); ow([205, 400], [390, 400]); ow([432, 400], [462, 400]);
+  // west wall of the offices (door by the stairs, opening to the floor)
+  ow([235, 440], [235, 640]); ow([235, 710], [235, 1115]);
+  // curved front room: straight west wall, glass arc on the north
+  ow([462, 305], [462, 490]);
+  { const [ax0, az0] = OF(462, 305), [ax1, az1] = OF(790, 305), [, top] = OF(626, 265);
+    const a = V(ax0, az0), b = V(ax1, az1), c = V((ax0 + ax1) / 2, 2 * top - az0), arc = new THREE.QuadraticBezierCurve3(a, c, b); const ps = arc.getPoints(10);
     for (let i = 0; i < ps.length - 1; i++) { const p0 = ps[i], p1 = ps[i + 1], len = p0.distanceTo(p1); const m = mesh(rbox(len + 0.3, 2.4, 0.3, 0.1), smat(0xdfe8fb, { transparent: true, opacity: 0.85 }), (p0.x + p1.x) / 2, 1.2, (p0.z + p1.z) / 2); m.rotation.y = -Math.atan2(p1.z - p0.z, p1.x - p0.x); g.add(m); } }
-  room(980, 270, 1078, 450, 2.4, [1]);
+  // four restrooms (2 × 2)
+  ow([235, 595], [565, 595]); ow([290, 595], [290, 770]); ow([405, 595], [405, 770]); ow([290, 682], [540, 682]);
+  ow([565, 620], [565, 645], [540, 645], [540, 715], [565, 715], [565, 735]);
+  ow([235, 770], [572, 770]);
+  // east column: office, lunch room, office
+  ow([614, 445], [614, 455]); ow([614, 480], [614, 595]); ow([614, 620], [614, 965]);
+  ow([614, 445], [805, 445]); ow([614, 590], [740, 590]); ow([765, 590], [805, 590]); ow([614, 770], [805, 770]); ow([614, 965], [805, 965]);
+  // offices below the restrooms
+  ow([405, 770], [405, 915]); ow([565, 770], [565, 915]);
+  ow([345, 915], [370, 915]); ow([395, 915], [410, 915]); ow([440, 915], [565, 915]);
+  ow([345, 915], [345, 970]); ow([235, 970], [315, 970]); ow([340, 970], [380, 970]); ow([405, 970], [405, 1115]); ow([235, 1115], [405, 1115]);
+  // Design room below the east column
+  room(980, OF(0, 965)[1], 1078, 450, 2.4, [1]);
   room(1032, 452, 1078, 515, 1.6, [1]);
   // room floors tinted, and their names
   const tint = (x1, y1, x2, y2, col) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(X(x2) - X(x1), Z(y2) - Z(y1)), smat(col)); p.rotation.x = -Math.PI / 2; p.position.set((X(x1) + X(x2)) / 2, 0.012, (Z(y1) + Z(y2)) / 2); p.receiveShadow = true; g.add(p); };
-  tint(745, 92, 845, 150, 0xe9edf6); tint(882, 80, 1078, 201, 0xeef1fb); tint(882, 212, 928, 264, 0xe6eef7); tint(967, 201, 1078, 270, 0xf6efe2); tint(980, 270, 1078, 450, 0xeef1fb); tint(700, 85, 745, 150, 0xf4efe6); tint(1032, 452, 1078, 515, 0xf3ece2);
+  tint(745, 92, 845, 150, 0xe9edf6);
+  { const T = (a0, b0, a1, b1, col) => tint(...OF(a0, b0), ...OF(a1, b1), col);
+    T(107, 225, 805, 400, 0xeef1fb); T(235, 400, 805, 770, 0xeef1fb); T(235, 770, 565, 1115, 0xeef1fb); T(614, 770, 805, 965, 0xeef1fb);
+    T(290, 595, 565, 770, 0xe6eef7); T(614, 590, 805, 770, 0xf6efe2); }
+  tint(980, OF(0, 965)[1], 1078, 450, 0xeef1fb); tint(700, 85, 745, 150, 0xf4efe6); tint(1032, 452, 1078, 515, 0xf3ece2);
   const tag = (txt, px, py, s = 0.75) => { const l = label(txt, '', s); l.position.copy(V(px, py, 3.2)); g.add(l); };
 
   // maintenance: workbench, red toolbox, parts shelf
@@ -537,15 +559,25 @@ function buildPlant(scene, anims) {
   for (const py of [100, 118, 136]) { g.add(mesh(rbox(2.4, 0.9, 1.1), smat(0xffffff), X(726), 0.45, Z(py))); g.add(mesh(rbox(2.4, 0.5, 0.35), smat(C.blueSoft), X(726), 0.25, Z(py) - 0.9)); }
   // offices: desks with screens; design room drawing tables
   const desk = (px, py) => { g.add(mesh(rbox(2.2, 0.9, 1.1), smat(0xffffff), X(px), 0.45, Z(py))); const s = mesh(rbox(0.9, 0.6, 0.08), smat(C.navy, { emissive: 0x2b45d6, emissiveIntensity: 0.35 }), X(px), 1.25, Z(py) - 0.3); g.add(s); };
-  [[900, 140], [935, 140], [900, 165], [935, 165], [990, 140], [1030, 140], [1060, 140], [1000, 300], [1045, 300], [1000, 360], [1045, 360], [1000, 420], [1045, 420]].forEach(([a, b]) => desk(a, b));
-  // front room: conference table
-  g.add(mesh(rbox(6, 0.85, 1.8, 0.4), smat(C.wood), X(1022), 0.42, Z(100)));
-  // restrooms: stalls
-  for (const [a, b] of [[893, 250], [917, 250]]) { g.add(mesh(rbox(1.2, 1.9, 1.2, 0.08), smat(0xd9e1ef), X(a), 0.95, Z(b))); g.add(mesh(rbox(0.6, 0.45, 0.4, 0.15), smat(0xffffff), X(a), 0.22, Z(b) - 1)); }
-  // lunch room: tables with benches, fridge, first-aid cross on the wall
-  for (const [a, b] of [[1020, 240], [1055, 240], [1020, 260], [1055, 260]]) { g.add(mesh(rbox(2.2, 0.85, 1.0, 0.12), smat(0xffffff), X(a), 0.42, Z(b))); g.add(mesh(rbox(2.2, 0.45, 0.3, 0.1), smat(C.blueSoft), X(a), 0.22, Z(b) - 0.8)); g.add(mesh(rbox(2.2, 0.45, 0.3, 0.1), smat(C.blueSoft), X(a), 0.22, Z(b) + 0.8)); }
-  g.add(mesh(rbox(1.0, 2.1, 0.9, 0.12), smat(0xe9edf3), X(1072), 1.05, Z(215)));
-  { const fa = new THREE.Group(); fa.position.set(X(1035), 1.7, Z(201) + 0.2); fa.add(mesh(rbox(0.75, 0.75, 0.06, 0.04), smat(0xffffff), 0, 0, 0, false)); fa.add(mesh(rbox(0.5, 0.15, 0.08, 0.02), smat(C.red), 0, 0, 0.01, false)); fa.add(mesh(rbox(0.15, 0.5, 0.08, 0.02), smat(C.red), 0, 0, 0.01, false)); g.add(fa); }
+  // office desks (east column offices, offices below the restrooms) and Design room drawing tables
+  [[1040, 158], [1062, 178], [1040, 272], [1062, 298], [918, 275], [975, 275], [918, 348], [1000, 345], [1045, 345], [1000, 395], [1045, 395], [1000, 432], [1045, 432]].forEach(([a, b]) => desk(a, b));
+  // reception desk in the hall
+  g.add(mesh(rbox(3.2, 1.05, 1.0, 0.2), smat(0xffffff), X(992), 0.52, Z(180))); g.add(mesh(rbox(3.2, 0.1, 0.5, 0.05), smat(C.blue), X(992), 1.1, Z(180) + 0.3));
+  // curved front room: conference table with chairs
+  g.add(mesh(rbox(6, 0.85, 1.8, 0.4), smat(C.wood), X(1022), 0.42, Z(118)));
+  for (let i = 0; i < 4; i++) for (const sz of [-1.3, 1.3]) g.add(mesh(rbox(0.6, 0.55, 0.6, 0.12), smat(C.navy), X(1022) - 2.1 + i * 1.4, 0.28, Z(118) + sz));
+  // stairs up to the second floor, rising to the north, with a handrail
+  { const [sx0, sz0] = OF(235, 400), [sx1, sz1] = OF(357, 236), n = 8, dz = (Z(sz0) - Z(sz1)) / n, w = X(sx1) - X(sx0) - 0.4;
+    for (let i = 0; i < n; i++) g.add(mesh(rbox(w, 0.3 * (i + 1), dz, 0.04), smat(i % 2 ? 0xd5dbe5 : 0xe3e7ee), (X(sx0) + X(sx1)) / 2, 0.15 * (i + 1), Z(sz0) - dz * (i + 0.5)));
+    g.add(mesh(rbox(0.12, 0.12, Z(sz0) - Z(sz1), 0.04), smat(C.frame), X(OF(297, 0)[0]), 3.0, (Z(sz0) + Z(sz1)) / 2)); }
+  // storage room shelves
+  g.add(mesh(rbox(3.4, 2.0, 0.8, 0.08), smat(C.body2), X(868), 1.0, Z(84)));
+  // restrooms: a stall and a sink in each
+  for (const [ax, ay] of [[347, 638], [470, 638], [347, 726], [470, 726]]) { const [a, b] = OF(ax, ay); g.add(mesh(rbox(1.0, 1.9, 1.0, 0.08), smat(0xd9e1ef), X(a) - 0.6, 0.95, Z(b))); g.add(mesh(rbox(0.6, 0.85, 0.45, 0.15), smat(0xffffff), X(a) + 0.9, 0.42, Z(b))); }
+  // lunch room: two tables with benches, fridge, first-aid station on the west wall
+  for (const b of [208, 234]) { g.add(mesh(rbox(2.2, 0.85, 1.0, 0.12), smat(0xffffff), X(1046), 0.42, Z(b))); g.add(mesh(rbox(2.2, 0.45, 0.3, 0.1), smat(C.blueSoft), X(1046), 0.22, Z(b) - 0.8)); g.add(mesh(rbox(2.2, 0.45, 0.3, 0.1), smat(C.blueSoft), X(1046), 0.22, Z(b) + 0.8)); }
+  g.add(mesh(rbox(0.9, 2.1, 0.9, 0.12), smat(0xe9edf3), X(1071), 1.05, Z(246)));
+  { const fa = new THREE.Group(); fa.position.set(X(1018) + 0.2, 1.7, Z(222)); fa.rotation.y = Math.PI / 2; fa.add(mesh(rbox(0.75, 0.75, 0.06, 0.04), smat(0xffffff), 0, 0, 0, false)); fa.add(mesh(rbox(0.5, 0.15, 0.08, 0.02), smat(C.red), 0, 0, 0.01, false)); fa.add(mesh(rbox(0.15, 0.5, 0.08, 0.02), smat(C.red), 0, 0, 0.01, false)); g.add(fa); }
   // die cutting materials: rolls of rule and rubber
   for (let i = 0; i < 4; i++) { const r = mesh(cylG(0.55, 1.8, 12), smat(i % 2 ? C.frame : C.red), X(1045 + (i % 2) * 18), 0.55, Z(462 + Math.floor(i / 2) * 28)); r.rotation.z = Math.PI / 2; g.add(r); }
 
@@ -907,14 +939,14 @@ function buildPeople(scene, anims) {
   // walking loops through the aisles (drawing coordinates)
   const loops = [
     { pts: [[195, 192], [440, 192], [440, 199], [195, 199]], speed: 1.5 },
-    { pts: [[885, 296], [965, 296], [965, 312], [885, 312]], speed: 1.4 },
+    { pts: [[856, 285], [880, 285], [880, 385], [856, 385]], speed: 1.4 },
     { pts: [[130, 525], [340, 525], [340, 532], [130, 532]], speed: 1.3 },
     { pts: [[420, 594], [705, 594], [705, 600], [420, 600]], speed: 1.6 },
     { pts: [[415, 556], [470, 556], [470, 564], [415, 564]], speed: 1.2 },
     { pts: [[60, 128], [125, 128], [125, 168], [60, 168]], speed: 1.5 },
     { pts: [[890, 500], [965, 500], [965, 512], [890, 512]], speed: 1.25 },
-    { pts: [[1010, 180], [1065, 180], [1065, 192], [1010, 192]], speed: 1.1 },
-    { pts: [[975, 235], [995, 235], [995, 262], [975, 262]], speed: 0.9 },
+    { pts: [[898, 145], [955, 145], [955, 180], [898, 180]], speed: 1.1 },
+    { pts: [[1006, 200], [1013, 200], [1013, 300], [1006, 300]], speed: 0.9 },
   ];
   loops.forEach((lp, i) => {
     const path = roundedPath(lp.pts, 0.6, true), L = path.getLength();
@@ -934,7 +966,7 @@ function buildPeople(scene, anims) {
   });
   // operators: standing at a machine, reaching and stepping side to side
   [[600, 274, 'z', 1], [590, 412, 'z', 1], [520, 478, 'z', 1], [520, 614, 'z', 1], [380, 318, 'z', 1], [570, 342, 'z', 1], [300, 586, 'z', 1],
-    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [245, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [492, 380, 'z', -1], [767, 676, 'x', -1]]
+    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [1060, 221, 'z', -1], [245, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [492, 380, 'z', -1], [767, 676, 'x', -1]]
     .forEach(([a, b, axis, face], i) => {
       const p = person(scene, { skin: SKINS[i % SKINS.length], hat: i % 2 ? C.blue : 0xffffff, vest: i % 5 === 2 ? 0xc6e03a : C.amber });
       const base = V(a, b);

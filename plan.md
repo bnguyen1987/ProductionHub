@@ -137,3 +137,11 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - Employee parking in front of Maintenance and the offices: two rows of striped spots with parked cars. One car drives in, parks, backs out and leaves.
 - A north–south road at the east end of the yard. Trucks arrive from the north (turning right into the yard) or from the south (turning left). When they leave, they turn left (north) or right (south). The west end stays a dead end.
 - Wide screens frame the side road too. Phones still frame just the building.
+- Front office rebuilt from the office floor plan:
+  - stairwell (with a storage room) beside Maintenance
+  - EXIT double door into the hall, with a reception desk
+  - curved glass front room with a conference table
+  - four restrooms in a 2 × 2 block
+  - east column: office, **lunch room** (tables, fridge, first aid), office
+  - three offices below the restrooms
+  - the Design room below the east column
