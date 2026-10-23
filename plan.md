@@ -151,3 +151,4 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
   - The Design room's four lower desks became one large table with chairs. The two desks above it stay.
   - Doors added: Maintenance east wall, hall into the stairwell, the two left restrooms, the lunch room, and the Design room.
 - All doors are closed. Every door opening in the office plan now has a door, with a double door at the hall EXIT. Only the wide opening to the plant floor stays open.
+- The Design room's big table has no chairs. One green-vest worker walks without a hard hat (bald).

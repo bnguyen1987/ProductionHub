@@ -596,9 +596,9 @@ function buildPlant(scene, anims) {
   const bigTable = (px, py, w, d, top, chairs) => {
     g.add(mesh(rbox(w, 0.85, d, 0.3), smat(top), X(px), 0.42, Z(py)));
     const n = Math.max(2, Math.round(w / 1.3));
-    for (let i = 0; i < n; i++) for (const sz of [-1, 1]) g.add(mesh(rbox(0.6, 0.55, 0.6, 0.12), smat(chairs), X(px) - w / 2 + 0.65 + (i * (w - 1.3)) / (n - 1), 0.28, Z(py) + sz * (d / 2 + 0.45)));
+    if (chairs) for (let i = 0; i < n; i++) for (const sz of [-1, 1]) g.add(mesh(rbox(0.6, 0.55, 0.6, 0.12), smat(chairs), X(px) - w / 2 + 0.65 + (i * (w - 1.3)) / (n - 1), 0.28, Z(py) + sz * (d / 2 + 0.45)));
   };
-  bigTable(1032, 410, 7.0, 2.6, 0xffffff, C.navy);   // Design room
+  bigTable(1032, 410, 7.0, 2.6, 0xffffff, null);     // Design room (no chairs)
   bigTable(1048, 284, 4.4, 2.0, C.wood, C.blueSoft); // lunch room
   // reception desk in the hall
   g.add(mesh(rbox(3.2, 1.05, 1.0, 0.2), smat(0xffffff), X(992), 0.52, Z(180))); g.add(mesh(rbox(3.2, 0.1, 0.5, 0.05), smat(C.blue), X(992), 1.1, Z(180) + 0.3));
@@ -957,7 +957,7 @@ function buildMachines(scene, anims, machines, pickables) {
 // =====================================================================
 // People: walkers on aisle loops, and operators working at machines
 // =====================================================================
-function person(scene, { vest = C.amber, hat = C.blue, skin = 0xe0b48a } = {}) {
+function person(scene, { vest = C.amber, hat = C.blue, skin = 0xe0b48a, bald = false } = {}) {
   const g = new THREE.Group(); scene.add(g);
   const pants = smat(C.navy), vestM = smat(vest), skinM = smat(skin), hatM = smat(hat);
   const leg = (s) => { const p = D(new THREE.Group()); p.position.set(0, 1.0, s * 0.17); g.add(p); p.add(mesh(rbox(0.26, 1.0, 0.26, 0.1), pants, 0, -0.5, 0)); return p; };
@@ -965,13 +965,16 @@ function person(scene, { vest = C.amber, hat = C.blue, skin = 0xe0b48a } = {}) {
   const legL = leg(1), legR = leg(-1), armL = arm(1), armR = arm(-1);
   g.add(mesh(rbox(0.46, 0.95, 0.68, 0.18), vestM, 0, 1.45, 0));
   g.add(mesh(new THREE.SphereGeometry(0.26, 12, 10), skinM, 0, 2.18, 0));
-  const hh = mesh(new THREE.SphereGeometry(0.29, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), hatM, 0, 2.24, 0); g.add(hh);
-  g.add(mesh(cylG(0.34, 0.04, 12), hatM, 0.04, 2.24, 0, false));
+  if (!bald) {
+    const hh = mesh(new THREE.SphereGeometry(0.29, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), hatM, 0, 2.24, 0); g.add(hh);
+    g.add(mesh(cylG(0.34, 0.04, 12), hatM, 0.04, 2.24, 0, false));
+  }
   bake(g);
   return { g, legL, legR, armL, armR };
 }
 const SKINS = [0xe0b48a, 0xc68e5e, 0x8d5a3b, 0xf0c9a0, 0xa8714a];
 function buildPeople(scene, anims) {
+  let madeBald = false;
   // walking loops through the aisles (drawing coordinates)
   const loops = [
     { pts: [[195, 192], [440, 192], [440, 199], [195, 199]], speed: 1.5 },
@@ -987,7 +990,9 @@ function buildPeople(scene, anims) {
   loops.forEach((lp, i) => {
     const path = roundedPath(lp.pts, 0.6, true), L = path.getLength();
     for (let k = 0; k < (i < 4 ? 2 : 1); k++) {
-      const p = person(scene, { skin: SKINS[(i + k) % SKINS.length], hat: (i + k) % 3 ? C.blue : 0xffffff, vest: (i + k) % 4 === 3 ? 0xc6e03a : C.amber });
+      const green = (i + k) % 4 === 3;
+      const p = person(scene, { skin: SKINS[(i + k) % SKINS.length], hat: (i + k) % 3 ? C.blue : 0xffffff, vest: green ? 0xc6e03a : C.amber, bald: green && !madeBald });
+      if (green) madeBald = true; // one green-shirt walker goes without a hard hat
       let s = (k * 0.5 + i * 0.13) * L;
       const tan = new THREE.Vector3();
       anims.push((t, dt) => {
