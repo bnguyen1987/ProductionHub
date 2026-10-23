@@ -38,8 +38,20 @@ export function render(view) {
   state.pattern = { straight: 'row', chimney: 'pinwheel' }[state.pattern] || state.pattern;
   state.foldPct = DEFAULTS.foldPct; state.thick = ''; state.palletH = DEFAULTS.palletH;
   state.lbsMsf = String(boardSpec(state.flute, state.grade).lbsMsf);
+  const startOver = () => {
+    if (!confirm('Clear everything and start a new pallet?')) return;
+    try { localStorage.removeItem('gwprod_pallet'); localStorage.removeItem('gwprod_pallet_dlimg'); } catch {}
+    dlImgs = {}; dlPage = null;
+    destroy();
+    render(view);
+    window.scrollTo(0, 0);
+  };
+  setTimeout(() => { const b = view.querySelector('#palReset'); if (b) b.onclick = startOver; }, 0);
   view.innerHTML = `
-    <div class="page-head"><h1>Pallet Calculator</h1><p>How many pieces fit on a pallet, how many pallets the order needs, and what the load will look like. Boxes are figured glued and folded flat.</p></div>
+    <div class="page-head" style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
+      <div><h1>Pallet Calculator</h1><p>How many pieces fit on a pallet, how many pallets the order needs, and what the load will look like. Boxes are figured glued and folded flat.</p></div>
+      <button class="btn" type="button" id="palReset" style="flex:none">Start over</button>
+    </div>
     <div class="layout wide-left">
       <div class="stack">
         <section class="card">
