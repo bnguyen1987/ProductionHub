@@ -185,3 +185,4 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - The truck yard is a single lane in and out, with no center line. Trucks and the car take turns.
 - Grass runs along the east and south sides of the building, with bushes against the walls and trees whose leaves sway slightly.
 - The Isowa outfeed conveyor is shorter, so it stops short of the south wall.
+- The concrete area by the lot entrance is now a grass island with a curb, bushes, two trees, and a monument sign reading "GoldenWest Packaging Group · Ontario" on both sides.

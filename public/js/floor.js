@@ -1259,6 +1259,7 @@ function buildForklifts(scene, anims) {
 // Truck yard north of the dock wall. Door k (1–12) sits at drawing x = 186 + (12 − k) × 39.45.
 const YARD = { wall: Z(78), near: Z(78) - 24, far: Z(78) - 24 }; // one lane in and out (vehicles take turns)
 const ROAD_X = X(1205); // north–south road past the east end of the yard
+const ISLAND = []; // grass island by the lot entrance: [x0, x1, z0, z1], filled in by buildTrucks
 const doorX = (k) => X(186 + ((12 - k) * (620 - 186)) / 11);
 const TRAILER = 14, CAB = 3.4;
 
@@ -1331,9 +1332,11 @@ function buildTrucks(scene, anims) {
     yard.add(mesh(rbox(3.0, 0.16, 4.0, 0.06), smat(C.frame), dx, 1.8, dz));
     for (const ox of [-1.1, 1.1]) for (const oz of [-1.5, 1.5]) yard.add(mesh(cylG(0.18, 0.15, 10), smat(C.frame), dx + ox, -0.1, dz + oz));
   }
-  // concrete between the parking lot and the street, so the lot entrance is narrower
+  // grass island between the parking lot and the street (narrows the lot entrance), with the company sign
   { const cx0 = X(1080), cx1 = ROAD_X - 5.1, cz0 = Z(-100), cz1 = YARD.wall;
-    yard.add(mesh(rbox(cx1 - cx0, 0.18, cz1 - cz0, 0.06), smat(0xcfd5df), (cx0 + cx1) / 2, -0.2, (cz0 + cz1) / 2)); }
+    yard.add(mesh(rbox(cx1 - cx0 + 0.3, 0.16, cz1 - cz0 + 0.3, 0.06), smat(0xc9ced8), (cx0 + cx1) / 2, -0.22, (cz0 + cz1) / 2)); // curb
+    yard.add(mesh(rbox(cx1 - cx0, 0.18, cz1 - cz0, 0.06), smat(0x7fbf5a, { roughness: 1 }), (cx0 + cx1) / 2, -0.19, (cz0 + cz1) / 2));
+    ISLAND.push(cx0, cx1, cz0, cz1); }
   for (let k = 1; k <= 13; k++) { const px = 186 + ((12 - k) * (620 - 186)) / 11 + (620 - 186) / 22; const st = mesh(rbox(0.16, 0.02, TRAILER + 1, 0.01), smat(0xffffff), X(px), -0.26, YARD.wall - (TRAILER + 1) / 2, false); yard.add(st); }
   bake(yard);
   // parked cars (one spot in row A is left open for the car that comes and goes)
@@ -1495,6 +1498,29 @@ function buildLandscape(scene, anims) {
   // trees: trunk + canopy; the canopies sway a little in the breeze
   const trunkM = smat(0x8a6240), canopyG = new THREE.IcosahedronGeometry(1.6, 0);
   const spots = [];
+  // grass island by the lot entrance: a few bushes, two trees and the monument sign
+  if (ISLAND.length) {
+    const [ix0, ix1, iz0, iz1] = ISLAND;
+    for (let i = 0; i < 5; i++) bush(ix0 + 0.9 + i * ((ix1 - ix0 - 1.8) / 4), iz0 + 0.9, k++);
+    for (const [tx, tz] of [[ix0 + (ix1 - ix0) * 0.62, iz0 + 4.2], [ix0 + (ix1 - ix0) * 0.3, iz0 + 9.5]]) spots.push([tx, tz, 0.1]);
+    // monument sign: stone base, white panel with the company name on both faces
+    const sx = (ix0 + ix1) / 2 + 0.6, sz = iz1 - 3.2;
+    g.add(mesh(rbox(5.2, 0.7, 1.0, 0.12), smat(0x9aa2af), sx, -0.1 + 0.35, sz));
+    for (const ox of [-2.2, 2.2]) g.add(mesh(rbox(0.5, 2.4, 0.9, 0.08), smat(0x9aa2af), sx + ox, 0.25 + 1.2, sz));
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 360;
+    const x = c.getContext('2d');
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, 1024, 360);
+    x.fillStyle = '#2b45d6'; x.fillRect(0, 300, 1024, 60);
+    x.fillStyle = '#14204f'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = 'bold 118px Inter, system-ui, sans-serif'; x.fillText('GoldenWest', 512, 108);
+    x.font = '600 70px Inter, system-ui, sans-serif'; x.fillStyle = '#2b45d6'; x.fillText('PACKAGING GROUP', 512, 222);
+    x.font = '600 34px Inter, system-ui, sans-serif'; x.fillStyle = '#ffffff'; x.fillText('ONTARIO', 512, 331);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    const face = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 });
+    const side = smat(0xf1f3f7);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(3.9, 1.37, 0.3), [side, side, side, side, face, face]); // front (+z) and back (−z) carry the name
+    panel.position.set(sx, 0.25 + 1.25, sz); panel.castShadow = true; scene.add(panel);
+  }
   for (let z = Z(160); z < Z(700); z += 8.5) spots.push([(east0 + east1) / 2 + 1.2, z]);
   for (let x = X(-60); x < X(1060); x += 10.5) spots.push([x, (south0 + south1) / 2 + 0.8]);
   spots.forEach(([x, z], i) => {
