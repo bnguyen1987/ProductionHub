@@ -109,3 +109,15 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
   - three dropped trailers stay at doors 12, 11 and 2
   - two semi-trucks take turns at the free doors: they pull in, back up to a door, wait while loading, pull out and leave
 - The opening view frames the building plus the yard. Phones frame just the building, and you can zoom out to see the trucks.
+
+## 11. Changes (Oct 22, later)
+
+- All names removed from the 3D view (rooms, racks, door numbers, EXIT signs).
+- Trucks come in from the right and leave to the right. The left end of the yard is a dead end, marked with a curb and bollards.
+- Pallet staging in the three circled areas: the west wall, the area by Maintenance, and the east aisle by the slitter. Each area has full pallets and stacks of empty pallets.
+- Forklifts work real jobs. Each one picks a full pallet in its staging area, then either sets it on a machine's infeed or drives through an open dock door and loads it into a trailer:
+  - West forklift: west staging area → trailers at doors 12 and 11.
+  - North forklift: staging by Maintenance → EMBA, McKinley, and the trailer at door 2.
+  - East forklift: east aisle staging → Jumbo, Shanghai, Large Matsu.
+- Pallets dropped at a machine get used up and disappear, and picked staging spots refill after about 30 seconds.
+- Dock doors 12, 11 and 2 stay open for loading.
