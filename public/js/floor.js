@@ -533,10 +533,10 @@ function buildPlant(scene, anims) {
   };
   wall(35, 100, 145, 100); wall(145, 100, 145, 78);
   { const gaps = [...OPEN_DOORS.map((k) => [186 + ((12 - k) * (620 - 186)) / 11, 16]), [RAMP.x, RAMP.half + 1]].sort((a, b) => a[0] - b[0]);
-    let x = 145; for (const [cx, hw] of gaps) { wall(x, 78, cx - hw, 78); x = cx + hw; } wall(x, 78, 1078, 78); }
+    let x = 145; for (const [cx, hw] of gaps) { wall(x, 78, cx - hw, 78); x = cx + hw; } wall(x, 78, 931.5, 78); } // stops at the stairwell: the curved front room is the front of the building
   // wall between the dock yard and the parking lot
   wall(737, 77, 737, -100, 2.6, 0.5);
-  wall(1078, 78, 1078, 698); wall(1078, 698, 35, 698);
+  wall(1078, 95, 1078, 698); wall(1078, 698, 35, 698);
   // west wall with two roll-up doors (closed)
   { const ROLL = [[650, 26], [215, 26]]; let y = 698;
     for (const [cy, hw] of ROLL) {
@@ -566,6 +566,13 @@ function buildPlant(scene, anims) {
   ow([235, 440], [235, 640]); ow([235, 710], [235, 1115]);
   // curved front room: straight west wall, glass arc on the north
   ow([462, 305], [462, 490]);
+  // curved wall from the stairwell corner around to the front room (closes in the entry by the EXIT double door)
+  { const p0 = OF(357, 400), p1 = OF(357, 545), p2 = OF(462, 545), crv = new THREE.QuadraticBezierCurve(new THREE.Vector2(...p0), new THREE.Vector2(...p1), new THREE.Vector2(...p2));
+    const pts = crv.getPoints(10);
+    for (let i = 0; i < pts.length - 1; i++) wall(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y, 2.4, 0.3, 0xf3f5f9);
+    wall(p2[0], p2[1], ...OF(462, 515), 2.4, 0.3, 0xf3f5f9); }
+  // entry outside the EXIT doors: sidewalk instead of plant floor
+  { const [ax, ay] = OF(357, 225), [bx, by] = OF(462, 400); const sw = new THREE.Mesh(new THREE.PlaneGeometry(X(bx) - X(ax), Z(by) - Z(ay)), smat(0xcfd5df)); sw.rotation.x = -Math.PI / 2; sw.position.set((X(ax) + X(bx)) / 2, 0.02, (Z(ay) + Z(by)) / 2); sw.receiveShadow = true; g.add(sw); }
   { const [ax0, az0] = OF(462, 305), [ax1, az1] = OF(790, 305), [, top] = OF(626, 265);
     const a = V(ax0, az0), b = V(ax1, az1), c = V((ax0 + ax1) / 2, 2 * top - az0), arc = new THREE.QuadraticBezierCurve3(a, c, b); const ps = arc.getPoints(10);
     for (let i = 0; i < ps.length - 1; i++) { const p0 = ps[i], p1 = ps[i + 1], len = p0.distanceTo(p1); const m = mesh(rbox(len + 0.3, 2.4, 0.3, 0.1), smat(0xdfe8fb, { transparent: true, opacity: 0.85 }), (p0.x + p1.x) / 2, 1.2, (p0.z + p1.z) / 2); m.rotation.y = -Math.atan2(p1.z - p0.z, p1.x - p0.x); g.add(m); } }
@@ -1020,7 +1027,7 @@ function buildPeople(scene, anims) {
     { pts: [[415, 556], [470, 556], [470, 564], [415, 564]], speed: 1.2 },
     { pts: [[88, 120], [130, 120], [130, 168], [88, 168]], speed: 1.5 },
     { pts: [[890, 500], [965, 500], [965, 512], [890, 512]], speed: 1.25 },
-    { pts: [[898, 145], [955, 145], [955, 180], [898, 180]], speed: 1.1 },
+    { pts: [[898, 140], [922, 140], [922, 186], [898, 186]], speed: 1.1 },
     { pts: [[1006, 200], [1013, 200], [1013, 300], [1006, 300]], speed: 0.9 },
   ];
   loops.forEach((lp, i) => {

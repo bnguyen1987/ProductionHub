@@ -160,3 +160,4 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - An air compressor (clickable) sits in the northwest corner, along the west wall below the two tanks.
 - Four columns shifted left, toward the machines.
 - All yellow exit arrows removed.
+- Curved wall added from the stairwell corner around to the front room, closing in the area by the EXIT double door. The outside wall above the curved glass room is removed, so the glass wall is now the front of the building, with sidewalk at the entry.
