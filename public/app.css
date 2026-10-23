@@ -364,3 +364,18 @@ details.fold[open]{padding-bottom:16px}
 .fc-row input,.fc-label input,.fc-label textarea{min-width:0;width:100%;font:inherit;font-size:13.5px;padding:7px 9px;border-radius:9px;border:1px solid rgba(27,34,51,.18);background:rgba(255,255,255,.8);color:#1b2233}
 .fc-label{display:block;font-size:12.5px;color:#4d5873;margin:0 0 8px}
 .fc-label textarea,.fc-label input{display:block;margin-top:4px}
+
+/* Floor: speech bubbles */
+.floor-bubble{position:absolute;left:0;top:0;z-index:2;display:none;align-items:center;gap:0;padding:5px 10px;border:0;border-radius:14px;cursor:pointer;
+  background:#fff;color:#14204f;font:700 13px/1.1 Inter,system-ui,sans-serif;box-shadow:0 4px 14px rgba(20,32,79,.25);white-space:nowrap;will-change:transform}
+.floor-bubble::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-top-color:#fff;border-bottom:0}
+.floor-bubble.show{display:inline-flex;animation:fbPop .28s cubic-bezier(.2,1.6,.4,1)}
+.floor-bubble .fb-dots{letter-spacing:2px;color:#2b45d6;animation:fbBlink 1.2s infinite}
+.floor-bubble .fb-say{display:none}
+.floor-bubble.talk .fb-dots{display:none}
+.floor-bubble.talk .fb-say{display:inline}
+.floor-bubble.talk{background:#2b45d6;color:#fff;font-size:14px;padding:7px 12px;animation:fbTalk .25s cubic-bezier(.2,1.6,.4,1)}
+.floor-bubble.talk::after{border-top-color:#2b45d6}
+@keyframes fbPop{from{scale:.4}to{scale:1}}
+@keyframes fbTalk{from{scale:.7}to{scale:1}}
+@keyframes fbBlink{0%,100%{opacity:1}50%{opacity:.35}}

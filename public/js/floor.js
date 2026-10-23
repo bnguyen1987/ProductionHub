@@ -270,7 +270,7 @@ function build(wrap, focusId) {
 
   buildPlant(scene, anims);
   buildMachines(scene, anims, machines, pickables);
-  buildPeople(scene, anims, machines);
+  const crew = buildPeople(scene, anims, machines);
   const fleet = buildForklifts(scene, anims);
   buildTrucks(scene, anims);
   buildLandscape(scene, anims);
@@ -471,7 +471,48 @@ function build(wrap, focusId) {
     sizeTags();
     renderer.render(scene, camera);
     placeCard();
+    bubbles(t);
   }
+
+  // ---------- speech bubbles: a few people (and two forklift drivers) pipe up now and then; tap to hear them ----------
+  const SAYINGS = [
+    { who: () => fleet[0] && fleet[0].f.g, h: 3.9, text: 'Wey!' },
+    { who: () => fleet[2] && fleet[2].f.g, h: 3.9, text: 'Hotwheels' },
+    { who: () => crew[0], h: 2.9, text: 'Common sense, my friend' },
+    { who: () => crew[3], h: 2.9, text: 'BRIAN!' },
+    { who: () => crew[5], h: 2.9, text: 'No Mercy' },
+    { who: () => crew[14], h: 2.9, text: 'No sirve la máquina' },
+    { who: () => crew[18], h: 2.9, text: 'Una consulta' },
+  ];
+  const bub = SAYINGS.map((sd, i) => {
+    const el = document.createElement('button');
+    el.type = 'button'; el.className = 'floor-bubble'; el.setAttribute('data-no-i18n', ''); el.setAttribute('aria-label', 'Speech bubble');
+    el.innerHTML = `<span class="fb-dots">•••</span><span class="fb-say">${esc(sd.text)}</span>`;
+    wrap.appendChild(el);
+    const b = { ...sd, el, state: 'off', next: 3 + i * 4.3 + Math.random() * 6, until: 0, obj: null };
+    el.addEventListener('pointerdown', (e) => e.stopPropagation());
+    el.addEventListener('click', (e) => { e.stopPropagation(); if (b.state === 'dots') { b.state = 'talk'; b.until = clockT + 3.6; el.classList.add('talk'); } });
+    return b;
+  });
+  let clockT = 0;
+  const bp = new THREE.Vector3();
+  function bubbles(t) {
+    clockT = t;
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    for (const b of bub) {
+      if (b.state === 'off' && t >= b.next) { b.state = 'dots'; b.until = t + 7 + Math.random() * 4; b.el.classList.add('show'); b.el.classList.remove('talk'); }
+      if (b.state !== 'off' && t >= b.until) { b.state = 'off'; b.next = t + 9 + Math.random() * 18; b.el.classList.remove('show', 'talk'); }
+      if (b.state === 'off') continue;
+      const o = b.who(); if (!o) continue;
+      o.getWorldPosition(bp); bp.y += b.h; bp.project(camera);
+      const sx = (bp.x * 0.5 + 0.5) * W, sy = (-bp.y * 0.5 + 0.5) * H;
+      const onScreen = bp.z < 1 && sx > -40 && sx < W + 40 && sy > 30 && sy < H + 40;
+      b.el.style.visibility = onScreen ? 'visible' : 'hidden';
+      b.el.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -100%)`;
+    }
+  }
+  three.cleanup.push(() => bub.forEach((b) => b.el.remove()));
+  three.bub = bub; // (tests)
   $('#flLoad')?.remove();
   frame();
 }
@@ -1022,6 +1063,7 @@ function person(scene, { vest = C.amber, hat = C.blue, skin = 0xe0b48a, bald = f
 const SKINS = [0xe0b48a, 0xc68e5e, 0x8d5a3b, 0xf0c9a0, 0xa8714a];
 function buildPeople(scene, anims) {
   let madeBald = false;
+  const crew = [];
   // walking loops through the aisles (drawing coordinates)
   const loops = [
     { pts: [[195, 192], [440, 192], [440, 199], [195, 199]], speed: 1.5 },
@@ -1040,6 +1082,7 @@ function buildPeople(scene, anims) {
       const green = (i + k) % 4 === 3;
       const p = person(scene, { skin: SKINS[(i + k) % SKINS.length], hat: (i + k) % 3 ? C.blue : 0xffffff, vest: green ? 0xc6e03a : C.amber, bald: green && !madeBald });
       if (green) madeBald = true; // one green-shirt walker goes without a hard hat
+      crew.push(p.g);
       let s = (k * 0.5 + i * 0.13) * L;
       const tan = new THREE.Vector3();
       anims.push((t, dt) => {
@@ -1057,6 +1100,7 @@ function buildPeople(scene, anims) {
     [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [1035, 259, 'z', 1], [546, 109, 'z', -1], [236, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [767, 676, 'x', -1]]
     .forEach(([a, b, axis, face], i) => {
       const p = person(scene, { skin: SKINS[i % SKINS.length], hat: i % 2 ? C.blue : 0xffffff, vest: i % 5 === 2 ? 0xc6e03a : C.amber });
+      crew.push(p.g);
       const base = V(a, b);
       p.g.position.copy(base);
       // face the machine
@@ -1071,6 +1115,7 @@ function buildPeople(scene, anims) {
         p.g.position.y = Math.abs(Math.sin(t * 2.2 + ph)) * 0.03;
       });
     });
+  return crew;
 }
 
 // =====================================================================

@@ -190,3 +190,10 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - The upper row of the employee lot lost its end space.
 - A small shipping desk with a clerk sits inside, by dock doors 3 and 4 at the east end of the die racks.
 - The outdoor pallet yard on the west side has stacks of empty pallets, with the roll-up door left clear.
+
+## 15. Fun: speech bubbles (Oct 23)
+
+- Seven people pop a "•••" bubble over their heads now and then, each on its own random timing. Tap the bubble and it opens into their saying for a few seconds, then pops away:
+  - Forklift drivers: "Wey!" and "Hotwheels"
+  - On the floor: "Common sense, my friend", "BRIAN!", "No Mercy", "No sirve la máquina", "Una consulta"
+- The bubbles follow people as they move, hide when off-screen, and don't open machine cards. The sayings stay exactly as written in both languages.

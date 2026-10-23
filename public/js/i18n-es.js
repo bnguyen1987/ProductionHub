@@ -19,6 +19,7 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Speech bubble': 'Globo de diálogo',
   'Air Compressor': 'Compresor de aire',
   'No specs on file yet. Tap Edit to add them.': 'Todavía no hay especificaciones. Toque Editar para agregarlas.',
   'Added on site by': 'Agregado en el sitio por',
