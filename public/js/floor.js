@@ -532,7 +532,10 @@ function buildPlant(scene, anims) {
     g.add(m);
   };
   wall(35, 100, 145, 100); wall(145, 100, 145, 78);
-  { let x = 145; for (const k of [...OPEN_DOORS].sort((a, b) => b - a)) { const dx = 186 + ((12 - k) * (620 - 186)) / 11; wall(x, 78, dx - 16, 78); x = dx + 16; } wall(x, 78, 1078, 78); }
+  { const gaps = [...OPEN_DOORS.map((k) => [186 + ((12 - k) * (620 - 186)) / 11, 16]), [RAMP.x, RAMP.half + 1]].sort((a, b) => a[0] - b[0]);
+    let x = 145; for (const [cx, hw] of gaps) { wall(x, 78, cx - hw, 78); x = cx + hw; } wall(x, 78, 1078, 78); }
+  // wall between the dock yard and the parking lot
+  wall(737, 77, 737, -100, 2.6, 0.5);
   wall(1078, 78, 1078, 698); wall(1078, 698, 35, 698); wall(35, 698, 35, 100);
   // inside rooms: offices, design, maintenance, lunch, hallway
   const room = (x1, y1, x2, y2, h = 2.4, open = []) => {
@@ -657,8 +660,17 @@ function buildPlant(scene, anims) {
     const lm = new THREE.MeshStandardMaterial({ color: C.amber, emissive: C.amber, emissiveIntensity: 1 });
     const l = mesh(cylG(0.18, 0.18, 10), lm, X(px), 2.85, Z(78) + 0.4, false); g.add(l); lights.push({ lm, ph: i * 0.7 });
   }
-  // ramp by door 1
-  const ramp = mesh(rbox(6, 0.3, 1.6, 0.06), smat(0xd5dbe5), X(675), 0.15, Z(84)); ramp.rotation.z = 0.06; g.add(ramp);
+  // big drive-in door (rolled up) and the truck ramp outside it
+  { const cx = X(RAMP.x), w = (RAMP.half * 2) * SC, z = Z(78);
+    for (const sx of [-1, 1]) { const post = mesh(rbox(0.4, 3.4, 0.6, 0.06), smat(C.yellow), cx + sx * (w / 2 + 0.2), 1.7, z); g.add(post); for (let k = 0; k < 4; k++) g.add(mesh(rbox(0.42, 0.25, 0.62, 0.02), smat(C.line), cx + sx * (w / 2 + 0.2), 0.4 + k * 0.8, z, false)); }
+    g.add(mesh(rbox(w + 1.2, 0.6, 0.7, 0.1), smat(0xd5dbe5), cx, 3.4, z));                 // header
+    { const roll = mesh(cylG(0.45, w, 14), smat(0xb3bccb), cx, 3.25, z - 0.1); roll.rotation.z = Math.PI / 2; g.add(roll); } // rolled-up door
+    // ramp: concrete slope from the yard up to the door, with curbs and yellow edges
+    const L = RAMP.len, zc = z - L / 2;
+    const slab = mesh(rbox(w, 0.3, L, 0.05), smat(0xc9ced8), cx, -0.28, zc); slab.rotation.x = -Math.atan2(0.3, L); g.add(slab);
+    for (let i = 0; i < 5; i++) g.add(mesh(rbox(w * 0.7, 0.02, 0.35, 0.01), smat(C.yellow), cx, -0.1 + i * 0.05, z - 1.2 - i * (L - 2) / 5, false));
+    for (const sx of [-1, 1]) { g.add(mesh(rbox(0.5, 0.8, L, 0.08), smat(0xd5dbe5), cx + sx * (w / 2 + 0.25), 0.1, zc)); g.add(mesh(rbox(0.52, 0.08, L, 0.02), smat(C.yellow), cx + sx * (w / 2 + 0.25), 0.52, zc, false)); }
+  }
   anims.push((t) => lights.forEach((l) => (l.lm.emissiveIntensity = 0.3 + 0.9 * Math.max(0, Math.sin(t * 2.4 + l.ph)))));
 
   // exit arrows (yellow on the drawing), pulsing
@@ -1061,7 +1073,9 @@ function forklift(scene) {
 // face = the way a forklift points when it picks from the slot.
 // door openings (drawing px on the wall line; last value = which way the door swings)
 const DOORS = [[845, 133, 1], [922, 127, 1], [909, 205, -1], [909, 238, -1], [1018, 302, -1], [980, 412, -1]];
-const OPEN_DOORS = [12, 11, 2]; // trailers parked here are loaded by the forklifts
+const OPEN_DOORS = [12, 11, 2];
+// big drive-in door with a ramp (drawing px: center x, half width; ramp length in units)
+const RAMP = { x: 680, half: 30, len: 9 }; // trailers parked here are loaded by the forklifts
 const FACE = { w: [-1, 0], e: [1, 0], n: [0, -1], s: [0, 1] };
 const REACH = 21, BACK = 45; // drawing px from the pallet center to the forklift center, and to its approach point
 function spot(cx, cy, face) {
@@ -1286,7 +1300,7 @@ function buildTrucks(scene, anims) {
     if (zc === rowA && i === 6) continue;
     if ((i * 7 + (faceN ? 1 : 3)) % 5 === 0) continue; // a few empty spots
     const c = car(scene, CAR_COLORS[ci++ % CAR_COLORS.length]);
-    c.g.position.set(PX0 + (i + 0.5) * SPOT, 0, zc); c.g.rotation.y = -Math.PI / 2; // nose south: row A to the building, row B to the aisle
+    c.g.position.set(PX0 + (i + 0.5) * SPOT, -0.27, zc); c.g.rotation.y = -Math.PI / 2; // nose south: row A to the building, row B to the aisle
   }
 
   {
@@ -1315,7 +1329,7 @@ function buildTrucks(scene, anims) {
       s += g.v * dt;
       const u = Math.min(1, s / g.len), p = g.c.getPointAt(u); g.c.getTangentAt(u, tan);
       if (g.rev) tan.multiplyScalar(-1);
-      c.g.position.set(p.x, 0, p.z); c.g.rotation.y = -Math.atan2(tan.z, tan.x);
+      c.g.position.set(p.x, -0.27, p.z); c.g.rotation.y = -Math.atan2(tan.z, tan.x);
       c.wheels.forEach((w) => (w.rotation.y += (g.rev ? -1 : 1) * dt * g.v * 2.5));
       if (u >= 1) { si = (si + 1) % segs.length; s = 0; }
     });
@@ -1324,12 +1338,12 @@ function buildTrucks(scene, anims) {
   // trailers already at the docks (no tractor)
   for (const k of [12, 11, 2]) {
     const t = truck(scene, C.red, false);
-    t.g.position.set(doorX(k), 0, YARD.wall - 0.35 - TRAILER / 2);
+    t.g.position.set(doorX(k), -0.27, YARD.wall - 0.35 - TRAILER / 2);
     t.g.rotation.y = Math.PI / 2;
   }
   // two trucks taking turns at the free doors
   const agents = [
-    { doors: [8, 4, 10, 6], color: C.blue, delay: 0 },
+    { doors: [8, 'R', 4, 10, 6], color: C.blue, delay: 0 },
     { doors: [3, 9, 5, 7], color: C.red, delay: 30 },
   ];
   agents.forEach((a) => {
@@ -1339,9 +1353,10 @@ function buildTrucks(scene, anims) {
     const tan = new THREE.Vector3();
     const line = (ax, az, bx, bz) => new THREE.LineCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(bx, 0, bz));
     const plan = () => {
-      const xd = doorX(a.doors[di % a.doors.length]);
+      const door = a.doors[di % a.doors.length], ramp = door === 'R';
+      const xd = ramp ? X(RAMP.x) : doorX(door);
       const fromNorth = di % 2 === 0, toNorth = (di + (a.color === C.red ? 1 : 0)) % 3 !== 0; di++;
-      const dock = YARD.wall - 0.35 - TRAILER / 2, turnX = xd - 15;
+      const dock = ramp ? YARD.wall + 1 - TRAILER / 2 : YARD.wall - 0.35 - TRAILER / 2, turnX = xd - 15; // ramp: back up the ramp, rear just inside the door
       const SB = ROAD_X - 2.2, NB = ROAD_X + 2.2, northEnd = YARD.far - 85, southEnd = Z(698) + 55;
       const bez = (ax, az, cx, cz, bx, bz) => new THREE.QuadraticBezierCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(cx, 0, cz), new THREE.Vector3(bx, 0, bz));
       const arrive = fromNorth
@@ -1356,8 +1371,10 @@ function buildTrucks(scene, anims) {
         { wait: 1.0 },
         { c: new THREE.QuadraticBezierCurve3(new THREE.Vector3(turnX, 0, YARD.far), new THREE.Vector3(xd, 0, YARD.far), new THREE.Vector3(xd, 0, dock)), v: 2.6, rev: true }, // back into the door
         { wait: 12, docked: true },                                                                   // loading
-        { c: new THREE.QuadraticBezierCurve3(new THREE.Vector3(xd, 0, dock), new THREE.Vector3(xd, 0, YARD.near), new THREE.Vector3(xd + 15, 0, YARD.near)), v: 3.2 }, // pull out, turn east
-        { c: line(xd + 15, YARD.near, leave[0].c.v0.x, YARD.near), v: 7 },                          // back out to the road (the yard is a dead end on the left)
+        ...(ramp
+          ? [{ c: line(xd, dock, xd, YARD.near + 4), v: 2.6 }, { c: bez(xd, YARD.near + 4, xd, YARD.near, xd + 8, YARD.near), v: 3 }] // straight down the ramp, then east (clears the yard wall)
+          : [{ c: bez(xd, dock, xd, YARD.near, xd + 15, YARD.near), v: 3.2 }]),                                                  // pull out, turn east
+        { c: line(ramp ? xd + 8 : xd + 15, YARD.near, leave[0].c.v0.x, YARD.near), v: 7 },                          // back out to the road (the yard is a dead end on the left)
         ...leave,
         { wait: 4, hidden: true },
       ];
@@ -1380,7 +1397,8 @@ function buildTrucks(scene, anims) {
       const u = Math.min(1, s / g.len);
       const p = g.c.getPointAt(u); g.c.getTangentAt(u, tan);
       if (g.rev) tan.multiplyScalar(-1);
-      tk.g.position.set(p.x, 0, p.z);
+      const onRamp = Math.abs(p.x - X(RAMP.x)) < 4 && p.z > YARD.wall - RAMP.len - 4 ? Math.min(1, Math.max(0, (p.z - (YARD.wall - RAMP.len - 4)) / (RAMP.len + 4))) : 0;
+      tk.g.position.set(p.x, -0.27 + onRamp * 0.27, p.z);
       tk.g.rotation.y = -Math.atan2(tan.z, tan.x);
       tk.wheels.forEach((w) => (w.rotation.y += (g.rev ? -1 : 1) * dt * g.v * 2));
       tk.lm.emissiveIntensity = g.rev ? 0.6 + 0.6 * Math.max(0, Math.sin(t * 9)) : 0.8;

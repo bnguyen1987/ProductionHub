@@ -152,3 +152,6 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
   - Doors added: Maintenance east wall, hall into the stairwell, the two left restrooms, the lunch room, and the Design room.
 - All doors are closed. Every door opening in the office plan now has a door, with a double door at the hall EXIT. Only the wide opening to the plant floor stays open.
 - The Design room's big table has no chairs. One green-vest worker walks without a hard hat (bald).
+- Big drive-in door opened by dock door 1, rolled up, with yellow and black posts. A concrete truck ramp outside has curbs and yellow edge stripes. The blue truck adds the ramp to its rotation: it backs up the ramp into the doorway, waits, drives straight down and leaves.
+- A wall now separates the dock yard from the employee parking lot.
+- Trucks and cars sit on the asphalt instead of floating just above it.
