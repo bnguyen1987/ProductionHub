@@ -10,7 +10,7 @@ const TYPE = { FFG: 'Flexo folder-gluer', PRESS: 'Flexo printer / slotter', FLAT
 const DIE = { none: 'No (print only)', rotary: 'Rotary die only', partial: 'Partial cuts only (hand holes, vents)', flat: 'Flat die cut' };
 
 // Every machine on the tab, in floor order. `base` = rows from the spec sheets.
-const LIST = [
+export const LIST = [
   ...MACHINES.map((m) => ({
     id: String(m.id), name: m.name, group: m.type === 'FLATBED' ? 'Die cutters' : 'Printing & converting', type: TYPE[m.type] || m.type, notes: m.notes,
     base: [
@@ -34,10 +34,22 @@ const LIST = [
     notes: `Orders under ${fmtNum(SMALL_ORDER_SQFT)} sq ft run on the slitter from stock sheets. Anything under 12" goes to the bandsaw.`,
     base: [['Sheet width', `${inch(s.minW)} to ${inch(s.maxW)}`], ['Sheet length', `${inch(s.minL)} to ${inch(s.maxL)}`]],
   })),
+  // On the floor but not in the Order Check (earlier spec sheet data)
+  { id: '149', name: 'Shanghai Juer Mini FFG', group: 'Printing & converting', type: 'Flexo folder-gluer', notConfirmed: true,
+    notes: 'Hand feed and hand stack. Top print, cold glue, max glue tab 1.75", slot 0.275". Printable area 37.4" × 78.74". Max bundle 25 SW / 15 DW, 12" high. Speed is an estimate; anilox to be confirmed.',
+    base: [['Sheet width', '11.81" to 39.37"'], ['Sheet length', '23.62" to 78.74"'], ['Print colors', '2 max'], ['Min panel', 'L 7.5", W 4.8"'], ['Crew', '3'], ['Standard speed', '2,000/hr (est.)'], ['Setup', '30 min'], ['Order Check', 'Not included']] },
+  { id: '130', name: 'Isowa Rotary Die Cut', group: 'Die cutters', type: 'Rotary die cutter', notConfirmed: true,
+    notes: 'Plain rotary die cut, hand feed and hand stack. 66" cylinder. Max rule 500" (more needs production OK). Sheet size limits are not confirmed yet.',
+    base: [['Print colors', 'No print'], ['Die cut', 'Rotary die only'], ['Max inches of rule', '500"'], ['Crew', '2–4'], ['Standard speed', '770/hr'], ['Setup', '40 min'], ['Minimum order', '100 pcs'], ['Order Check', 'Not included']] },
   ...['150', '151', '152'].map((id) => ({ id, name: `${id} Gluer`, group: 'Finishing', type: 'Gluer', notes: '', base: [] })),
   { id: '155', name: '155 Stitcher', group: 'Finishing', type: 'Stitcher', notes: '', base: [] },
+  { id: '112', name: '112 Band Saw', group: 'Other equipment', type: 'Band saw', notes: 'Cuts pieces under 12" that are too small for the slitter.', base: [] },
+  { id: '113', name: '113 Eccentric', group: 'Other equipment', type: 'Eccentric', notes: '', base: [] },
+  { id: 'Strapper', name: 'Strapper', group: 'Other equipment', type: 'Strapper', notes: '', base: [] },
+  { id: 'Baler', name: 'Baler', group: 'Other equipment', type: 'Baler', notes: '', base: [] },
 ];
-const GROUPS = ['Printing & converting', 'Die cutters', 'Slitters', 'Finishing'];
+export const GROUPS = ['Printing & converting', 'Die cutters', 'Slitters', 'Finishing', 'Other equipment'];
+export { SPEC_REV };
 
 let saved = {}, editing = null, query = '', group = '', focusId = '', scrolled = false;
 const NAME_KEY = 'gwprod_specs_name';
@@ -67,10 +79,10 @@ export function render(view, sub) {
     .catch((e) => { $('#spMsg').innerHTML = `<div class="alert warn">Could not load the added spec lines (${esc(e.message)}). Spec sheet numbers are still shown.</div>`; });
 }
 
-const rowsOf = (m) => [...m.base, ...((saved[m.id] && saved[m.id].extra) || []).map((r) => [r.label, r.value, true])];
+export const rowsOf = (m, saved) => [...m.base, ...((saved[m.id] && saved[m.id].extra) || []).map((r) => [r.label, r.value, true])];
 function shown() {
   return LIST.filter((m) => (!group || m.group === group)
-    && (!query || [m.id, m.name, m.type, m.notes, saved[m.id]?.notes || '', ...rowsOf(m).flat()].join(' ').toLowerCase().includes(query)));
+    && (!query || [m.id, m.name, m.type, m.notes, saved[m.id]?.notes || '', ...rowsOf(m, saved).flat()].join(' ').toLowerCase().includes(query)));
 }
 
 function draw() {
@@ -94,10 +106,10 @@ function draw() {
 
 function card(m) {
   const s = saved[m.id] || {};
-  const rows = rowsOf(m);
+  const rows = rowsOf(m, saved);
   if (editing === m.id) return editorCard(m, s);
   return `<div class="card spec-card" data-id="${esc(m.id)}">
-    <div class="spec-head"><div><h3>${esc(m.name)}</h3><span class="hint">#${esc(m.id)} · ${esc(m.type)}</span></div>
+    <div class="spec-head"><div><h3>${esc(m.name)}</h3><span class="hint">#${esc(m.id)} · ${esc(m.type)}</span>${m.id !== '111' ? ` <a class="hint spec-floor" href="#floor/${encodeURIComponent(m.id)}">On the floor</a>` : ''}</div>
       <div class="btn-row"><button class="btn small" type="button" data-edit="${esc(m.id)}">Edit</button><button class="btn small" type="button" data-print="${esc(m.id)}">Print</button></div></div>
     ${rows.length ? `<dl class="kv spec-kv">${rows.map(([k, v, added]) => `<dt${added ? ' data-no-i18n' : ''}>${esc(k)}</dt><dd${added ? ' data-no-i18n' : ''}>${esc(v)}</dd>`).join('')}</dl>`
       : '<p class="hint" style="margin:6px 0">Not on the spec sheets yet. Tap Edit to add the specs for this machine.</p>'}
@@ -152,7 +164,7 @@ function printSpecs(list) {
   if (!list.length) return;
   openPrint(list.map((m, i) => {
     const s = saved[m.id] || {};
-    const rows = rowsOf(m);
+    const rows = rowsOf(m, saved);
     return `<div style="${i ? 'page-break-before:always;break-before:page' : ''}">
       <div class="ps-head"><div><h1>${esc(m.name)}</h1><div class="ps-sub">Machine Specs · #${esc(m.id)} · ${esc(m.type)} · GoldenWest Packaging · Ontario</div></div><div class="ps-date">${esc(SPEC_REV)}</div></div>
       <div style="display:flex;gap:24px;align-items:flex-start">
