@@ -186,3 +186,7 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - Grass runs along the east and south sides of the building, with bushes against the walls and trees whose leaves sway slightly.
 - The Isowa outfeed conveyor is shorter, so it stops short of the south wall.
 - The concrete area by the lot entrance is now a grass island with a curb, bushes, two trees, and a monument sign reading "GoldenWest Packaging Group · Ontario" on both sides.
+- A new parking row runs along the top of the truck yard, north of the lane (about 33 spaces, some open). All parked cars are merged into one mesh, which keeps draw calls about the same.
+- The upper row of the employee lot lost its end space.
+- A small shipping desk with a clerk sits inside, by dock doors 3 and 4 at the east end of the die racks.
+- The outdoor pallet yard on the west side has stacks of empty pallets, with the roll-up door left clear.

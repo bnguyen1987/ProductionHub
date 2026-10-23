@@ -298,7 +298,7 @@ function build(wrap, focusId) {
     // tall screens (phones): turn the long building to run up the screen and look down a little more
     const tall = aspect < 0.9;
     const az = tall ? Math.PI / 2 : HOME.az, polar = tall ? THREE.MathUtils.degToRad(42) : HOME.polar;
-    const zTop = tall ? Z(78) : YARD.far - 3; // phones frame the building only; the yard is a zoom-out away
+    const zTop = tall ? Z(78) : Z(-252); // phones frame the building only; the yard is a zoom-out away
     const xRight = tall ? X(1078) : ROAD_X + 6;
     controls.target.set((X(35) + xRight) / 2, 0, (zTop + Z(698)) / 2);
     camera.position.set(Math.sin(polar) * Math.sin(az) * dist, Math.cos(polar) * dist, Math.sin(polar) * Math.cos(az) * dist).add(controls.target);
@@ -622,6 +622,10 @@ function buildPlant(scene, anims) {
   };
   bigTable(1032, 410, 7.0, 2.6, 0xffffff, null);     // Design room (no chairs)
   bigTable(1048, 284, 4.4, 2.0, C.wood, C.blueSoft); // lunch room
+  // small shipping desk by the dock doors (east end of the die racks)
+  g.add(mesh(rbox(2.0, 0.85, 1.0, 0.12), smat(0xffffff), X(538), 0.42, Z(98)));
+  g.add(mesh(rbox(0.8, 0.55, 0.08, 0.03), smat(C.navy, { emissive: 0x2b45d6, emissiveIntensity: 0.35 }), X(538), 1.15, Z(98) - 0.3));
+  g.add(mesh(rbox(0.6, 0.5, 0.6, 0.12), smat(C.navy), X(538), 0.25, Z(98) + 0.9));
   // reception desk in the hall
   g.add(mesh(rbox(3.2, 1.05, 1.0, 0.2), smat(0xffffff), X(992), 0.52, Z(180))); g.add(mesh(rbox(3.2, 0.1, 0.5, 0.05), smat(C.blue), X(992), 1.1, Z(180) + 0.3));
   // curved front room: conference table with chairs
@@ -1050,7 +1054,7 @@ function buildPeople(scene, anims) {
   });
   // operators: standing at a machine, reaching and stepping side to side
   [[600, 274, 'z', 1], [590, 412, 'z', 1], [520, 478, 'z', 1], [520, 614, 'z', 1], [380, 318, 'z', 1], [570, 342, 'z', 1], [300, 586, 'z', 1],
-    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [1035, 259, 'z', 1], [236, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [767, 676, 'x', -1]]
+    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [1035, 259, 'z', 1], [546, 109, 'z', -1], [236, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [767, 676, 'x', -1]]
     .forEach(([a, b, axis, face], i) => {
       const p = person(scene, { skin: SKINS[i % SKINS.length], hat: i % 2 ? C.blue : 0xffffff, vest: i % 5 === 2 ? 0xc6e03a : C.amber });
       const base = V(a, b);
@@ -1292,7 +1296,7 @@ function truck(scene, cabColor, withCab = true) {
 }
 
 function car(scene, color, moving = false) {
-  const g = new THREE.Group(); scene.add(g);
+  const g = new THREE.Group(); scene.add(g); // scene may also be a parent group
   const body = smat(color), dark = smat(C.frame), glass = smat(0x9fb6d6, { roughness: 0.3 });
   g.add(mesh(rbox(4.0, 0.85, 1.9, 0.3), body, 0, 0.75, 0));
   g.add(mesh(rbox(2.2, 0.7, 1.7, 0.3), glass, -0.25, 1.45, 0));
@@ -1307,7 +1311,7 @@ function buildTrucks(scene, anims) {
   const yardLock = { owner: null }; // only one vehicle moves through the yard / junction at a time
   // asphalt yard, lane lines, dock stripes
   const yard = new THREE.Group(); scene.add(yard);
-  const x0 = X(-110), x1 = ROAD_X, z0 = YARD.far - 6, z1 = YARD.wall;
+  const x0 = X(-110), x1 = ROAD_X, z0 = Z(-250), z1 = YARD.wall; // north edge leaves room for the parking row along the top
   // the side road (two lanes, north–south)
   const rz0 = YARD.far - 22, rz1 = Z(698) + 8;
   const road = new THREE.Mesh(new THREE.PlaneGeometry(10, rz1 - rz0), smat(0x6d7482, { roughness: 0.95 }));
@@ -1315,8 +1319,18 @@ function buildTrucks(scene, anims) {
   for (let z = rz0 + 2; z < rz1 - 2; z += 4) if (z < z0 - 1 || z > z1 + 1) yard.add(mesh(rbox(0.18, 0.02, 2, 0.01), smat(0xffd257), ROAD_X, -0.26, z, false));
   // employee parking in front of maintenance and the offices: two rows, nose to the building and to the aisle
   const PX0 = X(772), SPOT = 2.9, NS = 10, rowA = YARD.wall - 2.6, rowB = YARD.wall - 13.4, aisle = YARD.wall - 8;
-  for (let i = 0; i <= NS; i++) for (const zc of [rowA, rowB]) yard.add(mesh(rbox(0.14, 0.02, 4.6, 0.01), smat(0xffffff), PX0 + i * SPOT, -0.26, zc, false));
-  for (const zc of [rowA - 2.3, rowB + 2.3]) yard.add(mesh(rbox(NS * SPOT, 0.02, 0.14, 0.01), smat(0xffffff), PX0 + (NS * SPOT) / 2, -0.26, zc, false));
+  for (const [zc, n] of [[rowA, NS], [rowB, NS - 1]]) for (let i = 0; i <= n; i++) yard.add(mesh(rbox(0.14, 0.02, 4.6, 0.01), smat(0xffffff), PX0 + i * SPOT, -0.26, zc, false));
+  for (const [zc, n] of [[rowA - 2.3, NS], [rowB + 2.3, NS - 1]]) yard.add(mesh(rbox(n * SPOT, 0.02, 0.14, 0.01), smat(0xffffff), PX0 + (n * SPOT) / 2, -0.26, zc, false));
+  // parking row along the top of the truck yard (north of the lane)
+  const NPX0 = X(100), NNS = Math.floor((X(1060) - X(100)) / SPOT), nRow = Z(-208);
+  for (let i = 0; i <= NNS; i++) yard.add(mesh(rbox(0.14, 0.02, 4.6, 0.01), smat(0xffffff), NPX0 + i * SPOT, -0.26, nRow, false));
+  yard.add(mesh(rbox(NNS * SPOT, 0.02, 0.14, 0.01), smat(0xffffff), NPX0 + (NNS * SPOT) / 2, -0.26, nRow + 2.3, false));
+  yard.add(mesh(rbox(NNS * SPOT + 1, 0.3, 0.5, 0.08), smat(0xc9ced8), NPX0 + (NNS * SPOT) / 2, -0.12, nRow - 2.6)); // curb at the back
+  // pallet yard on the west side: stacks of empty pallets (roll-up door left clear)
+  for (const px of [-36, -13, 10]) for (let py = 445; py <= 605; py += 22) {
+    const n = 5 + ((px * 7 + py * 3) % 9 + 9) % 9; // 5–13 pallets high
+    for (let k = 0; k < n; k++) yard.add(mesh(rbox(1.5, 0.2, 1.4, 0.03), smat(k % 3 === 2 ? 0xa77a48 : C.wood), X(px) + ((k * 13) % 3 - 1) * 0.03, -0.18 + k * 0.21, Z(py)));
+  }
   yard.add(mesh(rbox(NS * SPOT + 1, 0.3, 0.5, 0.08), smat(0xc9ced8), PX0 + (NS * SPOT) / 2, -0.12, YARD.wall - 0.6)); // curb at the building
   const asphalt = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), smat(0x6d7482, { roughness: 0.95 }));
   asphalt.rotation.x = -Math.PI / 2; asphalt.position.set((x0 + x1) / 2, -0.28, (z0 + z1) / 2); asphalt.receiveShadow = true; yard.add(asphalt);
@@ -1342,13 +1356,20 @@ function buildTrucks(scene, anims) {
   // parked cars (one spot in row A is left open for the car that comes and goes)
   const CAR_COLORS = [0xffffff, C.blue, C.red, 0x9aa3b5, C.navy, 0xd9dde5, 0x3a404b, C.amber];
   let ci = 0;
+  const parked = new THREE.Group(); scene.add(parked);
   for (const [zc, faceN] of [[rowA, true], [rowB, false]]) for (let i = 0; i < NS; i++) {
     if (zc === rowA && i === 6) continue;
     if (i === NS - 1) continue; // end spots stay open next to the lane into the lot
     if ((i * 7 + (faceN ? 1 : 3)) % 5 === 0) continue; // a few empty spots
-    const c = car(scene, CAR_COLORS[ci++ % CAR_COLORS.length]);
+    const c = car(parked, CAR_COLORS[ci++ % CAR_COLORS.length]);
     c.g.position.set(PX0 + (i + 0.5) * SPOT, -0.27, zc); c.g.rotation.y = -Math.PI / 2; // nose south: row A to the building, row B to the aisle
   }
+  for (let i = 0; i < NNS; i++) {
+    if ((i * 5 + 2) % 7 === 0 || (i * 3) % 11 === 4) continue; // some open spots
+    const c = car(parked, CAR_COLORS[ci++ % CAR_COLORS.length]);
+    c.g.position.set(NPX0 + (i + 0.5) * SPOT, -0.27, nRow); c.g.rotation.y = Math.PI / 2; // nose north, away from the lane
+  }
+  bake(parked);
 
   {
     const c = car(scene, 0x2fc28a, true), tan = new THREE.Vector3();
