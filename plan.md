@@ -161,3 +161,14 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - Four columns shifted left, toward the machines.
 - All yellow exit arrows removed.
 - Curved wall added from the stairwell corner around to the front room, closing in the area by the EXIT double door. The outside wall above the curved glass room is removed, so the glass wall is now the front of the building, with sidewalk at the entry.
+
+## 13. Bug scan (Oct 23)
+
+- All tabs checked on phone and desktop, in English and Spanish, in light and dark: no errors, no sideways scrolling.
+- Bad-input and special-character tests pass, and so do the calculators' unit tests.
+- Floor tab ran 30 simulated minutes: no errors, memory stays flat, and reopening the tab doesn't leak.
+- Fixed:
+  - **Trucks:** the two semi-trucks could drive through each other in the yard. Yard traffic control now lets only one truck move in the yard or at the junction at a time, and they use dock doors that aren't next to each other.
+  - **People:** the lunch-room person stood in the chairs, the strapper operator stood in the strapper arch, and the hallway walker brushed an extinguisher. All three moved, and the extinguisher now hangs in the restroom wall niche.
+  - **East forklift:** clipped a column when turning at the top pallet spot. The east pallet spots shifted down slightly.
+  - **Drawing load:** the wheels of parked cars and dropped trailers are now merged with the vehicles, about 70 fewer draw calls.

@@ -276,7 +276,7 @@ function build(wrap, focusId) {
 
   three = { renderer, scene, camera, controls, raf: 0, ro: null, cleanup: [], machines };
   three.anims = anims; three.fleet = fleet;
-  if (/[?&]debug\b/.test(location.search)) window.__floor = three; // for testing only
+  if (/[?&]debug\b/.test(location.search)) { window.__floor = three; three.THREE = THREE; } // for testing only
   // name tags keep about the same size on screen at any zoom
   const tags = [];
   scene.traverse((o) => { if (o.isSprite) { o.userData.base = o.scale.clone(); tags.push(o); } });
@@ -693,7 +693,7 @@ function buildPlant(scene, anims) {
 
 
   // fire extinguishers (red on the drawing), hung on the nearest wall or column with a sign above
-  [[180, 92], [295, 113], [510, 113], [322, 180], [667, 180], [768, 90], [715, 90], [48, 172], [155, 320], [495, 330], [808, 330], [320, 463], [680, 453], [320, 568], [495, 568], [805, 568], [48, 610], [665, 682], [960, 262], [990, 370], [1070, 460], [1012, 222], [1068, 540]]
+  [[180, 92], [295, 113], [510, 113], [322, 180], [667, 180], [768, 90], [715, 90], [48, 172], [155, 320], [495, 330], [808, 330], [320, 463], [680, 453], [320, 568], [495, 568], [805, 568], [48, 610], [665, 682], [960, 262], [990, 370], [1070, 460], [998, 222], [1068, 540]]
     .forEach(([a, b]) => {
       let best = null; // { px, py, nx, ny, d, gap }
       for (const [x1, y1, x2, y2, t] of WALLS) {
@@ -1028,7 +1028,7 @@ function buildPeople(scene, anims) {
     { pts: [[88, 120], [130, 120], [130, 168], [88, 168]], speed: 1.5 },
     { pts: [[890, 500], [965, 500], [965, 512], [890, 512]], speed: 1.25 },
     { pts: [[898, 140], [922, 140], [922, 186], [898, 186]], speed: 1.1 },
-    { pts: [[1006, 200], [1013, 200], [1013, 300], [1006, 300]], speed: 0.9 },
+    { pts: [[1009, 200], [1013, 200], [1013, 300], [1009, 300]], speed: 0.9 },
   ];
   loops.forEach((lp, i) => {
     const path = roundedPath(lp.pts, 0.6, true), L = path.getLength();
@@ -1050,7 +1050,7 @@ function buildPeople(scene, anims) {
   });
   // operators: standing at a machine, reaching and stepping side to side
   [[600, 274, 'z', 1], [590, 412, 'z', 1], [520, 478, 'z', 1], [520, 614, 'z', 1], [380, 318, 'z', 1], [570, 342, 'z', 1], [300, 586, 'z', 1],
-    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [1062, 266, 'z', 1], [245, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [767, 676, 'x', -1]]
+    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [1035, 259, 'z', 1], [236, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [767, 676, 'x', -1]]
     .forEach(([a, b, axis, face], i) => {
       const p = person(scene, { skin: SKINS[i % SKINS.length], hat: i % 2 ? C.blue : 0xffffff, vest: i % 5 === 2 ? 0xc6e03a : C.amber });
       const base = V(a, b);
@@ -1129,7 +1129,7 @@ function buildForklifts(scene, anims) {
   const AREAS = {
     A: [290, 350, 380, 410, 440].map((y) => spot(128, y, 'w')),     // west wall
     B: [735, 760, 785, 810, 835].map((x) => spot(x, 205, 'n')),     // by maintenance
-    C: [345, 370, 395, 420].map((y) => spot(830, y, 'e')),           // east aisle, by the slitter
+    C: [353, 378, 403, 428].map((y) => spot(830, y, 'e')),  // clear of the column at (791, 330)           // east aisle, by the slitter
   };
   [290, 350, 380, 410, 440].forEach((y, i) => full(100, y, i % 2 === 0));
   empties(72, 300); empties(72, 360, 5); empties(72, 420, 7);
@@ -1281,7 +1281,7 @@ function truck(scene, cabColor, withCab = true) {
   }
   const wheels = [];
   for (const x of (withCab ? [-TRAILER / 2 + 1.0, -TRAILER / 2 + 2.3, TRAILER / 2 - 0.2, TRAILER / 2 + 1.0, TRAILER / 2 + CAB - 0.4] : [-TRAILER / 2 + 1.0, -TRAILER / 2 + 2.3])) for (const z of [1.05, -1.05]) {
-    const w = D(mesh(cylG(0.5, 0.45, 12), dark, x, 0.5, z)); w.rotation.x = Math.PI / 2; g.add(w); wheels.push(w);
+    const w0 = mesh(cylG(0.5, 0.45, 12), dark, x, 0.5, z), w = withCab ? D(w0) : w0; w.rotation.x = Math.PI / 2; g.add(w); wheels.push(w); // dropped trailers don't roll
   }
   // running lights
   const lm = new THREE.MeshStandardMaterial({ color: C.amber, emissive: 0xff8a00, emissiveIntensity: 1 });
@@ -1290,14 +1290,14 @@ function truck(scene, cabColor, withCab = true) {
   return { g, wheels, lm };
 }
 
-function car(scene, color) {
+function car(scene, color, moving = false) {
   const g = new THREE.Group(); scene.add(g);
   const body = smat(color), dark = smat(C.frame), glass = smat(0x9fb6d6, { roughness: 0.3 });
   g.add(mesh(rbox(4.0, 0.85, 1.9, 0.3), body, 0, 0.75, 0));
   g.add(mesh(rbox(2.2, 0.7, 1.7, 0.3), glass, -0.25, 1.45, 0));
   g.add(mesh(rbox(2.0, 0.12, 1.72, 0.06), body, -0.25, 1.82, 0));
   const wheels = [];
-  for (const x of [1.3, -1.3]) for (const z of [0.88, -0.88]) { const w = D(mesh(cylG(0.38, 0.26, 12), dark, x, 0.38, z)); w.rotation.x = Math.PI / 2; g.add(w); wheels.push(w); }
+  for (const x of [1.3, -1.3]) for (const z of [0.88, -0.88]) { const w0 = mesh(cylG(0.38, 0.26, 12), dark, x, 0.38, z), w = moving ? D(w0) : w0; /* parked cars' wheels get merged */ w.rotation.x = Math.PI / 2; g.add(w); wheels.push(w); }
   bake(g);
   return { g, wheels };
 }
@@ -1335,7 +1335,7 @@ function buildTrucks(scene, anims) {
   }
 
   {
-    const c = car(scene, 0x2fc28a), tan = new THREE.Vector3();
+    const c = car(scene, 0x2fc28a, true), tan = new THREE.Vector3();
     const SB = ROAD_X - 2.2, NB = ROAD_X + 2.2, spotX = PX0 + 6.5 * SPOT;
     const ln = (ax, az, bx, bz) => new THREE.LineCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(bx, 0, bz));
     const bz = (ax, az, cx, cz, bx, bzz) => new THREE.QuadraticBezierCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(cx, 0, cz), new THREE.Vector3(bx, 0, bzz));
@@ -1374,9 +1374,11 @@ function buildTrucks(scene, anims) {
   }
   // two trucks taking turns at the free doors
   const agents = [
-    { doors: [8, 'R', 4, 10], color: C.blue, delay: 0 },
-    { doors: [3, 9], color: C.red, delay: 30 },
+    { doors: [8, 'R', 10], color: C.blue, delay: 0 },   // the two trucks use doors that aren't next to each other
+    { doors: [3, 4], color: C.red, delay: 30 },
   ];
+  // yard traffic control: only one truck moves in the yard / at the road junction at a time
+  const yardLock = { owner: null };
   agents.forEach((a) => {
     const tk = truck(scene, a.color);
     tk.g.visible = false;
@@ -1390,18 +1392,22 @@ function buildTrucks(scene, anims) {
       const dock = ramp ? YARD.wall + 1 - TRAILER / 2 : YARD.wall - 0.35 - TRAILER / 2, turnX = xd - 15; // ramp: back up the ramp, rear just inside the door
       const SB = ROAD_X - 2.2, NB = ROAD_X + 2.2, northEnd = YARD.far - 85, southEnd = Z(698) + 55;
       const bez = (ax, az, cx, cz, bx, bz) => new THREE.QuadraticBezierCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(cx, 0, cz), new THREE.Vector3(bx, 0, bz));
+      // arriving trucks wait on the road short of the junction until the yard is clear
       const arrive = fromNorth
-        ? [{ c: line(SB, northEnd, SB, YARD.far - 7), v: 7 }, { c: bez(SB, YARD.far - 7, SB, YARD.far, SB - 7, YARD.far), v: 3.5 }]   // southbound, turn right into the yard
-        : [{ c: line(NB, southEnd, NB, YARD.far + 6), v: 7 }, { c: bez(NB, YARD.far + 6, NB, YARD.far, NB - 9, YARD.far), v: 3.5 }];  // northbound, turn left into the yard
+        ? [{ c: line(SB, northEnd, SB, YARD.far - 32), v: 7 }, { lock: 'get' }, { c: line(SB, YARD.far - 32, SB, YARD.far - 7), v: 6 }, { c: bez(SB, YARD.far - 7, SB, YARD.far, SB - 7, YARD.far), v: 3.5 }]   // southbound, turn right into the yard
+        : [{ c: line(NB, southEnd, NB, YARD.far + 31), v: 7 }, { lock: 'get' }, { c: line(NB, YARD.far + 31, NB, YARD.far + 6), v: 6 }, { c: bez(NB, YARD.far + 6, NB, YARD.far, NB - 9, YARD.far), v: 3.5 }];  // northbound, turn left into the yard
+      // leaving trucks free the yard once they are well clear of the junction
       const leave = toNorth
-        ? [{ c: bez(NB - 9, YARD.near, NB, YARD.near, NB, YARD.near - 7), v: 3.5 }, { c: line(NB, YARD.near - 7, NB, northEnd), v: 7 }] // turn left, head north
-        : [{ c: bez(SB - 7, YARD.near, SB, YARD.near, SB, YARD.near + 7), v: 3.5 }, { c: line(SB, YARD.near + 7, SB, southEnd), v: 7 }]; // turn right, head south
+        ? [{ c: bez(NB - 9, YARD.near, NB, YARD.near, NB, YARD.near - 7), v: 3.5 }, { c: line(NB, YARD.near - 7, NB, YARD.near - 35), v: 7 }, { lock: 'free' }, { c: line(NB, YARD.near - 35, NB, northEnd), v: 7 }] // turn left, head north
+        : [{ c: bez(SB - 7, YARD.near, SB, YARD.near, SB, YARD.near + 7), v: 3.5 }, { c: line(SB, YARD.near + 7, SB, YARD.near + 35), v: 7 }, { lock: 'free' }, { c: line(SB, YARD.near + 35, SB, southEnd), v: 7 }]; // turn right, head south
       segs = [
         ...arrive,
-        { c: line(arrive[1].c.v2.x, YARD.far, turnX, YARD.far), v: 7 },                            // along the far lane (heading west)
+        { c: line(arrive[arrive.length - 1].c.v2.x, YARD.far, turnX, YARD.far), v: 7 },                            // along the far lane (heading west)
         { wait: 1.0 },
         { c: new THREE.QuadraticBezierCurve3(new THREE.Vector3(turnX, 0, YARD.far), new THREE.Vector3(xd, 0, YARD.far), new THREE.Vector3(xd, 0, dock)), v: 2.6, rev: true }, // back into the door
+        { lock: 'free' },                                                                             // backed in: the yard is free while loading
         { wait: 12, docked: true },                                                                   // loading
+        { lock: 'get' },                                                                              // wait for a clear yard to pull out
         ...(ramp
           ? [{ c: line(xd, dock, xd, YARD.near + 4), v: 2.6 }, { c: bez(xd, YARD.near + 4, xd, YARD.near, xd + 8, YARD.near), v: 3 }] // straight down the ramp, then east (clears the yard wall)
           : [{ c: bez(xd, dock, xd, YARD.near, xd + 15, YARD.near), v: 3.2 }]),                                                  // pull out, turn east
@@ -1416,6 +1422,12 @@ function buildTrucks(scene, anims) {
     anims.push((t, dt) => {
       if (hold > 0) { hold -= dt; return; }
       let g = segs[si];
+      if (g.lock) {
+        if (g.lock === 'get') { if (yardLock.owner && yardLock.owner !== a) return; yardLock.owner = a; }
+        else if (yardLock.owner === a) yardLock.owner = null;
+        si++; s = 0; if (si >= segs.length) plan();
+        return;
+      }
       if (g.wait !== undefined) {
         tk.g.visible = !g.hidden;
         s += dt;
