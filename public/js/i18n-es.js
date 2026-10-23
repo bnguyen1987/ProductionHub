@@ -19,6 +19,7 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Air Compressor': 'Compresor de aire',
   'No specs on file yet. Tap Edit to add them.': 'Todavía no hay especificaciones. Toque Editar para agregarlas.',
   'Added on site by': 'Agregado en el sitio por',
   'Plant Floor': 'Planta',
@@ -432,7 +433,7 @@ export const PATTERNS = [
   [/^([\d,]+) pcs$/, '$1 pzas'],
   [/^([\d,]+) sheets$/, '$1 láminas'],
   [/^(\d+)-up \(more needs supervisor OK\)$/, '$1 salidas (más necesita OK del supervisor)'],
-  [/^#(\w+) · (Flexo folder-gluer|Flexo printer \/ slotter|Flatbed die cutter|Slitter|Gluer|Stitcher|Edit added lines|Rotary die cutter|Band saw|Eccentric|Strapper|Baler|FFG|PRESS|FLATBED|RDC)$/, (_, id, t) => `#${id} · ${({ 'Flexo folder-gluer': 'Flexo dobladora-pegadora', 'Flexo printer / slotter': 'Flexo impresora / ranuradora', 'Flatbed die cutter': 'Suajadora plana', Slitter: 'Cortadora', Gluer: 'Pegadora', Stitcher: 'Engrapadora', 'Edit added lines': 'Editar líneas agregadas', 'Rotary die cutter': 'Suajadora rotativa', 'Band saw': 'Sierra de banda', Eccentric: 'Excéntrica', Strapper: 'Flejadora', Baler: 'Empacadora' })[t] || t}`],
+  [/^#(\w+) · (Flexo folder-gluer|Flexo printer \/ slotter|Flatbed die cutter|Slitter|Gluer|Stitcher|Edit added lines|Rotary die cutter|Band saw|Eccentric|Strapper|Baler|Air compressor|FFG|PRESS|FLATBED|RDC)$/, (_, id, t) => `#${id} · ${({ 'Flexo folder-gluer': 'Flexo dobladora-pegadora', 'Flexo printer / slotter': 'Flexo impresora / ranuradora', 'Flatbed die cutter': 'Suajadora plana', Slitter: 'Cortadora', Gluer: 'Pegadora', Stitcher: 'Engrapadora', 'Edit added lines': 'Editar líneas agregadas', 'Rotary die cutter': 'Suajadora rotativa', 'Band saw': 'Sierra de banda', Eccentric: 'Excéntrica', Strapper: 'Flejadora', Baler: 'Empacadora', 'Air compressor': 'Compresor de aire' })[t] || t}`],
   [/^(\d+) Gluer$/, 'Pegadora $1'],
   [/^(\d+) Stitcher$/, 'Engrapadora $1'],
   [/^Could not save: (.+)$/, 'No se pudo guardar: $1'],

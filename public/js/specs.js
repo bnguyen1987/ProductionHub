@@ -47,6 +47,7 @@ export const LIST = [
   { id: '113', name: '113 Eccentric', group: 'Other equipment', type: 'Eccentric', notes: '', base: [] },
   { id: 'Strapper', name: 'Strapper', group: 'Other equipment', type: 'Strapper', notes: '', base: [] },
   { id: 'Baler', name: 'Baler', group: 'Other equipment', type: 'Baler', notes: '', base: [] },
+  { id: 'Compressor', name: 'Air Compressor', group: 'Other equipment', type: 'Air compressor', notes: '', base: [] },
 ];
 export const GROUPS = ['Printing & converting', 'Die cutters', 'Slitters', 'Finishing', 'Other equipment'];
 export { SPEC_REV };

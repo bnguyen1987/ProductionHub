@@ -155,3 +155,8 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - Big drive-in door opened by dock door 1, rolled up, with yellow and black posts. A concrete truck ramp outside has curbs and yellow edge stripes. The blue truck adds the ramp to its rotation: it backs up the ramp into the doorway, waits, drives straight down and leaves.
 - A wall now separates the dock yard from the employee parking lot.
 - Trucks and cars sit on the asphalt instead of floating just above it.
+- Two closed roll-up doors on the west wall, with yellow frames and drum housings.
+- The baler moved outside, against the north wall behind the die racks. It's fed through a chute in the wall, and bales come out the east end. Trucks no longer use doors 5–7 behind it.
+- An air compressor (clickable) sits where the baler used to be, next to the Small Marumatsu. Its location is a placeholder.
+- Four columns shifted left, toward the machines.
+- All yellow exit arrows removed.

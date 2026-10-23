@@ -536,7 +536,18 @@ function buildPlant(scene, anims) {
     let x = 145; for (const [cx, hw] of gaps) { wall(x, 78, cx - hw, 78); x = cx + hw; } wall(x, 78, 1078, 78); }
   // wall between the dock yard and the parking lot
   wall(737, 77, 737, -100, 2.6, 0.5);
-  wall(1078, 78, 1078, 698); wall(1078, 698, 35, 698); wall(35, 698, 35, 100);
+  wall(1078, 78, 1078, 698); wall(1078, 698, 35, 698);
+  // west wall with two roll-up doors (closed)
+  { const ROLL = [[650, 26], [215, 26]]; let y = 698;
+    for (const [cy, hw] of ROLL) {
+      wall(35, y, 35, cy + hw); y = cy - hw;
+      const len = hw * 2 * SC, zc = Z(cy), xw = X(35);
+      const d = mesh(rbox(0.22, 2.7, len, 0.05), smat(0xcfd6e2), xw, 1.35, zc); g.add(d);
+      for (let k = 0; k < 6; k++) g.add(mesh(rbox(0.26, 0.05, len - 0.05, 0.01), smat(0xb3bccb), xw, 0.25 + k * 0.45, zc, false));
+      for (const sz of [-1, 1]) g.add(mesh(rbox(0.6, 3.2, 0.35, 0.06), smat(C.yellow), xw, 1.6, zc + sz * (len / 2 + 0.18)));
+      g.add(mesh(rbox(0.7, 0.55, len + 0.8, 0.1), smat(0xd5dbe5), xw, 3.0, zc)); // door drum housing
+    }
+    wall(35, y, 35, 100); }
   // inside rooms: offices, design, maintenance, lunch, hallway
   const room = (x1, y1, x2, y2, h = 2.4, open = []) => {
     const sides = [[x1, y1, x2, y1], [x2, y1, x2, y2], [x2, y2, x1, y2], [x1, y2, x1, y1]];
@@ -624,8 +635,8 @@ function buildPlant(scene, anims) {
   [[55, 92], [86, 92]].forEach(([a, b]) => { g.add(mesh(cylG(1.25, 3.4, 20), smat(C.body2), X(a), 1.7, Z(b))); g.add(mesh(cylG(1.3, 0.2, 20), smat(C.line), X(a), 3.45, Z(b))); });
 
   // columns (black circles on the drawing), with a yellow safety band
-  const COLS = [[145, 188], [310, 180], [484, 180], [661, 180], [791, 178], [141, 320], [310, 323], [484, 330], [661, 330], [791, 330],
-    [140, 464], [310, 465], [478, 464], [661, 453], [791, 455], [140, 570], [310, 570], [484, 570], [676, 575], [791, 570]];
+  const COLS = [[145, 188], [310, 180], [484, 180], [630, 180], [791, 178], [141, 320], [310, 323], [484, 330], [630, 330], [791, 330],
+    [140, 464], [310, 465], [478, 464], [630, 457], [791, 455], [140, 570], [310, 570], [484, 570], [645, 566], [791, 570]];
   COLS.forEach(([a, b]) => { g.add(mesh(cylG(0.42, 5, 10), smat(0xd5dae3), X(a), 2.5, Z(b))); g.add(mesh(cylG(0.46, 0.9, 10), smat(C.yellow), X(a), 0.45, Z(b))); });
 
   // cutting die racks: long steel racks with dies standing in them (two, side by side)
@@ -673,17 +684,6 @@ function buildPlant(scene, anims) {
   }
   anims.push((t) => lights.forEach((l) => (l.lm.emissiveIntensity = 0.3 + 0.9 * Math.max(0, Math.sin(t * 2.4 + l.ph)))));
 
-  // exit arrows (yellow on the drawing), pulsing
-  const arrowShape = new THREE.Shape(); arrowShape.moveTo(0, 1.1); arrowShape.lineTo(0.75, 0.25); arrowShape.lineTo(0.28, 0.25); arrowShape.lineTo(0.28, -1); arrowShape.lineTo(-0.28, -1); arrowShape.lineTo(-0.28, 0.25); arrowShape.lineTo(-0.75, 0.25); arrowShape.lineTo(0, 1.1);
-  const arrowGeo = new THREE.ShapeGeometry(arrowShape); arrowGeo.rotateX(-Math.PI / 2);
-  const arrowMat = new THREE.MeshStandardMaterial({ color: C.amber, emissive: C.amber, emissiveIntensity: 0.4, transparent: true });
-  const arrows = [];
-  [[160, 115, 'n'], [655, 115, 'n'], [682, 115, 'n'], [62, 196, 'w'], [62, 238, 'w'], [62, 638, 'w'], [62, 664, 'w'], [1048, 563, 'e']].forEach(([a, b, dir]) => {
-    const m = new THREE.Mesh(arrowGeo, arrowMat); m.position.set(X(a), 0.03, Z(b));
-    m.rotation.y = { n: 0, w: Math.PI / 2, e: -Math.PI / 2, s: Math.PI }[dir];
-    m.scale.setScalar(1.3); g.add(m); arrows.push(m);
-  });
-  anims.push((t) => { arrowMat.emissiveIntensity = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(t * 3)); arrows.forEach((a, i) => a.position.y = 0.03 + 0.0 * i); });
 
   // fire extinguishers (red on the drawing), hung on the nearest wall or column with a sign above
   [[180, 92], [295, 113], [510, 113], [322, 180], [667, 180], [768, 90], [715, 90], [48, 172], [155, 320], [495, 330], [808, 330], [320, 463], [680, 453], [320, 568], [495, 568], [805, 568], [48, 610], [665, 682], [960, 262], [990, 370], [1070, 460], [1012, 222], [1068, 540]]
@@ -956,13 +956,37 @@ function buildMachines(scene, anims, machines, pickables) {
     c.anims.push((t) => { head.position.y = 2.6 + 0.2 + Math.abs(Math.sin(t * 1.8)) * 0.7; });
     c.light(ax + 1.5, 3.6, az + 0.4);
   }, [261, 361]);
+  // baler: outside against the north wall, fed through a chute in the wall; bales come out the east end
   machine('Baler', 'Baler', 'Baler', (c) => {
-    c.box(2.6, 2.2, 2.0, C.body, X(478), 0, Z(362), 0.2);
-    c.box(2.7, 0.3, 2.1, C.blue, X(478), 1.8, Z(362), 0.1);
-    const hop = mesh(new THREE.ConeGeometry(1.1, 1.6, 8), c.m(C.body2), X(458), 1.5, Z(362)); hop.rotation.z = Math.PI / 2; c.g.add(hop);
-    const ram = D(c.box(0.5, 1.2, 1.4, C.frame, X(478) + 1.1, 0.4, Z(362), 0.08));
-    const bale = D(c.box(1.2, 1.0, 1.2, C.kraft2, X(478) + 2.2, 0, Z(362), 0.08));
-    c.anims.push((t) => { const k = 0.5 + 0.5 * Math.sin(t * 1.4); ram.position.x = X(478) + 1.1 - k * 1.6; bale.scale.y = 0.6 + 0.4 * k; bale.position.y = (0.6 + 0.4 * k) * 0.5; });
+    const x0 = X(359), x1 = X(449), xc = (x0 + x1) / 2, L = x1 - x0, zc = Z(78) - 2.0, y0 = -0.27;
+    c.box(L, 2.6, 3.0, C.body, xc, y0, zc, 0.25);
+    c.box(L + 0.05, 0.35, 3.05, C.blue, xc, y0 + 2.1, zc, 0.1);
+    c.box(2.6, 1.6, 2.2, C.body2, xc - L * 0.25, y0 + 2.6, zc, 0.2);          // hopper on top
+    c.box(2.2, 1.4, 1.6, C.body2, xc - L * 0.25, 0.8, Z(78) + 0.6, 0.12);    // feed chute inside the building
+    c.box(1.4, 1.6, 1.0, C.body2, x1 - 1.2, y0, zc - 2.0, 0.12);            // control panel
+    c.cyl(0.12, 0.12, C.red, x1 - 1.2, y0 + 1.66, zc - 2.0, 10);
+    const rod = D(c.box(L * 0.45, 0.35, 0.35, C.frame, xc, y0 + 2.75, zc + 0.9, 0.06)); // hydraulic ram on top
+    const bale = D(c.box(1.6, 1.3, 1.6, C.kraft2, x1 + 0.9, y0, zc, 0.08));
+    for (const [dx, dz, dy] of [[2.8, -0.8, 0], [2.8, 0.9, 0], [2.8, 0.05, 1.3]]) c.box(1.6, 1.3, 1.6, C.kraft, x1 + dx, y0 + dy, zc + dz, 0.08); // finished bales
+    c.light(x0 + 0.8, y0 + 2.6, zc - 1.2);
+    c.anims.push((t) => { const k = 0.5 + 0.5 * Math.sin(t * 1.1); rod.position.x = xc - k * L * 0.25; const u = (t * 0.12) % 1; bale.position.x = x1 + 0.9 + u * 0.8; bale.scale.y = 0.4 + 0.6 * Math.min(1, u * 1.5); bale.position.y = y0 + (1.3 * bale.scale.y) / 2; });
+  });
+  // air compressor (where the baler used to be): horizontal tank, motor and pump on top, dryer cabinet
+  machine('Compressor', 'Air Compressor', 'Air compressor', (c) => {
+    const xc = X(470), zc = Z(362);
+    for (const dx of [-1.2, 1.2]) for (const dz of [-0.45, 0.45]) c.box(0.2, 0.5, 0.2, C.frame, xc + dx, 0, zc + dz, 0.04);
+    const tank = D(new THREE.Group()); tank.position.set(xc, 1.25, zc); tank.rotation.z = Math.PI / 2; c.g.add(tank);
+    c.cyl(0.8, 3.6, C.blue, 0, 0, 0, 16, tank);
+    for (const sy of [-1.8, 1.8]) { const capm = mesh(new THREE.SphereGeometry(0.8, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), c.m(C.blue), 0, sy, 0); if (sy < 0) capm.rotation.x = Math.PI; tank.add(capm); }
+    c.box(1.6, 0.9, 1.1, C.body, xc - 0.5, 2.0, zc, 0.15);                   // motor + pump
+    c.box(0.25, 1.1, 1.0, C.yellow, xc + 0.6, 1.9, zc, 0.06);                // belt guard
+    const fan = new THREE.Group(); fan.position.set(xc + 0.78, 2.45, zc); c.g.add(fan);
+    const pulley = D(c.cyl(0.38, 0.08, C.frame, 0, 0, 0, 12, fan)); pulley.rotation.z = Math.PI / 2;
+    c.box(0.1, 0.5, 0.12, C.red, 0, 0.2, 0, 0.02, pulley);
+    c.box(1.2, 1.9, 1.0, C.body2, xc + 2.6, 0, zc, 0.15);                    // dryer cabinet
+    c.cyl(0.2, 0.06, 0xffffff, xc - 1.2, 1.25, zc + 0.82, 12).rotation.x = Math.PI / 2; // gauge
+    c.light(xc + 2.6, 1.9, zc - 0.3);
+    c.anims.push((t, dt) => { pulley.rotation.y += dt * 14; tank.position.y = 1.25 + Math.sin(t * 40) * 0.006; });
   });
 }
 
@@ -1343,8 +1367,8 @@ function buildTrucks(scene, anims) {
   }
   // two trucks taking turns at the free doors
   const agents = [
-    { doors: [8, 'R', 4, 10, 6], color: C.blue, delay: 0 },
-    { doors: [3, 9, 5, 7], color: C.red, delay: 30 },
+    { doors: [8, 'R', 4, 10], color: C.blue, delay: 0 },
+    { doors: [3, 9], color: C.red, delay: 30 },
   ];
   agents.forEach((a) => {
     const tk = truck(scene, a.color);
