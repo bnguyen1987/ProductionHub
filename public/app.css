@@ -310,3 +310,20 @@ details.fold[open]{padding-bottom:16px}
 .dl-crop-box{position:absolute;border:2px solid var(--accent);background:color-mix(in oklab,var(--accent) 12%,transparent);box-shadow:0 0 0 9999px rgba(0,0,0,.25);pointer-events:none}
 
 .mach .runtime { margin: 6px 0 2px; font-size: .95em; }
+
+/* Machine Specs */
+.specs-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.specs-bar input[type=search]{flex:1 1 240px;min-width:0}
+.specs-bar .seg{flex-wrap:wrap}
+.spec-group{margin:18px 0 10px;font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}
+.spec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.spec-card{margin:0}
+.spec-card.focus{outline:2px solid var(--accent, #00694b);outline-offset:2px}
+.spec-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+.spec-head h3{margin:0 0 2px;font-size:17px}
+.spec-kv dd{text-align:right}
+.spec-notes{margin:10px 0 0;font-size:14px;color:var(--dim);line-height:1.45}
+.spec-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px}
+.spec-row input{min-width:0}
+@media (max-width:420px){.spec-grid{grid-template-columns:1fr}}
+.spec-head .btn-row{flex-wrap:nowrap;flex:none}

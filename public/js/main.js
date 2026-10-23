@@ -7,6 +7,7 @@ const PAGES = [
   { id: 'stock', title: 'Stock Sheet Calculator', short: 'Stock Sheet', desc: 'Outs, trim waste and sheets needed for a stock size.', load: () => import('./stock.js') },
   { id: 'handoff', title: 'Shift Handoff Log', short: 'Handoff', desc: 'Machine status, open jobs, quality/safety and maintenance notes for the next shift.', load: () => import('./handoff.js') },
   { id: 'order', title: 'New Order Checker', short: 'Order Check', desc: 'Upload a quote and see which machines can run it.', load: () => import('./order.js') },
+  { id: 'specs', title: 'Machine Specs', short: 'Specs', desc: 'Sheet sizes, colors, die cut limits, crew and speed for each machine.', load: () => import('./specs.js') },
   { id: 'cleanup', title: 'Machine Clean-Up', short: 'Clean-Up', desc: 'Bi-weekly clean-up sign-off for each machine. Scan the QR code on the machine.', load: () => import('./cleanup.js') },
   { id: 'requests', title: 'Change Requests', short: 'Requests', desc: 'Suggest a change to a job, like a better pallet size. Scan the QR code on the floor.', load: () => import('./requests.js') },
   { id: 'settings', title: 'Settings', short: 'Settings', desc: 'QR codes to print for change requests and machine clean-up.', load: () => import('./settings.js') },
