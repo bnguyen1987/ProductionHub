@@ -121,3 +121,4 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
   - East forklift: east aisle staging → Jumbo, Shanghai, Large Matsu.
 - Pallets dropped at a machine get used up and disappear, and picked staging spots refill after about 30 seconds.
 - Dock doors 12, 11 and 2 stay open for loading.
+- Second slitter added (#111, 120") right beside the 142" (#110). Both are turned 90° to run west to east: feed table, slitter head, then an outfeed conveyor toward the Design room. Each has its own specs card, and the Specs tab links both to the floor.

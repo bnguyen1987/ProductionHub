@@ -746,19 +746,25 @@ function buildMachines(scene, anims, machines, pickables) {
     lineMachine(c, { x0: 960, x1: 1036, yc: 662, wpx: 42, flow: 1, units: [{ t: 'feeder', len: 2 }, { t: 'die', len: 2.4 }, { t: 'stack', len: 1.6 }] });
     conveyor(c, [[1049, 692], [1049, 576]], 17);
   });
-  machine('110', 'Slitter', 'Slitter', (c) => {
-    // feed table (south) and slitter head (north), running north
-    c.box(2.1, 1.1, 3.3, C.body2, X(869), 0, Z(482), 0.12);
-    c.box(2.3, 2.0, 2.9, C.body, X(869), 0, Z(448), 0.2);
-    c.box(2.4, 0.3, 3.0, C.blue, X(869), 1.7, Z(448), 0.08);
+  // two slitters side by side, running east: feed table → slitter head → outfeed conveyor toward the Design room
+  const slitter = (id, name, yc) => machine(id, name, 'Slitter', (c) => {
+    const z = Z(yc);
+    c.box(1.2, 1.4, 1.0, C.body2, X(862), 0, z - 0.9, 0.1);                 // control panel at the feed end
+    c.cyl(0.12, 0.12, C.red, X(862), 1.46, z - 0.9, 10);
+    c.box(2.4, 1.1, 2.9, C.body2, X(878), 0, z, 0.12);                       // feed table
+    c.box(2.6, 2.0, 3.2, C.body, X(903), 0, z, 0.2);                         // slitter head
+    c.box(2.7, 0.3, 3.3, C.blue, X(903), 1.7, z, 0.08);
     const blades = [];
-    for (let i = 0; i < 4; i++) { const h = new THREE.Group(); h.position.set(X(869) - 0.75 + i * 0.5, 2.3, Z(448)); h.rotation.z = Math.PI / 2; c.g.add(h); blades.push(D(c.cyl(0.55, 0.06, 0xc7ccd6, 0, 0, 0, 16, h))); }
+    for (let i = 0; i < 5; i++) { const h = new THREE.Group(); h.position.set(X(903), 2.3, z - 1.1 + i * 0.55); h.rotation.x = Math.PI / 2; c.g.add(h); blades.push(D(c.cyl(0.55, 0.06, 0xc7ccd6, 0, 0, 0, 16, h))); }
     c.anims.push((t, dt) => blades.forEach((b) => (b.rotation.y += dt * 9)));
-    const sheet = D(c.box(1.8, 0.05, 1.4, C.kraft, X(869), 1.1, Z(495), 0.02));
-    c.anims.push((t) => { const u = (t * 0.3) % 1; sheet.position.z = Z(498) - u * 5.5; sheet.position.y = u < 0.55 ? 1.12 : 2.02; });
-    c.box(1.4, 1.2, 1.1, C.body2, X(865), 0, Z(401), 0.1);
-    c.light(X(880), 2.0, Z(438));
+    const sheet = D(c.box(2.0, 0.05, 2.4, C.kraft, X(870), 1.1, z, 0.02));
+    const ph = Math.random();
+    c.anims.push((t) => { const u = (t * 0.35 + ph) % 1; sheet.position.x = X(868) + u * 4.2; });
+    conveyor(c, [[917, yc], [970, yc]], 22, { speed: 1.8 });
+    c.light(X(903) + 0.9, 2.0, z - 1.4);
   });
+  slitter('110', '142" Slitter', 418);
+  slitter('111', '120" Slitter', 458);
   machine('112', 'Band Saw', 'Band saw', (c) => {
     c.box(1.4, 1.0, 1.6, C.body, X(803), 0, Z(588), 0.12);
     c.box(0.7, 2.6, 0.7, C.blue, X(803), 1.0, Z(584), 0.12);
@@ -844,7 +850,7 @@ function buildPeople(scene, anims) {
     { pts: [[420, 594], [705, 594], [705, 600], [420, 600]], speed: 1.6 },
     { pts: [[415, 556], [470, 556], [470, 564], [415, 564]], speed: 1.2 },
     { pts: [[60, 128], [125, 128], [125, 168], [60, 168]], speed: 1.5 },
-    { pts: [[895, 455], [965, 455], [965, 470], [895, 470]], speed: 1.25 },
+    { pts: [[890, 500], [965, 500], [965, 512], [890, 512]], speed: 1.25 },
     { pts: [[1010, 180], [1065, 180], [1065, 192], [1010, 192]], speed: 1.1 },
     { pts: [[975, 235], [995, 235], [995, 262], [975, 262]], speed: 0.9 },
   ];
@@ -866,7 +872,7 @@ function buildPeople(scene, anims) {
   });
   // operators: standing at a machine, reaching and stepping side to side
   [[600, 274, 'z', 1], [590, 412, 'z', 1], [520, 478, 'z', 1], [520, 614, 'z', 1], [380, 318, 'z', 1], [570, 342, 'z', 1], [300, 586, 'z', 1],
-    [930, 560, 'z', 1], [990, 634, 'z', 1], [895, 448, 'x', -1], [245, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [492, 380, 'z', -1], [767, 676, 'x', -1]]
+    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [245, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [492, 380, 'z', -1], [767, 676, 'x', -1]]
     .forEach(([a, b, axis, face], i) => {
       const p = person(scene, { skin: SKINS[i % SKINS.length], hat: i % 2 ? C.blue : 0xffffff, vest: i % 5 === 2 ? 0xc6e03a : C.amber });
       const base = V(a, b);

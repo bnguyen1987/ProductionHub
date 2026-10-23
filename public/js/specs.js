@@ -109,7 +109,7 @@ function card(m) {
   const rows = rowsOf(m, saved);
   if (editing === m.id) return editorCard(m, s);
   return `<div class="card spec-card" data-id="${esc(m.id)}">
-    <div class="spec-head"><div><h3>${esc(m.name)}</h3><span class="hint">#${esc(m.id)} · ${esc(m.type)}</span>${m.id !== '111' ? ` <a class="hint spec-floor" href="#floor/${encodeURIComponent(m.id)}">On the floor</a>` : ''}</div>
+    <div class="spec-head"><div><h3>${esc(m.name)}</h3><span class="hint">#${esc(m.id)} · ${esc(m.type)}</span> <a class="hint spec-floor" href="#floor/${encodeURIComponent(m.id)}">On the floor</a></div>
       <div class="btn-row"><button class="btn small" type="button" data-edit="${esc(m.id)}">Edit</button><button class="btn small" type="button" data-print="${esc(m.id)}">Print</button></div></div>
     ${rows.length ? `<dl class="kv spec-kv">${rows.map(([k, v, added]) => `<dt${added ? ' data-no-i18n' : ''}>${esc(k)}</dt><dd${added ? ' data-no-i18n' : ''}>${esc(v)}</dd>`).join('')}</dl>`
       : '<p class="hint" style="margin:6px 0">Not on the spec sheets yet. Tap Edit to add the specs for this machine.</p>'}
