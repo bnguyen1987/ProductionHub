@@ -182,3 +182,6 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - Two trash dumpsters sit in the northwest corner of the lot.
 - A concrete area between the parking lot and the street narrows the lot entrance. The employee car now comes in through the yard lanes and turns into the lot past the last row, and the end spot in each row stays open for that lane.
 - Yard traffic control covers the car too, and arriving trucks only appear once the yard is clear, so nothing queues on the short street.
+- The truck yard is a single lane in and out, with no center line. Trucks and the car take turns.
+- Grass runs along the east and south sides of the building, with bushes against the walls and trees whose leaves sway slightly.
+- The Isowa outfeed conveyor is shorter, so it stops short of the south wall.

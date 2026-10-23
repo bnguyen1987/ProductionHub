@@ -273,6 +273,7 @@ function build(wrap, focusId) {
   buildPeople(scene, anims, machines);
   const fleet = buildForklifts(scene, anims);
   buildTrucks(scene, anims);
+  buildLandscape(scene, anims);
 
   three = { renderer, scene, camera, controls, raf: 0, ro: null, cleanup: [], machines };
   three.anims = anims; three.fleet = fleet;
@@ -892,7 +893,7 @@ function buildMachines(scene, anims, machines, pickables) {
   });
   machine('130', 'Isowa Rotary Die Cut', 'RDC', (c) => {
     lineMachine(c, { x0: 960, x1: 1036, yc: 662, wpx: 42, flow: 1, units: [{ t: 'feeder', len: 2 }, { t: 'die', len: 2.4 }, { t: 'stack', len: 1.6 }] });
-    conveyor(c, [[1049, 576], [1049, 692]], 17);
+    conveyor(c, [[1049, 576], [1049, 668]], 17);
   });
   // two slitters side by side, running east: feed table → slitter head → outfeed conveyor toward the Design room
   const slitter = (id, name, yc) => machine(id, name, 'Slitter', (c) => {
@@ -1256,7 +1257,7 @@ function buildForklifts(scene, anims) {
 // Semi-trucks: back into a dock door, wait while loading, pull out and leave
 // =====================================================================
 // Truck yard north of the dock wall. Door k (1–12) sits at drawing x = 186 + (12 − k) × 39.45.
-const YARD = { wall: Z(78), near: Z(78) - 22, far: Z(78) - 26.5 };
+const YARD = { wall: Z(78), near: Z(78) - 24, far: Z(78) - 24 }; // one lane in and out (vehicles take turns)
 const ROAD_X = X(1205); // north–south road past the east end of the yard
 const doorX = (k) => X(186 + ((12 - k) * (620 - 186)) / 11);
 const TRAILER = 14, CAB = 3.4;
@@ -1305,7 +1306,7 @@ function buildTrucks(scene, anims) {
   const yardLock = { owner: null }; // only one vehicle moves through the yard / junction at a time
   // asphalt yard, lane lines, dock stripes
   const yard = new THREE.Group(); scene.add(yard);
-  const x0 = X(-110), x1 = ROAD_X, z0 = YARD.far - 3.5, z1 = YARD.wall;
+  const x0 = X(-110), x1 = ROAD_X, z0 = YARD.far - 6, z1 = YARD.wall;
   // the side road (two lanes, north–south)
   const rz0 = YARD.far - 22, rz1 = Z(698) + 8;
   const road = new THREE.Mesh(new THREE.PlaneGeometry(10, rz1 - rz0), smat(0x6d7482, { roughness: 0.95 }));
@@ -1333,7 +1334,6 @@ function buildTrucks(scene, anims) {
   // concrete between the parking lot and the street, so the lot entrance is narrower
   { const cx0 = X(1080), cx1 = ROAD_X - 5.1, cz0 = Z(-100), cz1 = YARD.wall;
     yard.add(mesh(rbox(cx1 - cx0, 0.18, cz1 - cz0, 0.06), smat(0xcfd5df), (cx0 + cx1) / 2, -0.2, (cz0 + cz1) / 2)); }
-  for (let x = X(35) + 1; x < x1 - 2; x += 4) { const d = mesh(rbox(2, 0.02, 0.18, 0.01), smat(0xffd257), x + 1, -0.26, (YARD.near + YARD.far) / 2, false); d.receiveShadow = true; yard.add(d); }
   for (let k = 1; k <= 13; k++) { const px = 186 + ((12 - k) * (620 - 186)) / 11 + (620 - 186) / 22; const st = mesh(rbox(0.16, 0.02, TRAILER + 1, 0.01), smat(0xffffff), X(px), -0.26, YARD.wall - (TRAILER + 1) / 2, false); yard.add(st); }
   bake(yard);
   // parked cars (one spot in row A is left open for the car that comes and goes)
@@ -1474,4 +1474,38 @@ function buildTrucks(scene, anims) {
       if (u >= 1) { si++; s = 0; if (si >= segs.length) plan(); }
     });
   });
+}
+
+// =====================================================================
+// Landscaping: grass along the east and south sides, bushes against the building, trees
+// =====================================================================
+function buildLandscape(scene, anims) {
+  const g = new THREE.Group(); scene.add(g);
+  const grassM = smat(0x7fbf5a, { roughness: 1 });
+  const plane = (x0, z0, x1, z1) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), grassM); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, -0.29, (z0 + z1) / 2); m.receiveShadow = true; g.add(m); };
+  const east0 = X(1078) + 0.3, east1 = ROAD_X - 5.05, south0 = Z(698) + 0.3, south1 = Z(758);
+  plane(east0, YARD.wall, east1, south1);            // east side, building to street
+  plane(X(-110), south0, east0, south1);             // south side
+  // bushes against the building: low-poly clumps in a few greens
+  const bushG = new THREE.IcosahedronGeometry(1, 0), greens = [0x4f9a3a, 0x5fae45, 0x3f8a33];
+  const bush = (x, z, k) => { const sc = 0.65 + ((k * 37) % 7) * 0.06; const m = mesh(bushG, smat(greens[k % 3], { flatShading: true }), x, 0.35 * sc, z); m.scale.set(sc * 1.1, sc * 0.8, sc); m.rotation.y = k; g.add(m); };
+  let k = 0;
+  for (let z = Z(110); z < Z(690); z += 2.6) bush(east0 + 1.0, z, k++);        // along the east wall
+  for (let x = X(45); x < X(1070); x += 2.6) bush(x, south0 + 1.0, k++);        // along the south wall
+  // trees: trunk + canopy; the canopies sway a little in the breeze
+  const trunkM = smat(0x8a6240), canopyG = new THREE.IcosahedronGeometry(1.6, 0);
+  const spots = [];
+  for (let z = Z(160); z < Z(700); z += 8.5) spots.push([(east0 + east1) / 2 + 1.2, z]);
+  for (let x = X(-60); x < X(1060); x += 10.5) spots.push([x, (south0 + south1) / 2 + 0.8]);
+  spots.forEach(([x, z], i) => {
+    const t = new THREE.Group(); t.position.set(x, -0.29, z); scene.add(t);
+    g.add(mesh(cylG(0.22, 2.2, 8), trunkM, x, 1.1 - 0.29, z));
+    const crown = D(new THREE.Group()); crown.position.y = 2.2; t.add(crown);
+    const s = 0.9 + (i % 4) * 0.12;
+    const c1 = mesh(canopyG, smat(greens[i % 3], { flatShading: true }), 0, 1.4 * s, 0); c1.scale.setScalar(s); crown.add(c1);
+    const c2 = mesh(canopyG, smat(greens[(i + 1) % 3], { flatShading: true }), 0.5 * s, 2.3 * s, 0.2); c2.scale.setScalar(s * 0.7); crown.add(c2);
+    const ph = i * 0.9;
+    anims.push((tt) => { crown.rotation.z = Math.sin(tt * 0.9 + ph) * 0.035; crown.rotation.x = Math.cos(tt * 0.7 + ph) * 0.03; });
+  });
+  bake(g);
 }
