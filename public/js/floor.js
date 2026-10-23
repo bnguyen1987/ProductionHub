@@ -971,21 +971,21 @@ function buildMachines(scene, anims, machines, pickables) {
     c.light(x0 + 0.8, y0 + 2.6, zc - 1.2);
     c.anims.push((t) => { const k = 0.5 + 0.5 * Math.sin(t * 1.1); rod.position.x = xc - k * L * 0.25; const u = (t * 0.12) % 1; bale.position.x = x1 + 0.9 + u * 0.8; bale.scale.y = 0.4 + 0.6 * Math.min(1, u * 1.5); bale.position.y = y0 + (1.3 * bale.scale.y) / 2; });
   });
-  // air compressor (where the baler used to be): horizontal tank, motor and pump on top, dryer cabinet
+  // air compressor: northwest corner, along the west wall below the tanks (tank runs north–south)
   machine('Compressor', 'Air Compressor', 'Air compressor', (c) => {
-    const xc = X(470), zc = Z(362);
-    for (const dx of [-1.2, 1.2]) for (const dz of [-0.45, 0.45]) c.box(0.2, 0.5, 0.2, C.frame, xc + dx, 0, zc + dz, 0.04);
-    const tank = D(new THREE.Group()); tank.position.set(xc, 1.25, zc); tank.rotation.z = Math.PI / 2; c.g.add(tank);
+    const xc = X(57), zc = Z(140);
+    for (const dz of [-1.2, 1.2]) for (const dx of [-0.45, 0.45]) c.box(0.2, 0.5, 0.2, C.frame, xc + dx, 0, zc + dz, 0.04);
+    const tank = D(new THREE.Group()); tank.position.set(xc, 1.25, zc); tank.rotation.x = Math.PI / 2; c.g.add(tank);
     c.cyl(0.8, 3.6, C.blue, 0, 0, 0, 16, tank);
     for (const sy of [-1.8, 1.8]) { const capm = mesh(new THREE.SphereGeometry(0.8, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), c.m(C.blue), 0, sy, 0); if (sy < 0) capm.rotation.x = Math.PI; tank.add(capm); }
-    c.box(1.6, 0.9, 1.1, C.body, xc - 0.5, 2.0, zc, 0.15);                   // motor + pump
-    c.box(0.25, 1.1, 1.0, C.yellow, xc + 0.6, 1.9, zc, 0.06);                // belt guard
-    const fan = new THREE.Group(); fan.position.set(xc + 0.78, 2.45, zc); c.g.add(fan);
-    const pulley = D(c.cyl(0.38, 0.08, C.frame, 0, 0, 0, 12, fan)); pulley.rotation.z = Math.PI / 2;
-    c.box(0.1, 0.5, 0.12, C.red, 0, 0.2, 0, 0.02, pulley);
-    c.box(1.2, 1.9, 1.0, C.body2, xc + 2.6, 0, zc, 0.15);                    // dryer cabinet
-    c.cyl(0.2, 0.06, 0xffffff, xc - 1.2, 1.25, zc + 0.82, 12).rotation.x = Math.PI / 2; // gauge
-    c.light(xc + 2.6, 1.9, zc - 0.3);
+    c.box(1.1, 0.9, 1.6, C.body, xc, 2.0, zc + 0.5, 0.15);                   // motor + pump
+    c.box(1.0, 1.1, 0.25, C.yellow, xc, 1.9, zc - 0.6, 0.06);                // belt guard
+    const fan = new THREE.Group(); fan.position.set(xc, 2.45, zc - 0.78); c.g.add(fan);
+    const pulley = D(c.cyl(0.38, 0.08, C.frame, 0, 0, 0, 12, fan)); pulley.rotation.x = Math.PI / 2;
+    c.box(0.12, 0.5, 0.1, C.red, 0, 0.2, 0, 0.02, pulley);
+    c.box(1.0, 1.9, 1.2, C.body2, xc, 0, zc + 3.0, 0.15);                    // dryer cabinet
+    c.cyl(0.2, 0.06, 0xffffff, xc + 0.82, 1.25, zc - 1.2, 12).rotation.z = Math.PI / 2; // gauge
+    c.light(xc + 0.3, 1.9, zc + 3.0);
     c.anims.push((t, dt) => { pulley.rotation.y += dt * 14; tank.position.y = 1.25 + Math.sin(t * 40) * 0.006; });
   });
 }
@@ -1018,7 +1018,7 @@ function buildPeople(scene, anims) {
     { pts: [[130, 525], [340, 525], [340, 532], [130, 532]], speed: 1.3 },
     { pts: [[420, 594], [705, 594], [705, 600], [420, 600]], speed: 1.6 },
     { pts: [[415, 556], [470, 556], [470, 564], [415, 564]], speed: 1.2 },
-    { pts: [[60, 128], [125, 128], [125, 168], [60, 168]], speed: 1.5 },
+    { pts: [[88, 120], [130, 120], [130, 168], [88, 168]], speed: 1.5 },
     { pts: [[890, 500], [965, 500], [965, 512], [890, 512]], speed: 1.25 },
     { pts: [[898, 145], [955, 145], [955, 180], [898, 180]], speed: 1.1 },
     { pts: [[1006, 200], [1013, 200], [1013, 300], [1006, 300]], speed: 0.9 },
@@ -1043,7 +1043,7 @@ function buildPeople(scene, anims) {
   });
   // operators: standing at a machine, reaching and stepping side to side
   [[600, 274, 'z', 1], [590, 412, 'z', 1], [520, 478, 'z', 1], [520, 614, 'z', 1], [380, 318, 'z', 1], [570, 342, 'z', 1], [300, 586, 'z', 1],
-    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [1062, 266, 'z', 1], [245, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [492, 380, 'z', -1], [767, 676, 'x', -1]]
+    [930, 560, 'z', 1], [990, 634, 'z', 1], [856, 432, 'x', 1], [856, 472, 'x', 1], [1062, 266, 'z', 1], [245, 361, 'x', 1], [72, 520, 'z', -1], [378, 545, 'z', 1], [240, 555, 'z', 1], [118, 512, 'x', -1], [767, 676, 'x', -1]]
     .forEach(([a, b, axis, face], i) => {
       const p = person(scene, { skin: SKINS[i % SKINS.length], hat: i % 2 ? C.blue : 0xffffff, vest: i % 5 === 2 ? 0xc6e03a : C.amber });
       const base = V(a, b);
