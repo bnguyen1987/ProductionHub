@@ -128,3 +128,12 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
   - **Edit** to add spec lines and notes, saved with a name and date
   - **Print** for a one-page spec sheet whose QR code opens that machine on the Floor tab
 - Old Specs links (#specs/...) now open the Floor tab on the same machine.
+
+## 12. Changes (Oct 23)
+
+- Fire extinguishers now hang on the nearest wall or column, off the floor on a bracket, with a red sign above.
+- A second cutting die rack sits beside the first, along the north wall.
+- Two more printing plate racks are in the same row as the others, west of them.
+- Employee parking in front of Maintenance and the offices: two rows of striped spots with parked cars. One car drives in, parks, backs out and leaves.
+- A north–south road at the east end of the yard. Trucks arrive from the north (turning right into the yard) or from the south (turning left). When they leave, they turn left (north) or right (south). The west end stays a dead end.
+- Wide screens frame the side road too. Phones still frame just the building.

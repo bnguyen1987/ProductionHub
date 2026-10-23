@@ -252,7 +252,7 @@ function build(wrap, focusId) {
   sun.position.set(-38, 70, 46);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -64, right: 64, top: 58, bottom: -58, near: 10, far: 220 });
+  Object.assign(sun.shadow.camera, { left: -64, right: 80, top: 58, bottom: -58, near: 10, far: 220 });
   sun.shadow.radius = 4; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
   scene.add(sun);
 
@@ -298,13 +298,14 @@ function build(wrap, focusId) {
     const tall = aspect < 0.9;
     const az = tall ? Math.PI / 2 : HOME.az, polar = tall ? THREE.MathUtils.degToRad(42) : HOME.polar;
     const zTop = tall ? Z(78) : YARD.far - 3; // phones frame the building only; the yard is a zoom-out away
-    controls.target.set((X(35) + X(1078)) / 2, 0, (zTop + Z(698)) / 2);
+    const xRight = tall ? X(1078) : ROAD_X + 6;
+    controls.target.set((X(35) + xRight) / 2, 0, (zTop + Z(698)) / 2);
     camera.position.set(Math.sin(polar) * Math.sin(az) * dist, Math.cos(polar) * dist, Math.sin(polar) * Math.cos(az) * dist).add(controls.target);
     camera.lookAt(controls.target);
     camera.updateMatrixWorld();
     const inv = camera.matrixWorldInverse;
     let mx = 0, my = 0;
-    for (const x of [X(35), X(1078)]) for (const z of [zTop, Z(698)]) for (const y of [0, 2.5]) {
+    for (const x of [X(35), xRight]) for (const z of [zTop, Z(698)]) for (const y of [0, 2.5]) {
       const p = new THREE.Vector3(x, y, z).applyMatrix4(inv);
       mx = Math.max(mx, Math.abs(p.x)); my = Math.max(my, Math.abs(p.y - 0));
     }
@@ -493,7 +494,9 @@ function buildPlant(scene, anims) {
   grid.rotation.x = -Math.PI / 2; grid.position.set((X(35) + X(1078)) / 2, 0.005, (Z(78) + Z(698)) / 2); grid.receiveShadow = true; g.add(grid);
 
   // outer walls (low, so the floor stays in view) with a dark cap like the drawing's linework
+  const WALLS = []; // drawing px segments, for hanging extinguishers
   const wall = (x1, y1, x2, y2, h = 2.2, t = 0.5, color = C.wall) => {
+    WALLS.push([x1, y1, x2, y2, t]);
     const a = V(x1, y1), b = V(x2, y2), len = a.distanceTo(b);
     const m = mesh(rbox(len + t, h, t, 0.12), smat(color), (a.x + b.x) / 2, h / 2, (a.z + b.z) / 2);
     m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
@@ -550,18 +553,20 @@ function buildPlant(scene, anims) {
   [[55, 92], [86, 92]].forEach(([a, b]) => { g.add(mesh(cylG(1.25, 3.4, 20), smat(C.body2), X(a), 1.7, Z(b))); g.add(mesh(cylG(1.3, 0.2, 20), smat(C.line), X(a), 3.45, Z(b))); });
 
   // columns (black circles on the drawing), with a yellow safety band
-  [[145, 188], [310, 180], [484, 180], [661, 180], [791, 178], [141, 320], [310, 323], [484, 330], [661, 330], [791, 330],
-    [140, 464], [310, 465], [478, 464], [661, 453], [791, 455], [140, 570], [310, 570], [484, 570], [676, 575], [791, 570]]
-    .forEach(([a, b]) => { g.add(mesh(cylG(0.42, 5, 10), smat(0xd5dae3), X(a), 2.5, Z(b))); g.add(mesh(cylG(0.46, 0.9, 10), smat(C.yellow), X(a), 0.45, Z(b))); });
+  const COLS = [[145, 188], [310, 180], [484, 180], [661, 180], [791, 178], [141, 320], [310, 323], [484, 330], [661, 330], [791, 330],
+    [140, 464], [310, 465], [478, 464], [661, 453], [791, 455], [140, 570], [310, 570], [484, 570], [676, 575], [791, 570]];
+  COLS.forEach(([a, b]) => { g.add(mesh(cylG(0.42, 5, 10), smat(0xd5dae3), X(a), 2.5, Z(b))); g.add(mesh(cylG(0.46, 0.9, 10), smat(C.yellow), X(a), 0.45, Z(b))); });
 
-  // cutting die rack: long steel rack with dies standing in it
-  const rackG = new THREE.Group(); rackG.position.set(X(402), 0, Z(101)); g.add(rackG);
+  // cutting die racks: long steel racks with dies standing in them (two, side by side)
+  for (const ry of [101, 128]) {
+  const rackG = new THREE.Group(); rackG.position.set(X(402), 0, Z(ry)); g.add(rackG);
   const RL = X(515) - X(288);
   for (const y of [0.1, 1.4, 2.7]) rackG.add(mesh(rbox(RL, 0.12, 1.7, 0.04), smat(C.blue), 0, y, 0));
   for (let i = 0; i <= 8; i++) rackG.add(mesh(rbox(0.16, 3.2, 1.8, 0.05), smat(C.frame), -RL / 2 + (i * RL) / 8, 1.6, 0));
   for (let s = 0; s < 2; s++) for (let i = 0; i < 46; i++) {
     const h = 0.8 + ((i * 37) % 5) * 0.08;
-    rackG.add(mesh(rbox(0.12, h, 1.4, 0.03), smat([C.wood, C.kraft, C.kraft2][i % 3]), -RL / 2 + 0.4 + i * (RL - 0.8) / 46, 0.16 + s * 1.3 + h / 2, 0, false));
+    rackG.add(mesh(rbox(0.12, h, 1.4, 0.03), smat([C.wood, C.kraft, C.kraft2][(i + (ry > 101 ? 1 : 0)) % 3]), -RL / 2 + 0.4 + i * (RL - 0.8) / 46, 0.16 + s * 1.3 + h / 2, 0, false));
+  }
   }
   // printing plate racks: slatted, plates hanging
   const plateRack = (x1, y1, x2, y2) => {
@@ -572,7 +577,7 @@ function buildPlant(scene, anims) {
     const n = Math.round(L / 0.45);
     for (let i = 0; i < n; i++) r.add(mesh(rbox(0.06, 2.2, Dd * 0.82, 0.02), smat(i % 4 === 0 ? C.blueSoft : C.plate), -L / 2 + 0.25 + i * (L - 0.5) / (n - 1), 1.35, 0, false));
   };
-  plateRack(452, 213, 500, 245); plateRack(508, 213, 556, 245); plateRack(538, 574, 655, 588);
+  plateRack(305, 213, 355, 245); plateRack(375, 213, 425, 245); plateRack(452, 213, 500, 245); plateRack(508, 213, 556, 245); plateRack(538, 574, 655, 588);
 
   // dock doors 12 → 1 along the north wall, each with a blinking light
   const lights = [];
@@ -600,13 +605,26 @@ function buildPlant(scene, anims) {
   });
   anims.push((t) => { arrowMat.emissiveIntensity = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(t * 3)); arrows.forEach((a, i) => a.position.y = 0.03 + 0.0 * i); });
 
-  // fire extinguishers (red on the drawing)
+  // fire extinguishers (red on the drawing), hung on the nearest wall or column with a sign above
   [[180, 92], [295, 113], [510, 113], [322, 180], [667, 180], [768, 90], [715, 90], [48, 172], [155, 320], [495, 330], [808, 330], [320, 463], [680, 453], [320, 568], [495, 568], [805, 568], [48, 610], [665, 682], [960, 262], [990, 370], [1070, 460], [1012, 222], [1068, 540]]
     .forEach(([a, b]) => {
-      const e = new THREE.Group(); e.position.set(X(a), 0, Z(b)); g.add(e);
-      e.add(mesh(cylG(0.2, 0.75, 10), smat(C.red), 0, 0.38, 0));
-      e.add(mesh(cylG(0.08, 0.16, 8), smat(C.line), 0, 0.82, 0, false));
-      e.add(mesh(rbox(0.5, 0.7, 0.05, 0.02), smat(C.red), 0, 1.7, 0, false));
+      let best = null; // { px, py, nx, ny, d, gap }
+      for (const [x1, y1, x2, y2, t] of WALLS) {
+        const dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy || 1;
+        const u = Math.max(0.02, Math.min(0.98, ((a - x1) * dx + (b - y1) * dy) / L2));
+        const qx = x1 + u * dx, qy = y1 + u * dy, d = Math.hypot(a - qx, b - qy);
+        if (!best || d < best.d) { let nx = -dy, ny = dx; const n = Math.hypot(nx, ny) || 1; nx /= n; ny /= n; if ((a - qx) * nx + (b - qy) * ny < 0) { nx = -nx; ny = -ny; } best = { px: qx, py: qy, nx, ny, d, gap: (t / SC) / 2 + 3 }; }
+      }
+      for (const [cx, cy] of COLS) {
+        const d = Math.hypot(a - cx, b - cy) - 4;
+        if (d < best.d) { const n = Math.hypot(a - cx, b - cy) || 1; best = { px: cx, py: cy, nx: (a - cx) / n, ny: (b - cy) / n, d, gap: 4.2 + 2.6 }; }
+      }
+      const ex = best.px + best.nx * best.gap, ey = best.py + best.ny * best.gap;
+      const e = new THREE.Group(); e.position.set(X(ex), 0, Z(ey)); e.rotation.y = Math.atan2(best.nx, best.ny); g.add(e); // back of the bracket against the wall
+      e.add(mesh(rbox(0.5, 0.08, 0.3, 0.02), smat(C.line), 0, 0.55, -0.12, false));            // bracket
+      e.add(mesh(cylG(0.2, 0.75, 10), smat(C.red), 0, 0.98, 0));                               // extinguisher, off the floor
+      e.add(mesh(cylG(0.08, 0.16, 8), smat(C.line), 0, 1.43, 0, false));
+      e.add(mesh(rbox(0.5, 0.7, 0.05, 0.02), smat(C.red), 0, 2.1, -0.2, false));               // sign on the wall
     });
   bake(g);
 }
@@ -888,7 +906,7 @@ const SKINS = [0xe0b48a, 0xc68e5e, 0x8d5a3b, 0xf0c9a0, 0xa8714a];
 function buildPeople(scene, anims) {
   // walking loops through the aisles (drawing coordinates)
   const loops = [
-    { pts: [[195, 226], [442, 226], [442, 233], [195, 233]], speed: 1.5 },
+    { pts: [[195, 192], [440, 192], [440, 199], [195, 199]], speed: 1.5 },
     { pts: [[885, 296], [965, 296], [965, 312], [885, 312]], speed: 1.4 },
     { pts: [[130, 525], [340, 525], [340, 532], [130, 532]], speed: 1.3 },
     { pts: [[420, 594], [705, 594], [705, 600], [420, 600]], speed: 1.6 },
@@ -1120,6 +1138,7 @@ function buildForklifts(scene, anims) {
 // =====================================================================
 // Truck yard north of the dock wall. Door k (1–12) sits at drawing x = 186 + (12 − k) × 39.45.
 const YARD = { wall: Z(78), near: Z(78) - 22, far: Z(78) - 26.5 };
+const ROAD_X = X(1205); // north–south road past the east end of the yard
 const doorX = (k) => X(186 + ((12 - k) * (620 - 186)) / 11);
 const TRAILER = 14, CAB = 3.4;
 
@@ -1151,10 +1170,32 @@ function truck(scene, cabColor, withCab = true) {
   return { g, wheels, lm };
 }
 
+function car(scene, color) {
+  const g = new THREE.Group(); scene.add(g);
+  const body = smat(color), dark = smat(C.frame), glass = smat(0x9fb6d6, { roughness: 0.3 });
+  g.add(mesh(rbox(4.0, 0.85, 1.9, 0.3), body, 0, 0.75, 0));
+  g.add(mesh(rbox(2.2, 0.7, 1.7, 0.3), glass, -0.25, 1.45, 0));
+  g.add(mesh(rbox(2.0, 0.12, 1.72, 0.06), body, -0.25, 1.82, 0));
+  const wheels = [];
+  for (const x of [1.3, -1.3]) for (const z of [0.88, -0.88]) { const w = D(mesh(cylG(0.38, 0.26, 12), dark, x, 0.38, z)); w.rotation.x = Math.PI / 2; g.add(w); wheels.push(w); }
+  bake(g);
+  return { g, wheels };
+}
+
 function buildTrucks(scene, anims) {
   // asphalt yard, lane lines, dock stripes
   const yard = new THREE.Group(); scene.add(yard);
-  const x0 = X(35) - 5, x1 = X(1078) + 32, z0 = YARD.far - 3.5, z1 = YARD.wall;
+  const x0 = X(35) - 5, x1 = ROAD_X, z0 = YARD.far - 3.5, z1 = YARD.wall;
+  // the side road (two lanes, north–south)
+  const rz0 = YARD.far - 90, rz1 = Z(698) + 60;
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(10, rz1 - rz0), smat(0x6d7482, { roughness: 0.95 }));
+  road.rotation.x = -Math.PI / 2; road.position.set(ROAD_X, -0.28, (rz0 + rz1) / 2); road.receiveShadow = true; yard.add(road);
+  for (let z = rz0 + 2; z < rz1 - 2; z += 4) if (z < z0 - 1 || z > z1 + 1) yard.add(mesh(rbox(0.18, 0.02, 2, 0.01), smat(0xffd257), ROAD_X, -0.26, z, false));
+  // employee parking in front of maintenance and the offices: two rows, nose to the building and to the aisle
+  const PX0 = X(772), SPOT = 2.9, NS = 10, rowA = YARD.wall - 2.6, rowB = YARD.wall - 13.4, aisle = YARD.wall - 8;
+  for (let i = 0; i <= NS; i++) for (const zc of [rowA, rowB]) yard.add(mesh(rbox(0.14, 0.02, 4.6, 0.01), smat(0xffffff), PX0 + i * SPOT, -0.26, zc, false));
+  for (const zc of [rowA - 2.3, rowB + 2.3]) yard.add(mesh(rbox(NS * SPOT, 0.02, 0.14, 0.01), smat(0xffffff), PX0 + (NS * SPOT) / 2, -0.26, zc, false));
+  yard.add(mesh(rbox(NS * SPOT + 1, 0.3, 0.5, 0.08), smat(0xc9ced8), PX0 + (NS * SPOT) / 2, -0.12, YARD.wall - 0.6)); // curb at the building
   const asphalt = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), smat(0x6d7482, { roughness: 0.95 }));
   asphalt.rotation.x = -Math.PI / 2; asphalt.position.set((x0 + x1) / 2, -0.28, (z0 + z1) / 2); asphalt.receiveShadow = true; yard.add(asphalt);
   // dead end on the left: curb and bollards
@@ -1163,6 +1204,47 @@ function buildTrucks(scene, anims) {
   for (let x = x0 + 6; x < x1 - 2; x += 4) { const d = mesh(rbox(2, 0.02, 0.18, 0.01), smat(0xffd257), x + 1, -0.26, (YARD.near + YARD.far) / 2, false); d.receiveShadow = true; yard.add(d); }
   for (let k = 1; k <= 13; k++) { const px = 186 + ((12 - k) * (620 - 186)) / 11 + (620 - 186) / 22; const st = mesh(rbox(0.16, 0.02, TRAILER + 1, 0.01), smat(0xffffff), X(px), -0.26, YARD.wall - (TRAILER + 1) / 2, false); yard.add(st); }
   bake(yard);
+  // parked cars (one spot in row A is left open for the car that comes and goes)
+  const CAR_COLORS = [0xffffff, C.blue, C.red, 0x9aa3b5, C.navy, 0xd9dde5, 0x3a404b, C.amber];
+  let ci = 0;
+  for (const [zc, faceN] of [[rowA, true], [rowB, false]]) for (let i = 0; i < NS; i++) {
+    if (zc === rowA && i === 6) continue;
+    if ((i * 7 + (faceN ? 1 : 3)) % 5 === 0) continue; // a few empty spots
+    const c = car(scene, CAR_COLORS[ci++ % CAR_COLORS.length]);
+    c.g.position.set(PX0 + (i + 0.5) * SPOT, 0, zc); c.g.rotation.y = -Math.PI / 2; // nose south: row A to the building, row B to the aisle
+  }
+
+  {
+    const c = car(scene, 0x2fc28a), tan = new THREE.Vector3();
+    const SB = ROAD_X - 2.2, NB = ROAD_X + 2.2, spotX = PX0 + 6.5 * SPOT;
+    const ln = (ax, az, bx, bz) => new THREE.LineCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(bx, 0, bz));
+    const bz = (ax, az, cx, cz, bx, bzz) => new THREE.QuadraticBezierCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(cx, 0, cz), new THREE.Vector3(bx, 0, bzz));
+    const segs = [
+      { wait: 6, hidden: true },
+      { c: ln(SB, YARD.far - 85, SB, aisle - 5), v: 8 },
+      { c: bz(SB, aisle - 5, SB, aisle, SB - 5, aisle), v: 4 },
+      { c: ln(SB - 5, aisle, spotX + 4, aisle), v: 5 },
+      { c: bz(spotX + 4, aisle, spotX, aisle, spotX, rowA), v: 2 },     // pull into the spot, nose to the building
+      { wait: 22 },
+      { c: bz(spotX, rowA, spotX, aisle, spotX - 4, aisle), v: 1.6, rev: true }, // back out, ending pointed east
+      { c: ln(spotX - 4, aisle, NB - 5, aisle), v: 5 },
+      { c: bz(NB - 5, aisle, NB, aisle, NB, aisle - 5), v: 4 },
+      { c: ln(NB, aisle - 5, NB, YARD.far - 85), v: 8 },
+    ];
+    segs.forEach((x) => { if (x.c) x.len = x.c.getLength(); });
+    let si = 0, s = 0;
+    anims.push((t, dt) => {
+      const g = segs[si];
+      if (g.wait !== undefined) { c.g.visible = !g.hidden; s += dt; if (s >= g.wait) { si = (si + 1) % segs.length; s = 0; } return; }
+      c.g.visible = true;
+      s += g.v * dt;
+      const u = Math.min(1, s / g.len), p = g.c.getPointAt(u); g.c.getTangentAt(u, tan);
+      if (g.rev) tan.multiplyScalar(-1);
+      c.g.position.set(p.x, 0, p.z); c.g.rotation.y = -Math.atan2(tan.z, tan.x);
+      c.wheels.forEach((w) => (w.rotation.y += (g.rev ? -1 : 1) * dt * g.v * 2.5));
+      if (u >= 1) { si = (si + 1) % segs.length; s = 0; }
+    });
+  }
 
   // trailers already at the docks (no tractor)
   for (const k of [12, 11, 2]) {
@@ -1182,16 +1264,26 @@ function buildTrucks(scene, anims) {
     const tan = new THREE.Vector3();
     const line = (ax, az, bx, bz) => new THREE.LineCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(bx, 0, bz));
     const plan = () => {
-      const xd = doorX(a.doors[di % a.doors.length]); di++;
+      const xd = doorX(a.doors[di % a.doors.length]);
+      const fromNorth = di % 2 === 0, toNorth = (di + (a.color === C.red ? 1 : 0)) % 3 !== 0; di++;
       const dock = YARD.wall - 0.35 - TRAILER / 2, turnX = xd - 15;
-      const startX = X(1078) + 30;
+      const SB = ROAD_X - 2.2, NB = ROAD_X + 2.2, northEnd = YARD.far - 85, southEnd = Z(698) + 55;
+      const bez = (ax, az, cx, cz, bx, bz) => new THREE.QuadraticBezierCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(cx, 0, cz), new THREE.Vector3(bx, 0, bz));
+      const arrive = fromNorth
+        ? [{ c: line(SB, northEnd, SB, YARD.far - 7), v: 7 }, { c: bez(SB, YARD.far - 7, SB, YARD.far, SB - 7, YARD.far), v: 3.5 }]   // southbound, turn right into the yard
+        : [{ c: line(NB, southEnd, NB, YARD.far + 6), v: 7 }, { c: bez(NB, YARD.far + 6, NB, YARD.far, NB - 9, YARD.far), v: 3.5 }];  // northbound, turn left into the yard
+      const leave = toNorth
+        ? [{ c: bez(NB - 9, YARD.near, NB, YARD.near, NB, YARD.near - 7), v: 3.5 }, { c: line(NB, YARD.near - 7, NB, northEnd), v: 7 }] // turn left, head north
+        : [{ c: bez(SB - 7, YARD.near, SB, YARD.near, SB, YARD.near + 7), v: 3.5 }, { c: line(SB, YARD.near + 7, SB, southEnd), v: 7 }]; // turn right, head south
       segs = [
-        { c: line(startX, YARD.far, turnX, YARD.far), v: 7 },                                       // drive in along the far lane (heading west)
+        ...arrive,
+        { c: line(arrive[1].c.v2.x, YARD.far, turnX, YARD.far), v: 7 },                            // along the far lane (heading west)
         { wait: 1.0 },
         { c: new THREE.QuadraticBezierCurve3(new THREE.Vector3(turnX, 0, YARD.far), new THREE.Vector3(xd, 0, YARD.far), new THREE.Vector3(xd, 0, dock)), v: 2.6, rev: true }, // back into the door
         { wait: 12, docked: true },                                                                   // loading
         { c: new THREE.QuadraticBezierCurve3(new THREE.Vector3(xd, 0, dock), new THREE.Vector3(xd, 0, YARD.near), new THREE.Vector3(xd + 15, 0, YARD.near)), v: 3.2 }, // pull out, turn east
-        { c: line(xd + 15, YARD.near, startX, YARD.near), v: 7 },                                  // leave the way it came (the yard is a dead end on the left)
+        { c: line(xd + 15, YARD.near, leave[0].c.v0.x, YARD.near), v: 7 },                          // back out to the road (the yard is a dead end on the left)
+        ...leave,
         { wait: 4, hidden: true },
       ];
       segs.forEach((g) => { if (g.c) g.len = g.c.getLength(); });
