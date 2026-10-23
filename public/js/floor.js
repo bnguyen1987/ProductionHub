@@ -495,6 +495,19 @@ function buildPlant(scene, anims) {
 
   // outer walls (low, so the floor stays in view) with a dark cap like the drawing's linework
   const WALLS = []; // drawing px segments, for hanging extinguishers
+  // a closed door filling the opening between two drawing points (double door if it's wide), with a header above
+  const doorIn = (ax, ay, bx, by, h = 2.4, t = 0.3) => {
+    const a = V(ax, ay), b = V(bx, by), len = a.distanceTo(b), ang = -Math.atan2(b.z - a.z, b.x - a.x);
+    const grp = new THREE.Group(); grp.position.set((a.x + b.x) / 2, 0, (a.z + b.z) / 2); grp.rotation.y = ang; g.add(grp);
+    const leaves = len > 1.7 ? 2 : 1, lw = len / leaves - 0.04;
+    for (let i = 0; i < leaves; i++) {
+      const cx = -len / 2 + (i + 0.5) * (len / leaves);
+      grp.add(mesh(rbox(lw, 2.1, 0.1, 0.03), smat(0xc99a62), cx, 1.05, 0));
+      const hx = leaves === 2 ? cx + (i === 0 ? lw / 2 - 0.15 : -lw / 2 + 0.15) : cx + lw / 2 - 0.15;
+      for (const sz of [-0.08, 0.08]) grp.add(mesh(rbox(0.06, 0.05, 0.1, 0.02), smat(C.frame), hx, 1.0, sz, false));
+    }
+    if (h > 2.15) grp.add(mesh(rbox(len + 0.1, h - 2.1, t, 0.04), smat(0xf3f5f9), 0, 2.1 + (h - 2.1) / 2, 0));
+  };
   const wall = (x1, y1, x2, y2, h = 2.2, t = 0.5, color = C.wall) => {
     // door opening? (DOORS = drawing px points on the wall line)
     const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
@@ -506,9 +519,7 @@ function buildPlant(scene, anims) {
         wall(x1 + dx * (u + half), y1 + dy * (u + half), x2, y2, h, t, color);
         // door leaf, hinged at one side of the opening and standing open
         const hx = x1 + dx * (u - half), hy = y1 + dy * (u - half), ang = -Math.atan2(Z(y2) - Z(y1), X(x2) - X(x1));
-        const hinge = new THREE.Group(); hinge.position.set(X(hx), 0, Z(hy)); hinge.rotation.y = ang + side * 1.25; g.add(hinge);
-        hinge.add(mesh(rbox(1.0, 2.1, 0.08, 0.03), smat(0xc99a62), 0.52, 1.05, 0));
-        hinge.add(mesh(rbox(0.12, 0.05, 0.12, 0.02), smat(C.frame), 0.85, 1.0, 0.08, false));
+        doorIn(hx, hy, x1 + dx * (u + half), y1 + dy * (u + half), h, t);
         return;
       }
     }
@@ -555,6 +566,10 @@ function buildPlant(scene, anims) {
   ow([405, 770], [405, 915]); ow([565, 770], [565, 915]);
   ow([345, 915], [370, 915]); ow([395, 915], [410, 915]); ow([440, 915], [565, 915]);
   ow([345, 915], [345, 970]); ow([235, 970], [315, 970]); ow([340, 970], [380, 970]); ow([405, 970], [405, 1115]); ow([235, 1115], [405, 1115]);
+  // closed doors in the plan's door openings (the wide opening to the floor stays open)
+  for (const [a0, a1] of [[[172, 400], [205, 400]], [[235, 400], [235, 440]], [[390, 400], [432, 400]], [[462, 490], [462, 515]], [[614, 455], [614, 480]],
+    [[565, 595], [565, 620]], [[614, 595], [614, 620]], [[740, 590], [765, 590]], [[565, 735], [565, 770]],
+    [[370, 915], [395, 915]], [[410, 915], [440, 915]], [[315, 970], [340, 970]], [[380, 970], [405, 970]]]) doorIn(...OF(...a0), ...OF(...a1));
   // Design room below the east column
   room(980, OF(0, 965)[1], 1078, 450, 2.4, [1]);
   room(1032, 452, 1078, 515, 1.6, [1]);
