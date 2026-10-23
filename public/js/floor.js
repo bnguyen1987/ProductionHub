@@ -878,7 +878,6 @@ function buildMachines(scene, anims, machines, pickables) {
   machine('132', '66" Shanghai RDC Slotter', 'PRESS', (c) => {
     lineMachine(c, { x0: 485, x1: 657, yc: 650, wpx: 50, flow: -1, units: [{ t: 'feeder', len: 3 }, { t: 'print', len: 2.5 }, { t: 'print', len: 2.5 }, { t: 'die', len: 3 }, { t: 'stack', len: 2 }, { t: 'table', len: 1.2 }] });
     conveyor(c, [[714, 648], [659, 648]], 34);
-    conveyor(c, [[642, 686], [572, 686]], 9, { h: 0.5, speed: 1.4 });
   }, [575, 650]);
   machine('149', 'Shanghai Juer Mini FFG', 'FFG', (c) => {
     lineMachine(c, { x0: 160, x1: 360, yc: 621, wpx: 40, flow: -1, units: [{ t: 'feeder', len: 3 }, { t: 'print', len: 2 }, { t: 'print', len: 2 }, { t: 'slot', len: 2 }, { t: 'folder', len: 7 }, { t: 'stack', len: 2.5 }] });
@@ -893,7 +892,7 @@ function buildMachines(scene, anims, machines, pickables) {
   });
   machine('130', 'Isowa Rotary Die Cut', 'RDC', (c) => {
     lineMachine(c, { x0: 960, x1: 1036, yc: 662, wpx: 42, flow: 1, units: [{ t: 'feeder', len: 2 }, { t: 'die', len: 2.4 }, { t: 'stack', len: 1.6 }] });
-    conveyor(c, [[1049, 692], [1049, 576]], 17);
+    conveyor(c, [[1049, 576], [1049, 692]], 17);
   });
   // two slitters side by side, running east: feed table → slitter head → outfeed conveyor toward the Design room
   const slitter = (id, name, yc) => machine(id, name, 'Slitter', (c) => {
@@ -1303,11 +1302,12 @@ function car(scene, color, moving = false) {
 }
 
 function buildTrucks(scene, anims) {
+  const yardLock = { owner: null }; // only one vehicle moves through the yard / junction at a time
   // asphalt yard, lane lines, dock stripes
   const yard = new THREE.Group(); scene.add(yard);
-  const x0 = X(35) - 5, x1 = ROAD_X, z0 = YARD.far - 3.5, z1 = YARD.wall;
+  const x0 = X(-110), x1 = ROAD_X, z0 = YARD.far - 3.5, z1 = YARD.wall;
   // the side road (two lanes, north–south)
-  const rz0 = YARD.far - 90, rz1 = Z(698) + 60;
+  const rz0 = YARD.far - 22, rz1 = Z(698) + 8;
   const road = new THREE.Mesh(new THREE.PlaneGeometry(10, rz1 - rz0), smat(0x6d7482, { roughness: 0.95 }));
   road.rotation.x = -Math.PI / 2; road.position.set(ROAD_X, -0.28, (rz0 + rz1) / 2); road.receiveShadow = true; yard.add(road);
   for (let z = rz0 + 2; z < rz1 - 2; z += 4) if (z < z0 - 1 || z > z1 + 1) yard.add(mesh(rbox(0.18, 0.02, 2, 0.01), smat(0xffd257), ROAD_X, -0.26, z, false));
@@ -1319,9 +1319,21 @@ function buildTrucks(scene, anims) {
   const asphalt = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), smat(0x6d7482, { roughness: 0.95 }));
   asphalt.rotation.x = -Math.PI / 2; asphalt.position.set((x0 + x1) / 2, -0.28, (z0 + z1) / 2); asphalt.receiveShadow = true; yard.add(asphalt);
   // dead end on the left: curb and bollards
-  yard.add(mesh(rbox(0.6, 0.35, z1 - z0, 0.08), smat(0xc9ced8), x0 + 0.3, -0.1, (z0 + z1) / 2));
-  for (let z = z0 + 1.5; z < z1 - 1; z += 3.5) { yard.add(mesh(cylG(0.22, 1.1, 10), smat(C.yellow), x0 + 1.2, 0.27, z)); }
-  for (let x = x0 + 6; x < x1 - 2; x += 4) { const d = mesh(rbox(2, 0.02, 0.18, 0.01), smat(0xffd257), x + 1, -0.26, (YARD.near + YARD.far) / 2, false); d.receiveShadow = true; yard.add(d); }
+  // asphalt continues down the west side of the building
+  { const wx0 = X(-110), wx1 = X(35) - 0.3, wz0 = YARD.wall - 0.01, wz1 = Z(707);
+    const wa = new THREE.Mesh(new THREE.PlaneGeometry(wx1 - wx0, wz1 - wz0), smat(0x6d7482, { roughness: 0.95 }));
+    wa.rotation.x = -Math.PI / 2; wa.position.set((wx0 + wx1) / 2, -0.28, (wz0 + wz1) / 2); wa.receiveShadow = true; yard.add(wa); }
+  // trash dumpsters in the corner of the lot
+  for (const dz of [Z(-186), Z(-144)]) {
+    const dx = X(-82);
+    yard.add(mesh(rbox(2.8, 2.0, 3.8, 0.15), smat(C.blue), dx, 0.73, dz));
+    yard.add(mesh(rbox(3.0, 0.16, 4.0, 0.06), smat(C.frame), dx, 1.8, dz));
+    for (const ox of [-1.1, 1.1]) for (const oz of [-1.5, 1.5]) yard.add(mesh(cylG(0.18, 0.15, 10), smat(C.frame), dx + ox, -0.1, dz + oz));
+  }
+  // concrete between the parking lot and the street, so the lot entrance is narrower
+  { const cx0 = X(1080), cx1 = ROAD_X - 5.1, cz0 = Z(-100), cz1 = YARD.wall;
+    yard.add(mesh(rbox(cx1 - cx0, 0.18, cz1 - cz0, 0.06), smat(0xcfd5df), (cx0 + cx1) / 2, -0.2, (cz0 + cz1) / 2)); }
+  for (let x = X(35) + 1; x < x1 - 2; x += 4) { const d = mesh(rbox(2, 0.02, 0.18, 0.01), smat(0xffd257), x + 1, -0.26, (YARD.near + YARD.far) / 2, false); d.receiveShadow = true; yard.add(d); }
   for (let k = 1; k <= 13; k++) { const px = 186 + ((12 - k) * (620 - 186)) / 11 + (620 - 186) / 22; const st = mesh(rbox(0.16, 0.02, TRAILER + 1, 0.01), smat(0xffffff), X(px), -0.26, YARD.wall - (TRAILER + 1) / 2, false); yard.add(st); }
   bake(yard);
   // parked cars (one spot in row A is left open for the car that comes and goes)
@@ -1329,6 +1341,7 @@ function buildTrucks(scene, anims) {
   let ci = 0;
   for (const [zc, faceN] of [[rowA, true], [rowB, false]]) for (let i = 0; i < NS; i++) {
     if (zc === rowA && i === 6) continue;
+    if (i === NS - 1) continue; // end spots stay open next to the lane into the lot
     if ((i * 7 + (faceN ? 1 : 3)) % 5 === 0) continue; // a few empty spots
     const c = car(scene, CAR_COLORS[ci++ % CAR_COLORS.length]);
     c.g.position.set(PX0 + (i + 0.5) * SPOT, -0.27, zc); c.g.rotation.y = -Math.PI / 2; // nose south: row A to the building, row B to the aisle
@@ -1339,22 +1352,36 @@ function buildTrucks(scene, anims) {
     const SB = ROAD_X - 2.2, NB = ROAD_X + 2.2, spotX = PX0 + 6.5 * SPOT;
     const ln = (ax, az, bx, bz) => new THREE.LineCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(bx, 0, bz));
     const bz = (ax, az, cx, cz, bx, bzz) => new THREE.QuadraticBezierCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(cx, 0, cz), new THREE.Vector3(bx, 0, bzz));
+    const xe = X(1070), nEnd = YARD.far - 16; // the lane between the end of the lot and the new concrete
     const segs = [
       { wait: 6, hidden: true },
-      { c: ln(SB, YARD.far - 85, SB, aisle - 5), v: 8 },
-      { c: bz(SB, aisle - 5, SB, aisle, SB - 5, aisle), v: 4 },
-      { c: ln(SB - 5, aisle, spotX + 4, aisle), v: 5 },
+      { lock: 'get' },
+      { c: ln(SB, nEnd, SB, YARD.far - 6), v: 7 },
+      { c: bz(SB, YARD.far - 6, SB, YARD.far, SB - 6, YARD.far), v: 3.5 },     // right onto the far lane
+      { c: ln(SB - 6, YARD.far, xe + 5, YARD.far), v: 5 },
+      { c: bz(xe + 5, YARD.far, xe, YARD.far, xe, YARD.far + 5), v: 3 },        // left into the lot
+      { c: ln(xe, YARD.far + 5, xe, aisle - 4), v: 4 },
+      { c: bz(xe, aisle - 4, xe, aisle, xe - 4, aisle), v: 3 },
+      { lock: 'free' },
+      { c: ln(xe - 4, aisle, spotX + 4, aisle), v: 4 },
       { c: bz(spotX + 4, aisle, spotX, aisle, spotX, rowA), v: 2 },     // pull into the spot, nose to the building
       { wait: 22 },
       { c: bz(spotX, rowA, spotX, aisle, spotX - 4, aisle), v: 1.6, rev: true }, // back out, ending pointed east
-      { c: ln(spotX - 4, aisle, NB - 5, aisle), v: 5 },
-      { c: bz(NB - 5, aisle, NB, aisle, NB, aisle - 5), v: 4 },
-      { c: ln(NB, aisle - 5, NB, YARD.far - 85), v: 8 },
+      { c: ln(spotX - 4, aisle, xe - 4, aisle), v: 4 },
+      { lock: 'get' },
+      { c: bz(xe - 4, aisle, xe, aisle, xe, aisle - 4), v: 3 },
+      { c: ln(xe, aisle - 4, xe, YARD.near + 4), v: 4 },
+      { c: bz(xe, YARD.near + 4, xe, YARD.near, xe + 5, YARD.near), v: 3 },   // right onto the near lane
+      { c: ln(xe + 5, YARD.near, NB - 6, YARD.near), v: 5 },
+      { c: bz(NB - 6, YARD.near, NB, YARD.near, NB, YARD.near - 6), v: 3.5 },  // left onto the street, north
+      { c: ln(NB, YARD.near - 6, NB, nEnd), v: 7 },
+      { lock: 'free' },
     ];
     segs.forEach((x) => { if (x.c) x.len = x.c.getLength(); });
     let si = 0, s = 0;
     anims.push((t, dt) => {
       const g = segs[si];
+      if (g.lock) { if (g.lock === 'get') { if (yardLock.owner && yardLock.owner !== c) return; yardLock.owner = c; } else if (yardLock.owner === c) yardLock.owner = null; si = (si + 1) % segs.length; s = 0; return; }
       if (g.wait !== undefined) { c.g.visible = !g.hidden; s += dt; if (s >= g.wait) { si = (si + 1) % segs.length; s = 0; } return; }
       c.g.visible = true;
       s += g.v * dt;
@@ -1378,7 +1405,6 @@ function buildTrucks(scene, anims) {
     { doors: [3, 4], color: C.red, delay: 30 },
   ];
   // yard traffic control: only one truck moves in the yard / at the road junction at a time
-  const yardLock = { owner: null };
   agents.forEach((a) => {
     const tk = truck(scene, a.color);
     tk.g.visible = false;
@@ -1390,15 +1416,15 @@ function buildTrucks(scene, anims) {
       const xd = ramp ? X(RAMP.x) : doorX(door);
       const fromNorth = di % 2 === 0, toNorth = (di + (a.color === C.red ? 1 : 0)) % 3 !== 0; di++;
       const dock = ramp ? YARD.wall + 1 - TRAILER / 2 : YARD.wall - 0.35 - TRAILER / 2, turnX = xd - 15; // ramp: back up the ramp, rear just inside the door
-      const SB = ROAD_X - 2.2, NB = ROAD_X + 2.2, northEnd = YARD.far - 85, southEnd = Z(698) + 55;
+      const SB = ROAD_X - 2.2, NB = ROAD_X + 2.2, northEnd = YARD.far - 16, southEnd = Z(698) + 6;
       const bez = (ax, az, cx, cz, bx, bz) => new THREE.QuadraticBezierCurve3(new THREE.Vector3(ax, 0, az), new THREE.Vector3(cx, 0, cz), new THREE.Vector3(bx, 0, bz));
-      // arriving trucks wait on the road short of the junction until the yard is clear
+      // arriving trucks only drive in (appear at the street end) once the yard is clear, so they never queue on the short street
       const arrive = fromNorth
-        ? [{ c: line(SB, northEnd, SB, YARD.far - 32), v: 7 }, { lock: 'get' }, { c: line(SB, YARD.far - 32, SB, YARD.far - 7), v: 6 }, { c: bez(SB, YARD.far - 7, SB, YARD.far, SB - 7, YARD.far), v: 3.5 }]   // southbound, turn right into the yard
-        : [{ c: line(NB, southEnd, NB, YARD.far + 31), v: 7 }, { lock: 'get' }, { c: line(NB, YARD.far + 31, NB, YARD.far + 6), v: 6 }, { c: bez(NB, YARD.far + 6, NB, YARD.far, NB - 9, YARD.far), v: 3.5 }];  // northbound, turn left into the yard
+        ? [{ lock: 'get' }, { c: line(SB, northEnd, SB, YARD.far - 7), v: 6 }, { c: bez(SB, YARD.far - 7, SB, YARD.far, SB - 7, YARD.far), v: 3.5 }]   // southbound, turn right into the yard
+        : [{ lock: 'get' }, { c: line(NB, southEnd, NB, YARD.far + 6), v: 7 }, { c: bez(NB, YARD.far + 6, NB, YARD.far, NB - 9, YARD.far), v: 3.5 }];  // northbound, turn left into the yard
       // leaving trucks free the yard once they are well clear of the junction
       const leave = toNorth
-        ? [{ c: bez(NB - 9, YARD.near, NB, YARD.near, NB, YARD.near - 7), v: 3.5 }, { c: line(NB, YARD.near - 7, NB, YARD.near - 35), v: 7 }, { lock: 'free' }, { c: line(NB, YARD.near - 35, NB, northEnd), v: 7 }] // turn left, head north
+        ? [{ c: bez(NB - 9, YARD.near, NB, YARD.near, NB, YARD.near - 7), v: 3.5 }, { c: line(NB, YARD.near - 7, NB, northEnd), v: 7 }, { lock: 'free' }] // turn left, head north
         : [{ c: bez(SB - 7, YARD.near, SB, YARD.near, SB, YARD.near + 7), v: 3.5 }, { c: line(SB, YARD.near + 7, SB, YARD.near + 35), v: 7 }, { lock: 'free' }, { c: line(SB, YARD.near + 35, SB, southEnd), v: 7 }]; // turn right, head south
       segs = [
         ...arrive,

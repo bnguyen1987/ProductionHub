@@ -172,3 +172,13 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
   - **People:** the lunch-room person stood in the chairs, the strapper operator stood in the strapper arch, and the hallway walker brushed an extinguisher. All three moved, and the extinguisher now hangs in the restroom wall niche.
   - **East forklift:** clipped a column when turning at the top pallet spot. The east pallet spots shifted down slightly.
   - **Drawing load:** the wheels of parked cars and dropped trailers are now merged with the vehicles, about 70 fewer draw calls.
+
+## 14. Changes (Oct 23, afternoon)
+
+- Removed the small conveyor under the Shanghai.
+- The Isowa outfeed conveyor now runs the other way (north to south).
+- The side street is shorter at both ends.
+- Asphalt now continues down the west side of the building. The curb and bollards at the old dead end are gone.
+- Two trash dumpsters sit in the northwest corner of the lot.
+- A concrete area between the parking lot and the street narrows the lot entrance. The employee car now comes in through the yard lanes and turns into the lot past the last row, and the end spot in each row stays open for that lane.
+- Yard traffic control covers the car too, and arriving trucks only appear once the yard is clear, so nothing queues on the short street.
