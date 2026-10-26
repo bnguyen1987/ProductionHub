@@ -19,8 +19,11 @@ Extract the order details. Dimensions in inches as decimals. Spec sheets often w
 Box dimensions are inside Length x Width x Depth.
 Die line drawings (e.g. Esko/ArtiosCAD, ".ARD") list "Blank width" x "Blank height": use those as sheet width x length. "Pieces Per: 4 OUT" is number_up.
 "Rules per inches", "Rule inches", "Total rule" or "Knife length" is the inches of cutting rule on the die: put it in rule_in. A die line with no box style given is "Die Cut".
+Style codes: RSC, HSC, FOL, DST (tray style the plant runs on its folder-gluers), "Tube" (scored tube / sleeve). Anything else that is cut on a die is "Die Cut":
+mailers, roll end tuck front (RETF), tuck tops, die-cut trays, pizza boxes, inserts, "w/ DFs" (dust flaps), FEFCO 04xx/02xx die cut styles, ArtiosCAD/Esko styles that are not plain RSC/HSC/FOL.
+hand_holes is true if the drawing or quote shows hand holes / handholds / hand cutouts.
 Return strict JSON only, no markdown fences, no commentary:
-{"customer":string|null,"part_or_design":string|null,"style":"RSC|HSC|FOL|Die Cut|Sheet|Other"|null,
+{"customer":string|null,"part_or_design":string|null,"style":"RSC|HSC|FOL|DST|Tube|Die Cut|Sheet|Other"|null,"hand_holes":boolean,
 "box_length_in":number|null,"box_width_in":number|null,"box_depth_in":number|null,
 "sheet_width_in":number|null,"sheet_length_in":number|null,
 "flute":"E|B|C|BC|A|SF"|null,"grade":string|null,"colors":number|null,"quantity":number|null,"number_up":number|null,

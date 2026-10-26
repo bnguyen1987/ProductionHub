@@ -1,9 +1,10 @@
 import { $, $$, esc, api, fileToPayload, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
 import { checkAll, estimateBlank, runHours, slitterCheck, SPEC_REV } from './ordercalc.js';
 
-const STYLES = ['RSC', 'HSC', 'FOL', 'Die Cut', 'Sheet', 'Other'];
+const STYLES = ['RSC', 'HSC', 'FOL', 'DST', 'Tube', 'Die Cut', 'Sheet', 'Other'];
+const STYLE_LABEL = { Tube: 'Scored tube' };
 const FLUTES = ['E', 'B', 'C', 'BC', 'A', 'SF'];
-const EMPTY = { customer: '', part: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '', colors: '0', qty: '', up: '1', rule: '', notes: '' };
+const EMPTY = { customer: '', part: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '', colors: '0', qty: '', up: '1', rule: '', handholes: '', notes: '' };
 let o;
 
 export function render(view) {
@@ -29,7 +30,7 @@ export function render(view) {
             <div class="field"><label>Part / design #</label><input type="text" data-f="part"></div>
           </div>
           <div class="lbl" style="margin:2px 0 6px">Style</div>
-          <div class="seg" id="oStyle" style="margin-bottom:12px">${STYLES.map((s) => `<button type="button" data-k="${s}">${s}</button>`).join('')}</div>
+          <div class="seg" id="oStyle" style="margin-bottom:12px">${STYLES.map((s) => `<button type="button" data-k="${s}">${STYLE_LABEL[s] || s}</button>`).join('')}</div>
           <div class="row" id="oBoxRow">
             <div class="field"><label>Box L (in)</label><input type="text" inputmode="decimal" data-f="L"></div>
             <div class="field"><label>Box W (in)</label><input type="text" inputmode="decimal" data-f="W"></div>
@@ -50,6 +51,7 @@ export function render(view) {
           </div>
           <div class="row">
             <div class="field"><label>Inches of rule (die)</label><input type="number" min="0" step="any" data-f="rule" placeholder="from die line, e.g. 866.82"></div>
+            <div class="field"><label>Hand holes</label><select data-f="handholes"><option value="">No</option><option value="yes">Yes</option></select></div>
             <div class="field" style="flex:2"><label>Notes</label><input type="text" data-f="notes" placeholder="anything special"></div>
           </div>
           <div class="btn-row" style="margin-top:12px"><button class="btn ghost" type="button" id="oReset">Start new order</button></div>
@@ -89,11 +91,11 @@ function run() {
     return;
   }
   const up = Math.max(1, parseInt(o.up, 10) || 1), qty = Math.max(0, Math.floor(+o.qty || 0));
-  const order = { sheetW, sheetL, flute: o.flute, colors: +o.colors || 0, L: L > 0 ? L : 0, W: W > 0 ? W : 0, D: D > 0 ? D : 0, style: o.style, up, qty, rule: Math.max(0, parseFloat(String(o.rule).replace(/,/g, '')) || 0) };
+  const order = { sheetW, sheetL, flute: o.flute, colors: +o.colors || 0, L: L > 0 ? L : 0, W: W > 0 ? W : 0, D: D > 0 ? D : 0, style: o.style, handholes: o.handholes === 'yes', up, qty, rule: Math.max(0, parseFloat(String(o.rule).replace(/,/g, '')) || 0) };
   const results = checkAll(order);
   const slit = slitterCheck(order);
   const pass = results.filter((r) => r.status === 'pass');
-  const warn = results.filter((r) => r.status === 'warn');
+  const warn = results.filter((r) => r.status === 'warn' && !r.printOnly); // print-only (EMBA/McKinley) can't finish the job
   const best = pass[0] || warn[0];
   const verdict = pass.length
     ? `<div class="alert ok"><b>Yes, it can run.</b> Best fit: ${esc(pass[0].machine.name)}${pass.length > 1 ? ` (${pass.length} machines qualify)` : ''}.</div>`
@@ -117,7 +119,7 @@ function run() {
       return `<div class="mach ${r.status}">
         <div class="mach-head">
           <b>${esc(m.name)}</b>
-          <span class="pill ${r.status === 'pass' ? 'ok' : r.status === 'warn' ? 'warn' : 'bad'}">${r.status === 'pass' ? 'Can run' : r.status === 'warn' ? 'Check' : 'Cannot run'}</span>
+          <span class="pill ${r.status === 'pass' ? 'ok' : r.status === 'warn' ? 'warn' : 'bad'}">${r.status === 'pass' ? 'Can run' : r.printOnly ? 'Print only' : r.status === 'warn' ? 'Check' : 'Cannot run'}</span>
           ${isBest ? '<span class="pill star">Best fit</span>' : ''}
           <span class="meta">#${m.id} · crew ${esc(m.crewTxt)}${m.speed ? ` · ${fmtNum(m.speed)}/hr${m.speedEst ? ' (est.)' : ''}` : ''} · setup ${m.setup} min</span>
         </div>
@@ -152,7 +154,7 @@ async function readQuote(file) {
     o = {
       ...EMPTY,
       customer: r.customer || '', part: r.part_or_design || '',
-      style: STYLES.includes(r.style) ? r.style : (r.style ? 'Other' : 'RSC'),
+      style: STYLES.includes(r.style) ? r.style : (r.style ? 'Other' : 'RSC'), handholes: r.hand_holes ? 'yes' : '',
       L: num(r.box_length_in), W: num(r.box_width_in), D: num(r.box_depth_in),
       sheetW: num(r.sheet_width_in), sheetL: num(r.sheet_length_in),
       flute: FLUTES.includes(r.flute) ? r.flute : (r.flute === 'DW' ? 'BC' : 'C'),

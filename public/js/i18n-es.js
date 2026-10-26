@@ -19,6 +19,19 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Scored tube': 'Tubo marcado',
+  'Hand holes': 'Agarraderas',
+  'Print only': 'Solo impresión',
+  'Cannot do hand holes': 'No puede hacer agarraderas',
+  'DST runs depending on the size. Confirm with production': 'DST se corre según el tamaño. Confirme con producción',
+  'Scored tube OK': 'Tubo marcado OK',
+  'Not a style this machine runs. It only runs RSC, HSC, FOL, DST and scored tubes': 'No es un estilo que corra esta máquina. Solo corre RSC, HSC, FOL, DST y tubos marcados',
+  'Print only (depending on the size). Sheets go on to the next step after printing': 'Solo impresión (según el tamaño). Las láminas pasan al siguiente paso después de imprimir',
+  'Only runs RSC, HSC, FOL, DST and scored tubes. Nothing to print on this sheet': 'Solo corre RSC, HSC, FOL, DST y tubos marcados. No hay impresión en esta lámina',
+  'Cannot die cut. Can only print the sheets (depending on the size), then die cut on the Shanghai (rotary) or a Marumatsu': 'No puede suajar. Solo puede imprimir las láminas (según el tamaño); luego se suajan en la Shanghai (rotativo) o en una Marumatsu',
+  'Die cutter. Not the usual route for this style': 'Suajadora. No es la ruta normal para este estilo',
+  'No': 'No',
+  'Yes': 'Sí',
   'Start over': 'Empezar de nuevo',
   'Clear everything and start a new pallet?': '¿Borrar todo y empezar una tarima nueva?',
   'Speech bubble': 'Globo de diálogo',

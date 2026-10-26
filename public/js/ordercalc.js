@@ -60,6 +60,7 @@ export function checkMachine(m, o) {
   const fails = [], warns = [], oks = [];
   const { sheetW: w, sheetL: l } = o;
   const slotted = ['RSC', 'HSC', 'FOL'].includes(o.style);
+  const glued = slotted || o.style === 'DST' || o.style === 'Tube'; // styles that need a folder-gluer
 
   // Size
   {
@@ -84,6 +85,22 @@ export function checkMachine(m, o) {
   else if (colors > 0) oks.push(`${colors} color${colors > 1 ? 's' : ''} OK (max ${m.maxColor})`);
 
   // Style / routing
+  // EMBA / McKinley (FFG) run only RSC, HSC, FOL, DST (size permitting) and scored tubes; no die cutting, no hand holes
+  let printOnly = false;
+  if (m.type === 'FFG') {
+    if (o.handholes) fails.push('Cannot do hand holes');
+    if (o.style === 'DST') warns.push('DST runs depending on the size. Confirm with production');
+    else if (o.style === 'Tube') oks.push('Scored tube OK');
+    else if (o.style === 'Other') fails.push('Not a style this machine runs. It only runs RSC, HSC, FOL, DST and scored tubes');
+    else if (o.style === 'Sheet') {
+      if (colors > 0) { warns.push('Print only (depending on the size). Sheets go on to the next step after printing'); printOnly = true; }
+      else fails.push('Only runs RSC, HSC, FOL, DST and scored tubes. Nothing to print on this sheet');
+    }
+  }
+  if (glued && !slotted && m.type !== 'FFG') {
+    if (m.type === 'PRESS') warns.push('No folder-gluer. Joint must be glued or stitched separately');
+    if (m.type === 'FLATBED') warns.push('Die cutter. Not the usual route for this style');
+  }
   if (slotted) {
     if (m.type === 'PRESS') warns.push('No folder-gluer. Joint must be glued or stitched separately');
     if (m.type === 'FLATBED') warns.push('Die cutter. Not the usual route for a slotted box');
@@ -91,7 +108,7 @@ export function checkMachine(m, o) {
   // Die cutting: EMBA/McKinley can't die cut (print only); Shanghai = rotary die only; Jumbo = partial cuts only (hand holes)
   if (o.style === 'Die Cut') {
     if (m.dieCut === 'none') {
-      if (colors > 0) warns.push('Cannot die cut. Can only print the sheets, then die cut on the Shanghai (rotary) or a Marumatsu');
+      if (colors > 0) { warns.push('Cannot die cut. Can only print the sheets (depending on the size), then die cut on the Shanghai (rotary) or a Marumatsu'); printOnly = true; }
       else fails.push('Cannot die cut, and there is no print for it to do');
     } else if (m.dieCut === 'partial') warns.push('Partial die cuts only (hand holes, vents). Cannot do a full die cut');
     else if (m.dieCut === 'rotary') oks.push('Die cut must be a rotary die (rotary die board)');
@@ -127,7 +144,7 @@ export function checkMachine(m, o) {
   }
 
   const status = fails.length ? 'fail' : warns.length ? 'warn' : 'pass';
-  return { machine: m, status, fails, warns, oks };
+  return { machine: m, status, fails, warns, oks, printOnly: printOnly && !fails.length };
 }
 
 // Pass first, then warn, then fail. Within a group: faster, then smaller crew.
