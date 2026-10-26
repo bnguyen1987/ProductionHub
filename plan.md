@@ -197,3 +197,5 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
   - Forklift drivers: "Wey!" and "Hotwheels"
   - On the floor: "Common sense, my friend", "BRIAN!", "No Mercy", "No sirve la máquina", "Una consulta"
 - The bubbles follow people as they move, hide when off-screen, and don't open machine cards. The sayings stay exactly as written in both languages.
+
+- Speech bubbles removed (Oct 26).
