@@ -19,6 +19,10 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'The sheet size above is': 'El tamaño de lámina de arriba es',
+  'One piece': 'Una pieza',
+  'The whole sheet': 'La lámina completa',
+  'Piece (blank)': 'Pieza (blank)',
   'Scored tube': 'Tubo marcado',
   'Hand holes': 'Agarraderas',
   'Print only': 'Solo impresión',
@@ -439,6 +443,8 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^Fits only if the sheet is turned 90° \((.+)\)\. This changes the grain direction\. Confirm with the supervisor$/, 'Solo cabe si se gira la lámina 90° ($1). Esto cambia la dirección de la flauta. Confirme con el supervisor'],
+  [/^(\d+)-up laid out (\d+) across × (\d+) along: sheet (.+)$/, '$1 salidas acomodadas $2 a lo ancho × $3 a lo largo: lámina $4'],
   // machine specs tab
   [/^Machine Specs$/, 'Especificaciones de máquinas'],
   [/^Sizes, colors, die cut limits, crew and speed for each machine\. From the machine spec sheets \((.+)\)\.$/, 'Tamaños, colores, límites de suajado, personal y velocidad de cada máquina. De las hojas de especificación ($1).'],

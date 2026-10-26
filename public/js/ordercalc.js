@@ -67,10 +67,12 @@ export function checkMachine(m, o) {
     const wOk = inRange(w, m.minW, m.maxW), lOk = inRange(l, m.minL, m.maxL);
     if (wOk && lOk) oks.push(`Sheet ${fmt(w)} × ${fmt(l)} fits (${fmt(m.minW)}–${fmt(m.maxW)} × ${fmt(m.minL)}–${fmt(m.maxL)})`);
     else if (lOk && m.skipFeedMaxW && inRange(w, m.minW, m.skipFeedMaxW)) warns.push(`Width ${fmt(w)} is over ${fmt(m.maxW)}. Only runs with skip-feed (up to ${fmt(m.skipFeedMaxW)})`);
-    else {
+    else if (inRange(l, m.minW, m.maxW) && inRange(w, m.minL, m.maxL)) {
+      // fits only when turned: a "Check", since turning changes the grain (flute) direction through the machine
+      warns.push(`Fits only if the sheet is turned 90° (${fmt(l)} × ${fmt(w)}). This changes the grain direction. Confirm with the supervisor`);
+    } else {
       if (!wOk) fails.push(`Sheet width ${fmt(w)} is outside ${fmt(m.minW)}–${fmt(m.maxW)}`);
       if (!lOk) fails.push(`Sheet length ${fmt(l)} is outside ${fmt(m.minL)}–${fmt(m.maxL)}`);
-      if (inRange(l, m.minW, m.maxW) && inRange(w, m.minL, m.maxL)) warns.push('Would fit if the sheet is turned 90°. Confirm feed direction with the supervisor');
     }
   }
 
@@ -148,9 +150,26 @@ export function checkMachine(m, o) {
 }
 
 // Pass first, then warn, then fail. Within a group: faster, then smaller crew.
+// Ways to lay out N pieces on one sheet: [across the width, along the length]
+export function layoutsFor(up) { const r = []; for (let a = 1; a <= up; a++) if (up % a === 0) r.push([a, up / a]); return r; }
+
+// order.upMode === 'piece' with up > 1: the size entered is one piece, so each machine tries every layout of the
+// pieces on a sheet and keeps the one that suits it best (no trim allowance between pieces is added).
 export function checkAll(order) {
   const rank = { pass: 0, warn: 1, fail: 2 };
-  return MACHINES.map((m) => checkMachine(m, order))
+  const multi = order.upMode === 'piece' && order.up > 1 && order.sheetW > 0 && order.sheetL > 0;
+  return MACHINES.map((m) => {
+    if (!multi) return checkMachine(m, order);
+    let best = null;
+    for (const [nx, ny] of layoutsFor(order.up)) {
+      const w = order.sheetW * nx, l = order.sheetL * ny;
+      const r = checkMachine(m, { ...order, sheetW: w, sheetL: l });
+      const score = rank[r.status] * 1000 + r.fails.length * 100 + r.warns.length * 10 + Math.abs(w - l) / 100;
+      if (!best || score < best.score) best = { ...r, score, layout: { nx, ny, w, l } };
+    }
+    best.oks.unshift(`${order.up}-up laid out ${best.layout.nx} across × ${best.layout.ny} along: sheet ${fmt(best.layout.w)} × ${fmt(best.layout.l)}`);
+    return best;
+  })
     .sort((a, b) => rank[a.status] - rank[b.status] || b.machine.speed - a.machine.speed || a.machine.crew - b.machine.crew);
 }
 

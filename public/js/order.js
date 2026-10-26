@@ -4,7 +4,7 @@ import { checkAll, estimateBlank, runHours, slitterCheck, SPEC_REV } from './ord
 const STYLES = ['RSC', 'HSC', 'FOL', 'DST', 'Tube', 'Die Cut', 'Sheet', 'Other'];
 const STYLE_LABEL = { Tube: 'Scored tube' };
 const FLUTES = ['E', 'B', 'C', 'BC', 'A', 'SF'];
-const EMPTY = { customer: '', part: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '', colors: '0', qty: '', up: '1', rule: '', handholes: '', notes: '' };
+const EMPTY = { customer: '', part: '', style: 'RSC', L: '', W: '', D: '', sheetW: '', sheetL: '', flute: 'C', grade: '', colors: '0', qty: '', up: '1', rule: '', handholes: '', upMode: 'piece', notes: '' };
 let o;
 
 export function render(view) {
@@ -49,6 +49,10 @@ export function render(view) {
             <div class="field"><label>Number up</label><input type="number" min="1" step="1" data-f="up"></div>
             <div class="field"><label>Quantity</label><input type="number" min="0" step="1" data-f="qty"></div>
           </div>
+          <div id="oUpMode" class="hidden" style="margin:0 0 12px">
+            <div class="lbl" style="margin:2px 0 6px">The sheet size above is</div>
+            <div class="seg" id="oUpSeg"><button type="button" data-k="piece">One piece</button><button type="button" data-k="sheet">The whole sheet</button></div>
+          </div>
           <div class="row">
             <div class="field"><label>Inches of rule (die)</label><input type="number" min="0" step="any" data-f="rule" placeholder="from die line, e.g. 866.82"></div>
             <div class="field"><label>Hand holes</label><select data-f="handholes"><option value="">No</option><option value="yes">Yes</option></select></div>
@@ -65,6 +69,7 @@ export function render(view) {
   $$('[data-f]', view).forEach((el) => { el.value = o[el.dataset.f]; el.addEventListener('input', () => { o[el.dataset.f] = el.value; run(); }); });
   $$('#oStyle button').forEach((b) => b.addEventListener('click', () => { o.style = b.dataset.k; run(); }));
   $$('#oFlute button').forEach((b) => b.addEventListener('click', () => { o.flute = b.dataset.k; run(); }));
+  $$('#oUpSeg button').forEach((b) => b.addEventListener('click', () => { o.upMode = b.dataset.k; run(); }));
   $('#oReset').addEventListener('click', () => { o = { ...EMPTY }; $$('[data-f]').forEach((el) => (el.value = o[el.dataset.f])); $('#oAiMsg').innerHTML = ''; $('#oFile').classList.add('hidden'); run(); });
   setupDrop($('#oDrop'), readQuote);
   run();
@@ -75,6 +80,9 @@ function run() {
   $$('#oStyle button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === o.style)));
   $$('#oFlute button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === o.flute)));
   $('#oBoxRow').classList.toggle('hidden', o.style === 'Sheet');
+  const upN = Math.max(1, parseInt(o.up, 10) || 1);
+  $('#oUpMode').classList.toggle('hidden', upN < 2);
+  $$('#oUpSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === (o.upMode || 'piece'))));
 
   const L = parseInches(o.L), W = parseInches(o.W), D = parseInches(o.D);
   let sheetW = parseInches(o.sheetW), sheetL = parseInches(o.sheetL);
@@ -91,9 +99,9 @@ function run() {
     return;
   }
   const up = Math.max(1, parseInt(o.up, 10) || 1), qty = Math.max(0, Math.floor(+o.qty || 0));
-  const order = { sheetW, sheetL, flute: o.flute, colors: +o.colors || 0, L: L > 0 ? L : 0, W: W > 0 ? W : 0, D: D > 0 ? D : 0, style: o.style, handholes: o.handholes === 'yes', up, qty, rule: Math.max(0, parseFloat(String(o.rule).replace(/,/g, '')) || 0) };
+  const order = { sheetW, sheetL, upMode: o.upMode || 'piece', flute: o.flute, colors: +o.colors || 0, L: L > 0 ? L : 0, W: W > 0 ? W : 0, D: D > 0 ? D : 0, style: o.style, handholes: o.handholes === 'yes', up, qty, rule: Math.max(0, parseFloat(String(o.rule).replace(/,/g, '')) || 0) };
   const results = checkAll(order);
-  const slit = slitterCheck(order);
+  const slit = slitterCheck(order.upMode === 'piece' && up > 1 ? { ...order, up: 1 } : order);
   const pass = results.filter((r) => r.status === 'pass');
   const warn = results.filter((r) => r.status === 'warn' && !r.printOnly); // print-only (EMBA/McKinley) can't finish the job
   const best = pass[0] || warn[0];
@@ -106,7 +114,7 @@ function run() {
   box.innerHTML = `<h2>Can we run it?</h2>
     ${verdict}
     ${slit ? `<div class="alert info" style="margin-top:10px"><b>Small order:</b> about ${fmtNum(slit.sqft)} sq ft, under 2,000 sq ft. Policy: run it on the slitter from stock sheets${slit.fits.length ? ` (${slit.fits.map((s) => `#${s.id} ${esc(s.name)}`).join(' or ')})` : ''}.${slit.under12 ? ' Anything under 12" goes to the bandsaw.' : slit.fits.length ? '' : ' Sheet is over the slitter limits (80" × 142").'} Check the Stock Sheet tab for a sheet to cut from.</div>` : ''}    <dl class="kv" style="margin:12px 0">
-      <dt>Sheet</dt><dd>${fmtIn(sheetW)} × ${fmtIn(sheetL)}${estimated ? ' <span class="pill warn">estimated</span>' : ''}</dd>
+      <dt>${up > 1 && (o.upMode || 'piece') === 'piece' ? 'Piece (blank)' : 'Sheet'}</dt><dd>${fmtIn(sheetW)} × ${fmtIn(sheetL)}${up > 1 ? ` · ${up}-up` : ''}${estimated ? ' <span class="pill warn">estimated</span>' : ''}</dd>
       <dt>Flute / colors</dt><dd>${esc(o.flute || '–')} · ${+o.colors ? esc(o.colors) + ' color' : 'no print'}</dd>
       ${+o.qty ? `<dt>Quantity</dt><dd>${fmtNum(+o.qty)}</dd>` : ''}
       ${best && qty ? `<dt>Run time</dt><dd><b>${dur(runHours(best.machine, qty, up))}</b> on ${esc(best.machine.name)}</dd>` : ''}
