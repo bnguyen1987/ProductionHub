@@ -103,15 +103,6 @@ export function render(v) {
           <div class="lbl" style="margin:8px 0 6px">Text boxes in the detail box (up to 4, side by side)</div>
           <div id="lDetTexts" class="det-texts"></div>
           <button type="button" class="btn small" id="lDetTextAdd" style="margin-top:6px">+ Add text box</button>
-          <div class="field" style="margin-top:10px"><label>Changes from the old sheet (one per line, kept with the layout, not printed)</label><textarea data-l="changes" rows="4"></textarea></div>
-          <div class="btn-row" style="margin-top:8px"><button type="button" class="btn small" id="lEdits">Add my edits to the changes</button><span class="hint" id="lEditsMsg"></span></div>
-          <div class="row" style="margin-top:12px">
-            <div class="field"><label>Original date</label><input type="text" data-l="origDate"></div>
-            <div class="field"><label>Revised</label><input type="text" data-l="revDate"></div>
-            <div class="field"><label>Sales</label><input type="text" data-l="sales"></div>
-            <div class="field"><label>Designer</label><input type="text" data-l="designer"></div>
-            <div class="field"><label>Approved by</label><input type="text" data-l="approved"></div>
-          </div>
         </section>
         </div>
         <div class="stack">
@@ -144,7 +135,6 @@ export function render(v) {
   $('#lAddPlate').onclick = () => addItem({ kind: 'plate', panel: L.printPanels[0] || 1, start: '', width: '', text: '', flip: false });
   $('#lAddBmc').onclick = () => addItem({ kind: 'bmc', panel: L.printPanels[0] || 1, start: mid(), ...bmcFromBoard(L.board), flip: false });
   $('#lAddText').onclick = () => addItem({ kind: 'text', panel: 1, start: mid(), text: '', size: 'M', flip: false });
-  $('#lEdits').onclick = addEdits;
   $('#lDetTextAdd').onclick = () => { if (L.detailTexts.length >= 4) return alert('The detail box holds up to 4 text boxes.'); L.detailTexts.push(''); paintDetails(); update(); const t = $$('#lDetTexts textarea').pop(); if (t) t.focus(); };
   $('#lDetLogos').onchange = (e) => { L.detailLogos = e.target.checked; update(); };
   $('#lDetAdd').onchange = (e) => { const f0 = e.target.files[0]; e.target.value = ''; if (f0) addDetail(f0); };
@@ -632,25 +622,6 @@ async function readLayout(input) {
   }
 }
 
-function addEdits() {
-  const o = L.orig;
-  const out = $('#lEditsMsg');
-  if (!o) { out.textContent = 'Upload an old layout first. Edits are compared to what was read from it.'; return; }
-  const have = list(L.changes.replace(/\n/g, ';'));
-  const lines = [];
-  for (const [k, t] of TRACK) {
-    const a = String(o[k] || '').trim(), b = String(L[k] || '').trim();
-    if (a === b) continue;
-    const pretty = (s) => (k.endsWith('Panels') ? list(s).map(show).join(' | ') : s) || 'blank';
-    const line = k.endsWith('Panels') ? `${t} updated to ${pretty(b)} (old sheet: ${pretty(a)})` : `${t} updated: ${pretty(a)} -> ${pretty(b)}`;
-    if (!L.changes.includes(line)) lines.push(line);
-  }
-  if (!lines.length) { out.textContent = have.length ? 'No new edits to add.' : 'Nothing changed from the old sheet yet.'; return; }
-  L.changes = (L.changes.trim() ? L.changes.trim() + '\n' : '') + lines.join('\n');
-  $('[data-l="changes"]').value = L.changes;
-  out.textContent = `Added ${lines.length} line${lines.length > 1 ? 's' : ''}.`;
-  update();
-}
 
 // ---- the sheet ----
 function sheetHtml(d, selIdx = -1, opt = {}) {
@@ -682,7 +653,6 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
         ${pics.length ? `<div class="ls-pics">${pics.map((x) => `<figure><img src="${x.img}" alt=""><figcaption>${esc(x.caption)}</figcaption></figure>`).join('')}</div>` : '<div class="ls-empty ls-nopic">No close-up yet. Add one under "Print detail box", or add a logo to a plate.</div>'}
         <div class="ls-dtexts">${dtexts.map((o) => `<div class="ls-dtext" data-edit="dtext:${o.k}">${esc(o.x).replace(/\n/g, '<br>')}</div>`).join('')}${allT.length < 4 ? '<div class="ls-dtext ls-dnew" data-edit="dtext:new"><span class="ls-add">+ add text box</span></div>' : ''}</div></div>
     </div>
-    <div class="ls-foot">${[['ORIGINAL DATE', d.origDate, 'origDate'], ['REVISED', d.revDate, 'revDate'], ['SALES', d.sales, 'sales'], ['DESIGNER', d.designer, 'designer'], ['APPROVED BY', d.approved, 'approved']].map(([t, v, k]) => `<div data-edit="${k}"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`).join('')}</div>
   </div>`;
 }
 
@@ -864,7 +834,7 @@ function wrap(s, n) {
 // measure the sheet as it prints, then give the spare height to the drawing (and the rest to the bottom boxes).
 // A sheet that is too tall is scaled down instead.
 function printSheet() {
-  const AVAIL = 736;
+  const AVAIL = 740;
   const measure = (o) => {
     const m = document.createElement('div');
     m.style.cssText = 'position:absolute;left:-10000px;top:0;width:1000px;visibility:hidden;font-size:12.5px;line-height:1.35;color:#000;background:#fff';
