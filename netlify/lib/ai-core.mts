@@ -57,11 +57,18 @@ Return strict JSON only, no markdown fences, no commentary:
 "style":string|null,"size":string|null,"board":string|null,"blank_width":string|null,"blank_length":string|null,
 "print":string|null,"routing":string|null,"view":"Outside|Inside"|null,
 "width_panels":[string],"length_panels":[string],"printed_panels":[number],
-"plates":[{"panel":number,"start_in":number,"width_in":number,"text":string,"upside_down":boolean,"source":{"file":number,"page":number,"box":[left,top,right,bottom]}|null}],
-"bmc":{"present":boolean,"test":"ECT|Mullen"|null,"wall":"single|double"|null,"value":number|null,"panel":number|null,"start_in":number|null,"upside_down":boolean,"written":string|null},
-"texts":[{"panel":number,"start_in":number,"text":string,"upside_down":boolean}],
+"plates":[{"panel":number,"length_panel":number|null,"align":"left|center|right","offset_in":number|null,"start_in":number|null,"width_in":number|null,"text":string,"upside_down":boolean,"source":{"file":number,"page":number,"box":[left,top,right,bottom]}|null}],
+"bmc":{"present":boolean,"test":"ECT|Mullen"|null,"wall":"single|double"|null,"value":number|null,"panel":number|null,"length_panel":number|null,"align":"left|center|right","start_in":number|null,"upside_down":boolean,"written":string|null,"extra_text":string|null},
+"texts":[{"panel":number,"length_panel":number|null,"align":"left|center|right","offset_in":number|null,"start_in":number|null,"text":string,"upside_down":boolean}],
 "notes":[string],"changes":[string],"original_date":string|null,"sales":string|null,"designer":string|null,
 "confidence":"high|medium|low","unclear":"one short sentence on anything you could not read, or empty"}
+POSITIONS (plates, texts, BMC): print layout drawings are usually hand drawn and NOT to scale, so never measure positions off the drawing.
+- panel = the width row it sits in (1 = top flap row, then body, then bottom flap).
+- length_panel = which length panel (column) it sits in, counted left to right in the SAME order as length_panels, where the glue flap (if listed) is 1. The print layout drawing often leaves the glue flap out: then its first column is length panel 2, its second column is length panel 3, and so on. Match columns by the score/slot lines drawn on the print layout and by panel size (long vs short panels) against the measurement drawing.
+- align = where it sits inside that panel as drawn: left, center or right. offset_in = a distance the sheet WRITES from that panel's score on the align side, else null.
+- start_in only if the sheet writes an exact distance from the left edge of the blank, else null. width_in only if written, else null.
+- Copy that is printed upside down on the drawing has upside_down true. Keep each text block's line breaks with \n.
+- For the BMC: extra_text = words written right beside the BMC (like the box size "54 X 10 X 10"); do not repeat those in texts.
 plate source: where that plate's logo/artwork is drawn on the uploaded pages, so the page can cut it out. file = attachment number (1 if only one), page = page number inside that attachment (1-based), box = a snug box around the logo or copy block (include its border if it has one) as fractions of that page's width/height from the top-left (0 to 1). Use null if the artwork is not shown.
 BMC = Box Maker's (Manufacturer's) Certificate stamp. It is often only a handwritten note like "BMC 32 ECT P2", "cert on flap", "200# cert" or a hand-drawn circle. Set bmc.present true when the sheet asks for one. Take test/value from the note; if the note gives none, use the board grade (200# = Mullen 200, ECT 32 = ECT 32); double wall for BC/DW board. panel/start_in only if the sheet shows where it goes, else null. written = the note word for word.
 texts: other short words the old sheet places ON the blank drawing that are not print plates (e.g. "THIS SIDE UP" marks or handwritten callouts that belong on a panel). Leave empty if none; general instructions go in notes.

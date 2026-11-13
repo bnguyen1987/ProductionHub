@@ -461,6 +461,22 @@ async function aiJob(body) {
   }
   throw new Error('The AI took too long. Try again.');
 }
+// Place an item from the AI by panel + alignment (hand-drawn layouts are not to scale).
+// Returns the start in inches from the left edge of the blank, or null to use the AI's start_in.
+function placeStart(src, wIn, lp) {
+  const lpN = parseInt(src && src.length_panel, 10);
+  if (!lp.length || !(lpN >= 1 && lpN <= lp.length)) return null;
+  const left = sum(lp.slice(0, lpN - 1)), len = lp[lpN - 1], right = left + len;
+  const w = Math.min(wIn, len);
+  const off = src.offset_in !== null && src.offset_in !== undefined && isFinite(+src.offset_in) ? +src.offset_in : null;
+  const m = Math.min(1.5, len * 0.08);
+  let s;
+  if (src.align === 'right') s = right - w - (off ?? m);
+  else if (src.align === 'center') s = left + (len - w) / 2;
+  else s = left + (off ?? m);
+  return Math.round(Math.max(left, Math.min(right - w, s)) * 16) / 16;
+}
+
 async function readLayout(input) {
   const files = (Array.isArray(input) ? input : [input]).slice(0, 4);
   const msg = $('#lAiMsg');
@@ -474,11 +490,20 @@ async function readLayout(input) {
     const str = (x) => (x === null || x === undefined ? '' : String(x).trim());
     const arr = (x) => (Array.isArray(x) ? x : []);
     const n = arr(r.width_panels).length;
-    const texts = arr(r.texts).filter((x) => x && str(x.text) && isFinite(+x.start_in)).map((x) => ({ kind: 'text', panel: Math.max(1, parseInt(x.panel, 10) || 1), start: fx(+x.start_in), text: str(x.text), size: 'M', flip: !!x.upside_down }));
-    const plates = arr(r.plates).map((p, k) => ({
-      panel: Math.max(1, parseInt(p.panel, 10) || 1), start: isFinite(+p.start_in) && p.start_in !== null ? fx(+p.start_in) : '',
-      width: isFinite(+p.width_in) && p.width_in ? fx(+p.width_in) : '', text: str(p.text), flip: !!p.upside_down, kind: 'plate', _ai: k,
-    }));
+    const lp = arr(r.length_panels).map(pin).filter((v) => isFinite(v) && v > 0);
+    const totL = lp.length ? sum(lp) : pin(r.blank_length);
+    const pxIn = isFinite(totL) && totL > 0 ? 786 / totL : 6; // drawing scale (x1 - x0 = 786)
+    const textIn = (txt, fs = 11) => (Math.max(1, ...String(txt || 'TEXT').split('\n').map((x) => x.trim().length)) * fs * 0.6 + 6) / pxIn;
+    const startOf = (src, wIn) => { const ps = placeStart(src, wIn, lp); return ps !== null ? fx(ps) : src && src.start_in !== null && src.start_in !== undefined && isFinite(+src.start_in) ? fx(+src.start_in) : ''; };
+    const plates = arr(r.plates).map((p, k) => {
+      const lpN = parseInt(p.length_panel, 10), seg = lpN >= 1 && lpN <= lp.length ? lp[lpN - 1] : 0;
+      const wIn = isFinite(+p.width_in) && +p.width_in > 0 ? +p.width_in : seg ? Math.min(seg * 0.6, 12) : 0;
+      return {
+        panel: Math.max(1, parseInt(p.panel, 10) || 1), start: startOf(p, wIn || 10),
+        width: wIn ? fx(wIn) : '', text: str(p.text), flip: !!p.upside_down, kind: 'plate', _ai: k,
+      };
+    });
+    const texts = arr(r.texts).filter((x) => x && str(x.text)).map((x) => ({ kind: 'text', panel: Math.max(1, parseInt(x.panel, 10) || 1), start: startOf(x, textIn(x.text)), text: str(x.text).split('\n').map((y) => y.trim()).filter(Boolean).join('\n'), size: 'M', flip: !!x.upside_down })).filter((x) => x.start !== '');
     let pp = arr(r.printed_panels).map((x) => parseInt(x, 10)).filter((x) => x >= 1 && (!n || x <= n));
     if (!pp.length) pp = [...new Set(plates.map((p) => p.panel))].sort((a, b) => a - b);
     L = {
@@ -497,14 +522,19 @@ async function readLayout(input) {
       const def = bmcFromBoard(L.board);
       const tst = /mullen|burst/i.test(bm.test || '') ? 'Mullen' : /ect/i.test(bm.test || '') ? 'ECT' : def.test;
       const wall = /double/i.test(bm.wall || '') ? 'double' : /single/i.test(bm.wall || '') ? 'single' : def.wall;
-      const lp = nums(L.lengthPanels), tl = lp.length ? sum(lp) : pin(L.blankL);
-      const hasPos = bm.start_in !== null && bm.start_in !== undefined && isFinite(+bm.start_in);
+      const tl = lp.length ? sum(lp) : pin(L.blankL);
+      const bmcIn = 46 / pxIn;
+      const ps = placeStart(bm, bmcIn, lp);
+      const hasPos = ps !== null || (bm.start_in !== null && bm.start_in !== undefined && isFinite(+bm.start_in));
       const bp = parseInt(bm.panel, 10);
       const panel = bp >= 1 && (!n || bp <= n) ? bp : (Array.from({ length: n || 1 }, (_, k) => k + 1).find((k) => !pp.includes(k)) || 1);
-      L.plates.push({ kind: 'bmc', panel, start: hasPos ? fx(+bm.start_in) : fx(Math.max(0, (isFinite(tl) ? tl : 60) / 2 - 3)), test: tst, wall, rating: String(parseInt(bm.value, 10) || def.rating), flip: !!bm.upside_down });
+      const bStart = ps !== null ? ps : hasPos ? +bm.start_in : Math.max(0, (isFinite(tl) ? tl : 60) / 2 - 3);
+      const extra = str(bm.extra_text);
+      L.plates.push({ kind: 'bmc', panel, start: fx(bStart), test: tst, wall, rating: String(parseInt(bm.value, 10) || def.rating), flip: !!bm.upside_down, nodim: !!extra });
+      if (extra) L.plates.push({ kind: 'text', panel, start: fx(Math.round((bStart + 56 / pxIn) * 16) / 16), text: extra, size: 'M', flip: !!bm.upside_down });
       const line = `Handwritten BMC note converted to a BMC stamp${bm.written ? ` (old sheet: "${str(bm.written)}")` : ''}.`;
       L.changes = (L.changes ? L.changes + '\n' : '') + line;
-      bmcMsg = ` <br>Found a BMC note and made a stamp (${esc(bmcLabel(L.plates[L.plates.length - 1]))}).${hasPos && bm.panel ? '' : ' Its spot was not on the sheet, so it is in the middle of a panel. Move it if needed.'}`;
+      bmcMsg = ` <br>Found a BMC note and made a stamp (${esc(bmcLabel(L.plates.find((x) => x.kind === 'bmc')))}).${hasPos && bm.panel ? '' : ' Its spot was not on the sheet, so it is in the middle of a panel. Move it if needed.'}`;
     }
     L.orig = Object.fromEntries(TRACK.map(([k]) => [k, L[k]]));
     fill();
