@@ -8,7 +8,7 @@ const today = () => { const d = new Date(); return `${String(d.getMonth() + 1).p
 const EMPTY = () => ({
   id: '', customer: '', shipTo: '', fileNo: '', specNo: '', design: '', ident: '', style: '', size: '', board: '',
   blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
-  printPanels: [], plates: [], notes: '', changes: '', origDate: '', revDate: today(), sales: '', designer: '', approved: '', orig: null,
+  printPanels: [], plates: [], notes: '', changes: '', detailText: '', details: [], detailLogos: true, origDate: '', revDate: today(), sales: '', designer: '', approved: '', orig: null,
 });
 const INFO = [
   ['customer', 'Customer'], ['shipTo', 'Ship to'], ['fileNo', 'File #'], ['specNo', 'Spec #'],
@@ -96,7 +96,12 @@ export function render(v) {
         <section class="card">
           <h2><span class="n">4</span>Notes and changes</h2>
           <div class="field"><label>Print and production notes (one per line)</label><textarea data-l="notes" rows="5"></textarea></div>
-          <div class="field" style="margin-top:10px"><label>Changes from the old sheet (one per line)</label><textarea data-l="changes" rows="4"></textarea></div>
+          <div class="lbl" style="margin:12px 0 6px">Print detail box <span class="hint" style="font-weight:500">close-ups of the logo / print for the operator</span></div>
+          <label class="chk" style="margin-bottom:6px"><input type="checkbox" id="lDetLogos"> Show the plate logos zoomed in</label>
+          <div id="lDetPics" class="det-pics"></div>
+          <label class="btn small" style="margin:6px 0">+ Add close-up picture<input type="file" accept="image/*" hidden id="lDetAdd"></label>
+          <div class="field"><label>Text in the detail box</label><textarea data-l="detailText" rows="3" placeholder="e.g. Logo must be centered. Match PMS black. Check registration."></textarea></div>
+          <div class="field" style="margin-top:10px"><label>Changes from the old sheet (one per line, kept with the layout, not printed)</label><textarea data-l="changes" rows="4"></textarea></div>
           <div class="btn-row" style="margin-top:8px"><button type="button" class="btn small" id="lEdits">Add my edits to the changes</button><span class="hint" id="lEditsMsg"></span></div>
           <div class="row" style="margin-top:12px">
             <div class="field"><label>Original date</label><input type="text" data-l="origDate"></div>
@@ -138,6 +143,8 @@ export function render(v) {
   $('#lAddBmc').onclick = () => addItem({ kind: 'bmc', panel: L.printPanels[0] || 1, start: mid(), ...bmcFromBoard(L.board), flip: false });
   $('#lAddText').onclick = () => addItem({ kind: 'text', panel: 1, start: mid(), text: '', size: 'M', flip: false });
   $('#lEdits').onclick = addEdits;
+  $('#lDetLogos').onchange = (e) => { L.detailLogos = e.target.checked; update(); };
+  $('#lDetAdd').onchange = (e) => { const f0 = e.target.files[0]; e.target.value = ''; if (f0) addDetail(f0); };
   $('#lPrint').onclick = printSheet;
   $('#lSave').onclick = save;
   $('#lNew').onclick = () => { if (!confirm('Clear this layout and start over?')) return; L = EMPTY(); sel = -1; undo = null; fill(); $('#lAiMsg').innerHTML = ''; $('#lSaveMsg').innerHTML = ''; };
@@ -211,6 +218,10 @@ function paintSelBar() {
 
 function fill() {
   $$('[data-l]', view).forEach((el) => { el.value = L[el.dataset.l] ?? ''; });
+  if (!Array.isArray(L.details)) L.details = [];
+  if (L.detailLogos === undefined) L.detailLogos = true;
+  $('#lDetLogos').checked = !!L.detailLogos;
+  paintDetails();
   paintPlates();
   update();
 }
@@ -326,6 +337,23 @@ function toLogo(src, sx, sy, sw, sh, flip = false) {
   g.drawImage(src, sx, sy, sw, sh, 0, 0, c.width, c.height);
   return c.toDataURL('image/jpeg', 0.85);
 }
+function paintDetails() {
+  const box = $('#lDetPics');
+  if (!box) return;
+  box.innerHTML = L.details.map((d, i) => `<div class="det-pic"><img src="${d.img}" alt="Close-up"><input type="text" data-dcap="${i}" value="${esc(d.caption || '')}" placeholder="Caption (optional)"><button type="button" class="btn small ghost danger" data-drm="${i}" aria-label="Remove picture">✕</button></div>`).join('');
+  $$('[data-drm]', box).forEach((b) => b.onclick = () => { L.details.splice(+b.dataset.drm, 1); paintDetails(); update(); });
+  $$('[data-dcap]', box).forEach((inp) => inp.oninput = () => { L.details[+inp.dataset.dcap].caption = inp.value; update(); });
+}
+async function addDetail(file) {
+  try {
+    if (!file.type.startsWith('image/')) throw new Error('Pick a picture (JPG or PNG) of the logo.');
+    if (L.details.length >= 3) throw new Error('The detail box holds up to 3 pictures. Remove one first.');
+    const c = await pageCanvas(file, 1, 1400);
+    L.details.push({ img: toLogo(c, 0, 0, c.width, c.height, false), caption: '' });
+    paintDetails(); update();
+  } catch (e) { alert(e.message); }
+}
+
 async function addImage(i, file) {
   const p = L.plates[i];
   if (!p) return;
@@ -360,7 +388,7 @@ async function cutLogos(files, aiPlates) {
 
 // ---- edit text right on the sheet ----
 const LABELS = { customer: 'Customer', shipTo: 'Ship to', fileNo: 'File #', design: 'Design no.', ident: 'Ident', style: 'Style', size: 'Size (L × W × D)', board: 'Board / flute',
-  blank: 'Blank size (width x length)', print: 'Print / ink', routing: 'Routing', view: 'View', origDate: 'Original date', revDate: 'Revised', sales: 'Sales', designer: 'Designer', approved: 'Approved by' };
+  blank: 'Blank size (width x length)', detailText: 'Text in the detail box', print: 'Print / ink', routing: 'Routing', view: 'View', origDate: 'Original date', revDate: 'Revised', sales: 'Sales', designer: 'Designer', approved: 'Approved by' };
 function editValue(key) {
   if (key === 'blank') return L.blankW || L.blankL ? `${show(L.blankW)} x ${show(L.blankL)}` : '';
   const [k, i] = key.split(':');
@@ -385,8 +413,8 @@ function openEditor(key, anchor) {
   const card = $('.lay-preview'), cr = card.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
   const [k, i] = key.split(':');
   const label = k === 'notes' ? (i === 'new' ? 'New note' : 'Note ' + (+i + 1)) : k === 'changes' ? (i === 'new' ? 'New change' : 'Change line') : k === 'item' ? ((L.plates[+i] || {}).kind === 'text' ? 'Text' : 'Copy on the plate') : LABELS[key] || key;
-  const multi = k === 'item'; // text items and plate copy can have several lines
-  const long = multi || k === 'notes' || k === 'changes' || key === 'customer' || key === 'shipTo';
+  const multi = k === 'item' || key === 'detailText'; // text items and plate copy can have several lines
+  const long = multi || key === 'detailText' || k === 'notes' || k === 'changes' || key === 'customer' || key === 'shipTo';
   const box = document.createElement('div');
   box.className = 'sheet-editor';
   box.innerHTML = `<div class="lbl">${esc(label)}</div>${long ? '<textarea rows="3"></textarea>' : '<input type="text">'}${multi ? '<div class="hint">Enter = new line. Save when done.</div>' : ''}
@@ -577,6 +605,11 @@ function sheetHtml(d, selIdx = -1) {
   const cell = (t, v, k) => `<div class="ls-cell" data-edit="${k}"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`;
   const blank = d.blankW || d.blankL ? `${show(d.blankW) || '?'} x ${show(d.blankL) || '?'}` : '';
   const notes = d.notes.split('\n').map((x) => x.trim()).filter(Boolean);
+  // close-ups: plate logos (once each) + pictures added for the detail box, at most 3
+  const seen = new Set(), pics = [];
+  if (d.detailLogos !== false) (d.plates || []).forEach((p) => { if (p.kind === 'plate' && p.img && !seen.has(p.img)) { seen.add(p.img); pics.push({ img: p.img, caption: `P${p.panel}${p.text ? ' · ' + String(p.text).split('\n')[0] : ''}` }); } });
+  (d.details || []).forEach((x) => x && x.img && pics.push({ img: x.img, caption: x.caption || '' }));
+  pics.splice(3);
   const changes = d.changes.split('\n').map((x) => x.trim().replace(/^[-•]\s*/, '')).filter(Boolean);
   const head2 = [d.specNo && `Spec # ${esc(d.specNo)}`, d.fileNo && `File # ${esc(d.fileNo)}`].filter(Boolean).join('&nbsp; | &nbsp;');
   return `<div class="lsheet">
@@ -591,7 +624,9 @@ function sheetHtml(d, selIdx = -1) {
     ${drawing(d, selIdx)}
     <div class="ls-boxes">
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
-      <div class="ls-box"><div class="ls-bh">REVISION - CHANGES${d.origDate ? ` FROM ${esc(d.origDate)} SHEET` : ''}</div><ul>${changes.map((x, k) => `<li data-edit="changes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="changes:new">+ add change</li></ul></div>
+      <div class="ls-box ls-detail"><div class="ls-bh">PRINT DETAIL (ZOOMED IN)</div>
+        ${pics.length ? `<div class="ls-pics">${pics.map((x) => `<figure><img src="${x.img}" alt=""><figcaption>${esc(x.caption)}</figcaption></figure>`).join('')}</div>` : '<div class="ls-empty ls-nopic">No close-up yet. Add one under "Print detail box", or add a logo to a plate.</div>'}
+        <div class="ls-dtext" data-edit="detailText">${esc(d.detailText || '').replace(/\n/g, '<br>') || '<span class="ls-add">+ add text</span>'}</div></div>
     </div>
     <div class="ls-foot">${[['ORIGINAL DATE', d.origDate, 'origDate'], ['REVISED', d.revDate, 'revDate'], ['SALES', d.sales, 'sales'], ['DESIGNER', d.designer, 'designer'], ['APPROVED BY', d.approved, 'approved']].map(([t, v, k]) => `<div data-edit="${k}"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`).join('')}</div>
   </div>`;

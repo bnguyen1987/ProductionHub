@@ -19,6 +19,16 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Print detail box': 'Recuadro de detalle de impresión',
+  'close-ups of the logo / print for the operator': 'acercamientos del logo / impresión para el operador',
+  'Show the plate logos zoomed in': 'Mostrar los logos de las placas en grande',
+  '+ Add close-up picture': '+ Agregar foto de cerca',
+  'Text in the detail box': 'Texto en el recuadro de detalle',
+  'e.g. Logo must be centered. Match PMS black. Check registration.': 'p. ej. El logo debe ir centrado. Igualar negro PMS. Revisar registro.',
+  'Changes from the old sheet (one per line, kept with the layout, not printed)': 'Cambios de la hoja vieja (uno por línea, se guardan pero no se imprimen)',
+  'Caption (optional)': 'Pie de foto (opcional)',
+  'Remove picture': 'Quitar foto',
+  'The detail box holds up to 3 pictures. Remove one first.': 'El recuadro lleva hasta 3 fotos. Quite una primero.',
   'Type anything (Enter = new line)': 'Escriba lo que sea (Enter = línea nueva)',
   'Enter = new line. Save when done.': 'Enter = línea nueva. Guarde al terminar.',
   'only the panels with a plate, BMC or text get shaded; a row picked here with nothing on it is shaded whole': 'solo se sombrean los paneles con placa, BMC o texto; una fila marcada aquí sin nada se sombrea completa',
