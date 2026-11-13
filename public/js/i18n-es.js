@@ -19,6 +19,8 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Undo the last change (Ctrl+Z)': 'Deshacer el último cambio (Ctrl+Z)',
+  '↶ Undo': '↶ Deshacer',
   'Auto': 'Auto',
   'Bigger text': 'Letra más grande',
   'Smaller text': 'Letra más chica',

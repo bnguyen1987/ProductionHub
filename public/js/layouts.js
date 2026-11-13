@@ -19,6 +19,30 @@ const INFO = [
 const TRACK = [['style', 'Style'], ['size', 'Size'], ['board', 'Board'], ['blankW', 'Blank width'], ['blankL', 'Blank length'], ['print', 'Print'], ['routing', 'Routing'], ['widthPanels', 'Panel scores'], ['lengthPanels', 'Length scores']];
 
 let L, view, saved = [], ro = null, sel = -1, undo = null, dragged = false;
+// Undo history: a snapshot after each change (quick changes in a row, like typing, count as one step).
+let hist = [], histLock = false, histT = 0;
+function snap() {
+  if (histLock) return;
+  const j = JSON.stringify({ ...L, orig: undefined });
+  if (hist.length && hist[hist.length - 1] === j) return;
+  const now = Date.now();
+  if (hist.length > 1 && now - histT < 700) hist[hist.length - 1] = j; else hist.push(j);
+  histT = now;
+  if (hist.length > 40) hist.shift();
+  const b = $('#lUndoAll'); if (b) b.disabled = hist.length < 2;
+}
+function undoLast() {
+  if (hist.length < 2) return;
+  hist.pop();
+  const prev = JSON.parse(hist[hist.length - 1]);
+  histLock = true;
+  L = { ...EMPTY(), ...prev, orig: L.orig };
+  sel = -1; undo = null;
+  fill();
+  histLock = false;
+  histT = 0;
+  const b = $('#lUndoAll'); if (b) b.disabled = hist.length < 2;
+}
 
 // ---- inches ----
 const pin = (s) => parseInches(String(s ?? '').replace(/["”]/g, '').trim());
@@ -87,6 +111,7 @@ export function render(v) {
             <button type="button" class="btn primary" id="lPrint">Print / save PDF</button>
             <input type="text" id="lName" placeholder="Your name" aria-label="Your name" style="max-width:170px">
             <button type="button" class="btn" id="lSave">Save</button>
+            <button type="button" class="btn" id="lUndoAll" disabled title="Undo the last change (Ctrl+Z)">↶ Undo</button>
             <button type="button" class="btn ghost" id="lNew">Start over</button>
           </div>
           <div id="lSaveMsg" style="margin-top:8px"></div>
@@ -150,6 +175,8 @@ export function render(v) {
   $('#lDetAdd').onchange = (e) => { const f0 = e.target.files[0]; e.target.value = ''; if (f0) addDetail(f0); };
   $('#lPrint').onclick = printSheet;
   $('#lSave').onclick = save;
+  $('#lUndoAll').onclick = undoLast;
+  hist = []; histT = 0;
   $('#lNew').onclick = () => { if (!confirm('Clear this layout and start over?')) return; L = EMPTY(); sel = -1; undo = null; fill(); $('#lAiMsg').innerHTML = ''; $('#lSaveMsg').innerHTML = ''; };
   $('#lFind').oninput = paintList;
   $('#lSheet').addEventListener('click', (e) => {
@@ -181,6 +208,7 @@ export function destroy() { if (ro) ro.disconnect(); ro = null; document.removeE
 
 // ---- select / highlight / delete a print on the sheet ----
 function onKey(e) {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !e.target.closest('input,textarea,select,[contenteditable]')) { e.preventDefault(); undoLast(); return; }
   if (sel < 0 || e.target.closest('input,textarea,select,[contenteditable]')) return;
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delPlate(sel); }
   else if (e.key === 'Escape') select(-1);
@@ -239,6 +267,8 @@ function paintSelBar() {
       ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Font:</span><button type="button" class="btn small" id="lFsDn" aria-label="Smaller text">A−</button><span class="fs-val">${p.kind === 'text' ? textFs(p) : +p.fsz > 0 ? p.fsz : 'Auto'}</span><button type="button" class="btn small" id="lFsUp" aria-label="Bigger text">A+</button>${p.kind === 'plate' && +p.fsz > 0 ? '<button type="button" class="btn small ghost" id="lFsAuto">Auto</button>' : ''}</span>` : ''}
       ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Text:</span>${['left', 'center', 'right'].map((a) => `<button type="button" class="btn small" data-ta="${a}" aria-pressed="${(p.ta || (p.kind === 'text' ? 'left' : 'center')) === a}">${a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right'}</button>`).join('')}</span>` : ''}
       <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
+      <button type="button" class="btn small" id="lFlip" aria-pressed="${!!p.flip}">Upside down</button>
+      ${p.kind === 'plate' ? `<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden id="lSelImg"></label>` : ''}
       <button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
     $('#lMvP').onchange = (e) => { p.panel = +e.target.value; p.dy = 0; paintPlates(); update(); };
@@ -257,6 +287,8 @@ function paintSelBar() {
     if ($('#lEditSel')) $('#lEditSel').onclick = () => { const g = $(`#lSheet [data-pi="${sel}"]`); openEditor('item:' + sel, g || $('#lSheet')); };
     $('#lDelSel').onclick = () => delPlate(sel);
     $('#lDup').onclick = () => duplicate(sel);
+    $('#lFlip').onclick = () => { p.flip = !p.flip; paintPlates(); update(); };
+    if ($('#lSelImg')) $('#lSelImg').onchange = (e) => { const f0 = e.target.files[0]; if (f0) addImage(sel, f0); };
     $('#lDone').onclick = () => select(-1);
   } else if (undo) {
     bar.innerHTML = `<span>Deleted.</span><span class="btn-row"><button type="button" class="btn small" id="lUndo">Undo</button></span>`;
@@ -296,6 +328,7 @@ function onInput(e) {
 
 function update() {
   saveForm('layout', L);
+  snap();
   const wp = nums(L.widthPanels), lp = nums(L.lengthPanels), bw = pin(L.blankW), bl = pin(L.blankL);
   const chk = (a, b, what) => !a.length ? '' : `Adds up to <b>${f(sum(a))}"</b>${isFinite(b) ? (near(sum(a), b) ? ` <span class="pill ok">matches the blank ${what}</span>` : ` <span class="pill warn">blank ${what} is ${f(b)}"</span>`) : ''}`;
   $('#lWChk').innerHTML = chk(wp, bw, 'width');
