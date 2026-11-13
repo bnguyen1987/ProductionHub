@@ -19,6 +19,13 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Distances': 'Distancias',
+  'Hide distances': 'Ocultar distancias',
+  'Show distances': 'Mostrar distancias',
+  'Glue tab and slots': 'Ceja de pegue y ranuras',
+  'Auto (RSC-type: small 1st length panel)': 'Auto (tipo RSC: 1er panel chico)',
+  'Show': 'Mostrar',
+  "Don't show": 'No mostrar',
   'Edit text': 'Editar texto',
   'Drag a print, BMC or text to move it. Tap it to highlight or delete it. Tap any words on the sheet to change them.': 'Arrastre una impresión, BMC o texto para moverlo. Tóquelo para resaltarlo o borrarlo. Toque cualquier palabra de la hoja para cambiarla.',
   'New note': 'Nota nueva',

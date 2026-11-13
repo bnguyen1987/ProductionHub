@@ -8,7 +8,7 @@ const store = () => getStore({ name: "print-layouts", consistency: "strong" });
 const s = (v: any, n = 200) => (typeof v === "string" ? v.trim().slice(0, n) : "");
 const okId = (id: string) => /^[A-Za-z0-9_-]{4,40}$/.test(id);
 const FIELDS = ["customer", "shipTo", "fileNo", "specNo", "design", "ident", "style", "size", "board", "blankW", "blankL",
-  "print", "routing", "view", "widthPanels", "lengthPanels", "origDate", "revDate", "sales", "designer", "approved"];
+  "print", "routing", "view", "widthPanels", "lengthPanels", "origDate", "revDate", "sales", "designer", "approved", "glueTab"];
 
 function clean(b: any) {
   const doc: any = {};
@@ -16,7 +16,7 @@ function clean(b: any) {
   doc.printPanels = (Array.isArray(b.printPanels) ? b.printPanels : []).map((n: any) => parseInt(n, 10)).filter((n: number) => n >= 1 && n <= 20).slice(0, 20);
   doc.plates = (Array.isArray(b.plates) ? b.plates : []).slice(0, 40).map((p: any) => ({
     panel: Math.max(1, Math.min(20, parseInt(p?.panel, 10) || 1)),
-    start: s(p?.start, 20), width: s(p?.width, 20), text: s(p?.text, 200), flip: !!p?.flip, hl: !!p?.hl,
+    start: s(p?.start, 20), width: s(p?.width, 20), text: s(p?.text, 200), flip: !!p?.flip, hl: !!p?.hl, nodim: !!p?.nodim,
     kind: ["plate", "bmc", "text"].includes(p?.kind) ? p.kind : "plate",
     test: p?.test === "Mullen" ? "Mullen" : "ECT", wall: p?.wall === "double" ? "double" : "single", rating: s(p?.rating, 6), size: ["S", "M", "L"].includes(p?.size) ? p.size : "M",
   }));

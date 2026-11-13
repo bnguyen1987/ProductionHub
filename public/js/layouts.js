@@ -37,7 +37,6 @@ const BMC = {
   double: { ECT: { 42: [80, 85], 48: [100, 95], 51: [120, 105], 61: [140, 110], 71: [160, 115], 82: [180, 120] },
     Mullen: { 200: [80, 85, 92], 275: [100, 95, 110], 350: [120, 105, 126], 400: [140, 110, 180], 500: [160, 115, 222], 600: [180, 120, 270] } },
 };
-const CERT_BY = 'GOLDENWEST PACKAGING GROUP · ONTARIO, CA';
 const bmcOf = (p) => { const w = p.wall === 'double' ? 'double' : 'single', tst = p.test === 'Mullen' ? 'Mullen' : 'ECT'; return { w, tst, v: String(p.rating || ''), row: BMC[w][tst][p.rating] }; };
 const bmcLabel = (p) => { const b = bmcOf(p); return `${b.v || '?'} ${b.tst === 'ECT' ? 'ECT' : 'lb Mullen'}, ${b.w} wall`; };
 // Default BMC from the board field: "ECT 32 C" → ECT 32; "200# C Kraft" → Mullen 200; BC / DW → double wall.
@@ -114,6 +113,7 @@ export function render(v) {
           <div id="lWChk" class="hint" style="margin:4px 0 10px"></div>
           <div class="field"><label>Scores along the length, left to right</label><input type="text" data-l="lengthPanels" placeholder="4 3/4, 123 1/16, 4 3/4"></div>
           <div id="lLChk" class="hint" style="margin:4px 0 10px"></div>
+          <div class="field" style="max-width:260px;margin-bottom:10px"><label>Glue tab and slots</label><select data-l="glueTab"><option value="">Auto (RSC-type: small 1st length panel)</option><option value="on">Show</option><option value="off">Don't show</option></select></div>
           <div class="lbl" style="margin:4px 0 6px">Printed panels</div>
           <div class="seg" id="lPP"></div>
           <div class="lbl" style="margin:14px 0 6px">Print, BMC and text on the sheet <span class="hint" style="font-weight:500">start = inches from the left edge of the blank</span></div>
@@ -195,9 +195,10 @@ function paintSelBar() {
   if (p) {
     const what = p.kind === 'bmc' ? `<b>Selected BMC:</b> P${p.panel} · ${esc(bmcLabel(p))}` : `<b>${p.kind === 'text' ? 'Selected text:' : 'Selected print:'}</b> P${p.panel}${p.text ? ' · ' + esc(p.text) : ''}`;
     bar.innerHTML = `<span>${what}</span>
-      <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
+      <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
       <button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
+    if ($('#lDims')) $('#lDims').onclick = () => { p.nodim = !p.nodim; paintPlates(); update(); };
     if ($('#lEditSel')) $('#lEditSel').onclick = () => { const g = $(`#lSheet [data-pi="${sel}"]`); openEditor('item:' + sel, g || $('#lSheet')); };
     $('#lDelSel').onclick = () => delPlate(sel);
     $('#lDone').onclick = () => select(-1);
@@ -221,6 +222,7 @@ function onInput(e) {
     const p = L.plates[+row.dataset.plate];
     const k = t.dataset.p;
     if (!p || !k) return;
+    if (k === 'dims') { p.nodim = !t.checked; update(); return; }
     p[k] = k === 'flip' || k === 'hl' ? t.checked : k === 'panel' ? +t.value : t.value;
     if (k === 'test' || k === 'wall') { const r = BMC[p.wall === 'double' ? 'double' : 'single'][p.test === 'Mullen' ? 'Mullen' : 'ECT']; if (!r[p.rating]) p.rating = p.test === 'Mullen' ? (p.wall === 'double' ? '275' : '200') : (p.wall === 'double' ? '48' : '32'); }
     if (k === 'test' || k === 'wall' || k === 'rating') { paintPlates(); }
@@ -283,6 +285,7 @@ function paintPlates() {
       ${mid}
       <label class="chk"><input type="checkbox" data-p="flip" ${p.flip ? 'checked' : ''}> Upside down</label>
       <label class="chk"><input type="checkbox" data-p="hl" ${p.hl ? 'checked' : ''}> Highlight</label>
+      ${kind !== 'text' ? `<label class="chk"><input type="checkbox" data-p="dims" ${p.nodim ? '' : 'checked'}> Distances</label>` : ''}
       <button type="button" class="btn small ghost danger" data-del="${i}" aria-label="Remove">✕</button>
     </div>`; }).join('') : '<p class="hint" style="margin:0">Nothing on the sheet yet.</p>';
   $$('[data-del]', $('#lPlates')).forEach((b) => b.onclick = () => delPlate(+b.dataset.del));
@@ -478,8 +481,6 @@ function sheetHtml(d, selIdx = -1) {
   const blank = d.blankW || d.blankL ? `${show(d.blankW) || '?'} x ${show(d.blankL) || '?'}` : '';
   const notes = d.notes.split('\n').map((x) => x.trim()).filter(Boolean);
   const changes = d.changes.split('\n').map((x) => x.trim().replace(/^[-•]\s*/, '')).filter(Boolean);
-  const uniq = new Set();
-  const bmcs = (d.plates || []).filter((p) => p.kind === 'bmc').filter((p) => { const k = bmcLabel(p); if (uniq.has(k)) return false; uniq.add(k); return true; }).slice(0, 2);
   const head2 = [d.specNo && `Spec # ${esc(d.specNo)}`, d.fileNo && `File # ${esc(d.fileNo)}`].filter(Boolean).join('&nbsp; | &nbsp;');
   return `<div class="lsheet">
     <div class="ls-top"><div class="ls-title">SPECIFICATION SHEET</div><div class="ls-co">GoldenWest Packaging Group&nbsp; | &nbsp;Ontario, CA${head2 ? `<br>${head2}` : ''}</div></div>
@@ -491,9 +492,8 @@ function sheetHtml(d, selIdx = -1) {
     </div>
     <div class="ls-h">BLANK LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
     ${drawing(d, selIdx)}
-    <div class="ls-boxes${bmcs.length ? ' has-bmc' : ''}">
+    <div class="ls-boxes">
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
-      ${bmcs.length ? `<div class="ls-box ls-bmcbox"><div class="ls-bh">BOX CERTIFICATE (BMC)</div><div class="ls-seals">${bmcs.map((b, k) => `<div>${sealSvg(b, 'd' + k)}<div class="ls-bmcpos">On P${b.panel}, ${esc(show(b.start))}" from left edge${b.flip ? ', upside down' : ''}</div></div>`).join('')}</div></div>` : ''}
       <div class="ls-box"><div class="ls-bh">REVISION - CHANGES${d.origDate ? ` FROM ${esc(d.origDate)} SHEET` : ''}</div><ul>${changes.map((x, k) => `<li data-edit="changes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="changes:new">+ add change</li></ul></div>
     </div>
     <div class="ls-foot">${[['ORIGINAL DATE', d.origDate, 'origDate'], ['REVISED', d.revDate, 'revDate'], ['SALES', d.sales, 'sales'], ['DESIGNER', d.designer, 'designer'], ['APPROVED BY', d.approved, 'approved']].map(([t, v, k]) => `<div data-edit="${k}"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`).join('')}</div>
@@ -521,10 +521,26 @@ function drawing(d, selIdx = -1) {
   const arrow = (xa, xb, y, c) => `<line x1="${xa.toFixed(1)}" y1="${y.toFixed(1)}" x2="${xb.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="1" marker-start="url(#la${c === RED ? 'r' : 'k'})" marker-end="url(#la${c === RED ? 'r' : 'k'})"/>`;
 
   // printed rows, outline, scores
-  R.forEach((r, i) => { if (pp.has(i + 1)) o.push(`<rect x="${x0}" y="${r.y.toFixed(1)}" width="${x1 - x0}" height="${r.h.toFixed(1)}" fill="#e6eef7"/>`); });
-  o.push(`<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${H}" fill="none" stroke="${INK}" stroke-width="1.6"/>`);
-  R.slice(1).forEach((r) => o.push(`<line x1="${x0}" y1="${r.y.toFixed(1)}" x2="${x1}" y2="${r.y.toFixed(1)}" stroke="${INK}" ${DASH}/>`));
-  scores.slice(1, -1).forEach((s) => o.push(`<line x1="${X(s).toFixed(1)}" y1="${y0}" x2="${X(s).toFixed(1)}" y2="${y0 + H}" stroke="${INK}" ${DASH}/>`));
+  // RSC-type blank: the 1st length panel is a glue tab (no flaps above/below it, tapered ends) and the flap rows are slotted at each score.
+  const tab = rows.length >= 2 && lp.length >= 4 && (d.glueTab === 'on' || (d.glueTab !== 'off' && lp[0] > 0 && lp[0] <= 2.5));
+  const flap = new Set(!tab ? [] : rows.length >= 3 ? [0, rows.length - 1] : [rows[0] <= rows[1] ? 0 : 1]);
+  const body = R.filter((r, i) => !flap.has(i));
+  const yE = y0 + H, xg = tab ? X(lp[0]) : x0;
+  const bT = body.length ? body[0].y : y0, bB = body.length ? body[body.length - 1].y + body[body.length - 1].h : yE;
+  const tp = Math.min(10, (bB - bT) * 0.2);
+  R.forEach((r, i) => { if (pp.has(i + 1)) { const xa = flap.has(i) ? xg : x0; o.push(`<rect x="${xa.toFixed(1)}" y="${r.y.toFixed(1)}" width="${(x1 - xa).toFixed(1)}" height="${r.h.toFixed(1)}" fill="#e6eef7"/>`); } });
+  if (tab) {
+    o.push(`<path d="M${xg.toFixed(1)} ${y0}H${x1}V${yE}H${xg.toFixed(1)}V${bB.toFixed(1)}L${x0} ${(bB - tp).toFixed(1)}V${(bT + tp).toFixed(1)}L${xg.toFixed(1)} ${bT.toFixed(1)}Z" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`);
+    if (xg - x0 >= 9 && bB - bT > 40) o.push(t((x0 + xg) / 2 + 2.5, (bT + bB) / 2, 'GLUE TAB', { size: 6.5, weight: 700, fill: '#555', tr: `rotate(-90 ${((x0 + xg) / 2 + 2.5).toFixed(1)} ${((bT + bB) / 2).toFixed(1)})` }));
+  } else o.push(`<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${H}" fill="none" stroke="${INK}" stroke-width="1.6"/>`);
+  R.slice(1).forEach((r) => o.push(`<line x1="${xg.toFixed(1)}" y1="${r.y.toFixed(1)}" x2="${x1}" y2="${r.y.toFixed(1)}" stroke="${INK}" ${DASH}/>`));
+  scores.slice(1, -1).forEach((sc) => {
+    const x = X(sc).toFixed(1);
+    if (!tab) { o.push(`<line x1="${x}" y1="${y0}" x2="${x}" y2="${yE}" stroke="${INK}" ${DASH}/>`); return; }
+    R.forEach((r, i) => o.push(flap.has(i)
+      ? `<line x1="${x}" y1="${r.y.toFixed(1)}" x2="${x}" y2="${(r.y + r.h).toFixed(1)}" stroke="${INK}" stroke-width="1.4"/>` // slot (cut)
+      : `<line x1="${x}" y1="${r.y.toFixed(1)}" x2="${x}" y2="${(r.y + r.h).toFixed(1)}" stroke="${INK}" ${DASH}/>`));
+  });
 
   // panel names (left) and sizes (right)
   R.forEach((r, i) => {
@@ -586,7 +602,7 @@ function drawing(d, selIdx = -1) {
   });
   // gaps: from the nearest score (or plate) on the left of each plate, and from the last plate to the next score
   for (let i = 1; i <= R.length; i++) {
-    const row = plates.filter((p) => p.panel === i && !p.skip).sort((a, b) => a.s - b.s);
+    const row = plates.filter((p) => p.panel === i && !p.skip && !p.nodim).sort((a, b) => a.s - b.s);
     if (!row.length) continue;
     const y = R[i - 1].m;
     let prevEnd = null, prevKind = '';
@@ -605,25 +621,6 @@ function drawing(d, selIdx = -1) {
 
   const mk = (id, c) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" fill="${c}"/></marker>`;
   return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 34}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk('lak', INK)}${mk('lar', RED)}</defs>${o.join('')}</svg>`;
-}
-
-// The full BMC stamp: double ring, curved text, test values in the middle.
-function sealSvg(p, id) {
-  const b = bmcOf(p), row = b.row || [];
-  const R = 70, c = 76;
-  const mid = b.tst === 'ECT'
-    ? ['EDGE CRUSH TEST (ECT)', `${b.v} LBS PER INCH WIDTH`]
-    : ['BURSTING TEST', `${b.v} LBS PER SQ INCH`, 'MIN COMB WT FACINGS', `${row[2] ?? '?'} LBS PER M SQ FT`];
-  const lines = [`THIS ${b.w.toUpperCase()} WALL BOX MEETS ALL`, 'CONSTRUCTION REQUIREMENTS OF', 'APPLICABLE FREIGHT CLASSIFICATION', ...mid, `SIZE LIMIT ${row[1] ?? '?'} INCHES`, `GROSS WT LT ${row[0] ?? '?'} LBS`];
-  const lh = lines.length > 8 ? 7.6 : 8.4, y0 = c - ((lines.length - 1) * lh) / 2 + 2.5;
-  const ar = R - 9;
-  return `<svg class="ls-seal" viewBox="0 0 152 152" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
-    <defs><path id="st-${id}" d="M ${c - ar} ${c} A ${ar} ${ar} 0 0 1 ${c + ar} ${c}"/><path id="sb-${id}" d="M ${c - ar - 6} ${c} A ${ar + 6} ${ar + 6} 0 0 0 ${c + ar + 6} ${c}"/></defs>
-    <circle cx="${c}" cy="${c}" r="${R + 4}" fill="#fff" stroke="#111" stroke-width="2"/><circle cx="${c}" cy="${c}" r="${R - 14}" fill="none" stroke="#111" stroke-width="1"/>
-    <text font-size="9.5" font-weight="700" fill="#111" letter-spacing="1.5"><textPath href="#st-${id}" startOffset="50%" text-anchor="middle">BOX CERTIFICATE</textPath></text>
-    <text font-size="6.6" font-weight="700" fill="#111"><textPath href="#sb-${id}" startOffset="50%" text-anchor="middle">${esc(CERT_BY)}</textPath></text>
-    ${lines.map((l, k) => `<text x="${c}" y="${(y0 + k * lh).toFixed(1)}" font-size="${k < 3 ? 5.2 : 6.3}" font-weight="${k < 3 ? 400 : 700}" text-anchor="middle" fill="#111">${esc(l)}</text>`).join('')}
-  </svg>`;
 }
 
 function gapMark(o, xa, xb, y, label, c, t, arrow) {
