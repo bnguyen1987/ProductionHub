@@ -546,7 +546,7 @@ function sheetHtml(d, selIdx = -1) {
   const changes = d.changes.split('\n').map((x) => x.trim().replace(/^[-•]\s*/, '')).filter(Boolean);
   const head2 = [d.specNo && `Spec # ${esc(d.specNo)}`, d.fileNo && `File # ${esc(d.fileNo)}`].filter(Boolean).join('&nbsp; | &nbsp;');
   return `<div class="lsheet">
-    <div class="ls-top"><div class="ls-title">SPECIFICATION SHEET</div><div class="ls-co">GoldenWest Packaging Group&nbsp; | &nbsp;Ontario, CA${head2 ? `<br>${head2}` : ''}</div></div>
+    <div class="ls-top"><div class="ls-title">PRINT LAYOUT SHEET</div><div class="ls-co">GoldenWest Packaging Group&nbsp; | &nbsp;Ontario, CA${head2 ? `<br>${head2}` : ''}</div></div>
     <div class="ls-grid">
       ${cell('CUSTOMER', d.customer, 'customer')}${cell('SHIP TO', d.shipTo, 'shipTo')}${cell('FILE #', d.fileNo, 'fileNo')}
       ${cell('DESIGN NO.', d.design, 'design')}${cell('IDENT', d.ident, 'ident')}${cell('STYLE', d.style, 'style')}
@@ -564,7 +564,9 @@ function sheetHtml(d, selIdx = -1) {
 }
 
 // SVG of the blank: width panels as rows (height exaggerated), length scores as columns, plates and the gaps between them.
+let mkSeq = 0;
 function drawing(d, selIdx = -1) {
+  const uid = 'm' + (++mkSeq) + '-'; // own arrowhead ids per copy (the hidden preview's ids would not print)
   const x0 = 64, x1 = 850, y0 = 14, H = 270;
   const wp = nums(d.widthPanels), lp = nums(d.lengthPanels);
   const bw = pin(d.blankW), bl = pin(d.blankL);
@@ -581,7 +583,7 @@ function drawing(d, selIdx = -1) {
   const o = [];
   const RED = '#c0392b', INK = '#222', DASH = 'stroke-dasharray="6 4"';
   const t = (x, y, s, a = {}) => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${a.size || 10}" fill="${a.fill || INK}" text-anchor="${a.anchor || 'middle'}"${a.weight ? ` font-weight="${a.weight}"` : ''}${a.tr ? ` transform="${a.tr}"` : ''}>${esc(s)}</text>`;
-  const arrow = (xa, xb, y, c) => `<line x1="${xa.toFixed(1)}" y1="${y.toFixed(1)}" x2="${xb.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="1" marker-start="url(#la${c === RED ? 'r' : 'k'})" marker-end="url(#la${c === RED ? 'r' : 'k'})"/>`;
+  const arrow = (xa, xb, y, c) => `<line x1="${xa.toFixed(1)}" y1="${y.toFixed(1)}" x2="${xb.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="1" marker-start="url(#${uid}la${c === RED ? 'r' : 'k'})" marker-end="url(#${uid}la${c === RED ? 'r' : 'k'})"/>`;
 
   // printed rows, outline, scores
   // RSC-type blank: the 1st length panel is a glue tab (no flaps above/below it, tapered ends) and the flap rows are slotted at each score.
@@ -631,7 +633,7 @@ function drawing(d, selIdx = -1) {
     if (wp.length) o.push(t(x1 + 40, r.m + 3.5, f(rows[i]), { size: 10, weight: 600 }));
   });
   o.push(`<line x1="${x1 + 4}" y1="${y0 + H}" x2="${x1 + 14}" y2="${y0 + H}" stroke="${INK}"/>`);
-  o.push(`<line x1="${x1 + 84}" y1="${y0}" x2="${x1 + 84}" y2="${y0 + H}" stroke="${INK}" marker-start="url(#lak)" marker-end="url(#lak)"/>`);
+  o.push(`<line x1="${x1 + 84}" y1="${y0}" x2="${x1 + 84}" y2="${y0 + H}" stroke="${INK}" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
   o.push(t(x1 + 100, y0 + H / 2, f(wp.length ? totW : bw) || '', { size: 11, weight: 700, tr: `rotate(90 ${x1 + 100} ${y0 + H / 2})` }));
 
   // length dims
@@ -703,13 +705,18 @@ function drawing(d, selIdx = -1) {
   }
 
   const mk = (id, c) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" fill="${c}"/></marker>`;
-  return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 34}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk('lak', INK)}${mk('lar', RED)}</defs>${o.join('')}</svg>`;
+  return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 34}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk(uid + 'lak', INK)}${mk(uid + 'lar', RED)}</defs>${o.join('')}</svg>`;
 }
 
 function gapMark(o, xa, xb, y, label, c, t, arrow) {
   if (xb - xa < 8) return;
   o.push(arrow(xa + 1, xb - 1, y, c));
   const w = label.length * 5.4 + 8, cx = (xa + xb) / 2;
+  if (xb - xa < w + 24) { // short gap: label sits above the arrow so the arrow stays visible
+    o.push(`<rect x="${(cx - w / 2).toFixed(1)}" y="${(y - 17).toFixed(1)}" width="${w.toFixed(1)}" height="11" fill="#fff" fill-opacity=".85"/>`);
+    o.push(t(cx, y - 8, label, { size: 9, fill: c, weight: 700 }));
+    return;
+  }
   o.push(`<rect x="${(cx - w / 2).toFixed(1)}" y="${(y - 6.5).toFixed(1)}" width="${w.toFixed(1)}" height="13" fill="#fff"/>`);
   o.push(t(cx, y + 3.5, label, { size: 9.5, fill: c, weight: 700 }));
 }
