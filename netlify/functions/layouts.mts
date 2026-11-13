@@ -17,6 +17,8 @@ function clean(b: any) {
   doc.plates = (Array.isArray(b.plates) ? b.plates : []).slice(0, 40).map((p: any) => ({
     panel: Math.max(1, Math.min(20, parseInt(p?.panel, 10) || 1)),
     start: s(p?.start, 20), width: s(p?.width, 20), text: s(p?.text, 200), flip: !!p?.flip, hl: !!p?.hl,
+    kind: ["plate", "bmc", "text"].includes(p?.kind) ? p.kind : "plate",
+    test: p?.test === "Mullen" ? "Mullen" : "ECT", wall: p?.wall === "double" ? "double" : "single", rating: s(p?.rating, 6), size: ["S", "M", "L"].includes(p?.size) ? p.size : "M",
   }));
   doc.notes = s(b.notes, 4000);
   doc.changes = s(b.changes, 4000);

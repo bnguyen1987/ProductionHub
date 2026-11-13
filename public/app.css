@@ -397,10 +397,18 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .ls-foot>div{padding:4px 8px;border-right:1px solid #9aa5b1;min-height:34px}
 .lsheet .ls-foot>div:last-child{border-right:0}
 .lsheet .ls-foot b{font-size:12.5px;display:block;margin-top:2px}
-#printSheet .lsheet-print .lsheet{width:100%;padding:0}
+#printSheet .lsheet-print .lsheet{width:1000px;padding:0}
 #printSheet .lsheet-print{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 #lSheet .ls-plate{cursor:pointer}
 #lSheet .ls-plate:hover rect{stroke:#1a73e8;stroke-width:2}
 .sel-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;min-height:20px}
 .sel-bar:has(.btn){padding:8px 10px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft)}
 .plate-row.sel{background:var(--accent-soft);border-radius:8px;padding-left:8px;padding-right:8px}
+.plate-row.k-bmc{grid-template-columns:80px 1fr 1fr auto}
+.plate-row .bmc-vals{grid-column:1/-1;margin-top:-2px}
+.plate-row.k-text .grow{grid-column:1/-1}
+.lsheet .ls-boxes.has-bmc{grid-template-columns:1.2fr .7fr 1fr}
+.lsheet .ls-seals{display:flex;justify-content:center;gap:6px;padding:4px}
+.lsheet .ls-seals>div{text-align:center}
+.lsheet .ls-seal{width:140px;height:140px;display:block;margin:0 auto}
+.lsheet .ls-bmcpos{font-size:9.5px;color:#333}

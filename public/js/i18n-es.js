@@ -19,6 +19,30 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  '+ Add BMC': '+ Agregar BMC',
+  '+ Add text': '+ Agregar texto',
+  'Print, BMC and text on the sheet': 'Impresión, BMC y texto en la hoja',
+  'BMC on': 'BMC en',
+  'Text on': 'Texto en',
+  'Test': 'Prueba',
+  'Wall': 'Pared',
+  'Rating': 'Valor',
+  'Single': 'Sencilla',
+  'Double': 'Doble',
+  'Mullen (burst)': 'Mullen (reventamiento)',
+  'Size': 'Tamaño',
+  'Small': 'Chico',
+  'Medium': 'Mediano',
+  'Large': 'Grande',
+  'Text': 'Texto',
+  'Type anything': 'Escriba lo que sea',
+  'Selected BMC:': 'BMC seleccionado:',
+  'Selected text:': 'Texto seleccionado:',
+  'Deleted.': 'Borrado.',
+  'Tap a print, BMC or text on the sheet to highlight or delete it.': 'Toque una impresión, BMC o texto en la hoja para resaltarlo o borrarlo.',
+  'Nothing on the sheet yet.': 'Todavía no hay nada en la hoja.',
+  'Not a standard rating. Check the values on the stamp.': 'No es un valor estándar. Revise los valores del sello.',
+  'Remove': 'Quitar',
   'Selected print:': 'Impresión seleccionada:',
   'Highlight': 'Resaltar',
   'Remove highlight': 'Quitar resaltado',
@@ -517,6 +541,8 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^Size limit (\d+)" · Gross wt (\d+) lbs(?: · Facings (\d+) lbs\/MSF)?$/, (m, a, b, c) => `Límite de tamaño ${a}" · Peso bruto ${b} lbs${c ? ` · Liners ${c} lbs/MSF` : ''}`],
+  [/^Found a BMC note and made a stamp \((.+)\)\.(.*)$/, (m, a, b) => `Se encontró una nota de BMC y se hizo un sello (${a}).${b ? ' No decía dónde va, así que está en medio de un panel. Muévalo si hace falta.' : ''}`],
   [/^Reading (.+)… this can take 20–40 seconds\.$/, 'Leyendo $1… puede tardar de 20 a 40 segundos.'],
   [/^Added (\d+) lines?\.$/, 'Se agregaron $1 línea(s).'],
   [/^Adds up to$/, 'Suma'],

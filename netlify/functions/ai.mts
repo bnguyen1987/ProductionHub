@@ -55,8 +55,12 @@ Return strict JSON only, no markdown fences, no commentary:
 "print":string|null,"routing":string|null,"view":"Outside|Inside"|null,
 "width_panels":[string],"length_panels":[string],"printed_panels":[number],
 "plates":[{"panel":number,"start_in":number,"width_in":number,"text":string,"upside_down":boolean}],
+"bmc":{"present":boolean,"test":"ECT|Mullen"|null,"wall":"single|double"|null,"value":number|null,"panel":number|null,"start_in":number|null,"upside_down":boolean,"written":string|null},
+"texts":[{"panel":number,"start_in":number,"text":string,"upside_down":boolean}],
 "notes":[string],"changes":[string],"original_date":string|null,"sales":string|null,"designer":string|null,
 "confidence":"high|medium|low","unclear":"one short sentence on anything you could not read, or empty"}
+BMC = Box Maker's (Manufacturer's) Certificate stamp. It is often only a handwritten note like "BMC 32 ECT P2", "cert on flap", "200# cert" or a hand-drawn circle. Set bmc.present true when the sheet asks for one. Take test/value from the note; if the note gives none, use the board grade (200# = Mullen 200, ECT 32 = ECT 32); double wall for BC/DW board. panel/start_in only if the sheet shows where it goes, else null. written = the note word for word.
+texts: other short words the old sheet places ON the blank drawing that are not print plates (e.g. "THIS SIDE UP" marks or handwritten callouts that belong on a panel). Leave empty if none; general instructions go in notes.
 size is the box size as written (L x W x D). print is like "1 color - BLACK ink". notes are short production/print notes in plain words (one idea each). Use null when a value is not on the sheet.`;
 
 export default async (req: Request) => {
