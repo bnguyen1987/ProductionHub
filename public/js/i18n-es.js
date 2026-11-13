@@ -19,6 +19,11 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Auto': 'Auto',
+  'Bigger text': 'Letra más grande',
+  'Smaller text': 'Letra más chica',
+  'Font:': 'Letra:',
+  'Font size': 'Tamaño de letra',
   'Center': 'Centro',
   'Text:': 'Texto:',
   'Right': 'Derecha',

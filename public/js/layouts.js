@@ -32,6 +32,11 @@ const list = (s) => String(s || '').split(/[,|;]/).map((x) => x.trim()).filter(B
 const nums = (s) => list(s).map(pin).filter((v) => isFinite(v) && v > 0);
 const sum = (a) => a.reduce((t, v) => t + v, 0);
 const near = (a, b) => Math.abs(a - b) < 1 / 32;
+const SIZE_PX = { XS: 6, S: 8, M: 11, L: 15 };
+const clampFs = (v) => Math.max(4, Math.min(40, Math.round(+v * 2) / 2));
+// font size of a text item: typed size wins, else the old Small/Medium/Large preset
+const textFs = (p) => (+p.fsz > 0 ? clampFs(p.fsz) : SIZE_PX[p.size] || 11);
+const autoFs = {}; // last auto-fit size of each plate, so A+/A- can start from it
 
 // Box Maker's Certificate (BMC) values from the freight rules (NMFC Item 222 / UFC Rule 41).
 // [max gross wt lbs, size limit in (L+W+D), min combined facings lbs/MSF (Mullen only)]. Confirm against the plant's stamp.
@@ -231,6 +236,7 @@ function paintSelBar() {
         <button type="button" class="btn small" id="lMvR" aria-label="Move right">▶</button>
         <button type="button" class="btn small" id="lMvU" aria-label="Move up">▲</button><button type="button" class="btn small" id="lMvD" aria-label="Move down">▼</button>
         <button type="button" class="btn small" id="lCtrH" title="Center left-right in its panel">Center ↔</button><button type="button" class="btn small" id="lCtrV" title="Center top-to-bottom in its panel">Center ↕</button></span>
+      ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Font:</span><button type="button" class="btn small" id="lFsDn" aria-label="Smaller text">A−</button><span class="fs-val">${p.kind === 'text' ? textFs(p) : +p.fsz > 0 ? p.fsz : 'Auto'}</span><button type="button" class="btn small" id="lFsUp" aria-label="Bigger text">A+</button>${p.kind === 'plate' && +p.fsz > 0 ? '<button type="button" class="btn small ghost" id="lFsAuto">Auto</button>' : ''}</span>` : ''}
       ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Text:</span>${['left', 'center', 'right'].map((a) => `<button type="button" class="btn small" data-ta="${a}" aria-pressed="${(p.ta || (p.kind === 'text' ? 'left' : 'center')) === a}">${a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right'}</button>`).join('')}</span>` : ''}
       <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
       <button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
@@ -240,6 +246,9 @@ function paintSelBar() {
     $('#lMvR').onclick = () => nudge(0.5);
     $('#lMvU').onclick = () => movePanel(-1);
     $('#lCtrH').onclick = () => centerItem(sel);
+    const stepFs = (d) => { const cur = p.kind === 'text' ? textFs(p) : +p.fsz > 0 ? +p.fsz : autoFs[sel] || 8; p.fsz = clampFs(cur + d); paintPlates(); update(); };
+    if ($('#lFsDn')) { $('#lFsDn').onclick = () => stepFs(-1); $('#lFsUp').onclick = () => stepFs(1); }
+    if ($('#lFsAuto')) $('#lFsAuto').onclick = () => { p.fsz = ''; paintPlates(); update(); };
     $$('[data-ta]', bar).forEach((b) => b.onclick = () => { p.ta = b.dataset.ta; paintPlates(); update(); });
     $('#lCtrV').onclick = () => { p.dy = 0; paintPlates(); update(); };
     $('#lMvD').onclick = () => movePanel(1);
@@ -277,6 +286,7 @@ function onInput(e) {
     const k = t.dataset.p;
     if (!p || !k) return;
     if (k === 'dims') { p.nodim = !t.checked; update(); return; }
+    if (k === 'fsz') { p.fsz = t.value === '' ? '' : clampFs(t.value); update(); return; }
     p[k] = k === 'flip' || k === 'hl' ? t.checked : k === 'panel' ? +t.value : t.value;
     if (k === 'test' || k === 'wall') { const r = BMC[p.wall === 'double' ? 'double' : 'single'][p.test === 'Mullen' ? 'Mullen' : 'ECT']; if (!r[p.rating]) p.rating = p.test === 'Mullen' ? (p.wall === 'double' ? '275' : '200') : (p.wall === 'double' ? '48' : '32'); }
     if (k === 'test' || k === 'wall' || k === 'rating') { paintPlates(); }
@@ -314,7 +324,7 @@ function span(p, g) {
   if (!isFinite(s)) return null;
   let w;
   if (p.kind === 'bmc') w = 1;
-  else if (p.kind === 'text') w = (Math.max(1, ...String(p.text || 'TEXT').split('\n').map((x) => x.trim().length)) * ({ XS: 6, S: 8, M: 11, L: 15 }[p.size] || 11) * 0.6 + 6) / g.pxIn;
+  else if (p.kind === 'text') w = (Math.max(1, ...String(p.text || 'TEXT').split('\n').map((x) => x.trim().length)) * textFs(p) * 0.6 + 6) / g.pxIn;
   else w = isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : g.totL * 0.1;
   return [s, s + w];
 }
@@ -415,10 +425,10 @@ function paintPlates() {
         <div class="field"><label>Rating</label><select data-p="rating">${ratings.map((r) => opt(r, b.v, b.tst === 'ECT' ? r + ' ECT' : r + ' lb')).join('')}</select></div>`;
       body = `<div class="hint bmc-vals">${b.row ? `Size limit ${b.row[1]}" · Gross wt ${b.row[0]} lbs${b.row[2] ? ` · Facings ${b.row[2]} lbs/MSF` : ''}` : 'Not a standard rating. Check the values on the stamp.'}</div>`;
     } else if (kind === 'text') {
-      top = `<div class="field"><label>Size</label><select data-p="size">${opt('XS', p.size, 'Extra small')}${opt('S', p.size, 'Small')}${opt('M', p.size || 'M', 'Medium')}${opt('L', p.size, 'Large')}</select></div><div class="field"><label>Text align</label><select data-p="ta">${opt('left', p.ta || 'left', 'Left')}${opt('center', p.ta || 'left', 'Center')}${opt('right', p.ta || 'left', 'Right')}</select></div>`;
+      top = `<div class="field"><label>Font size</label><input type="number" min="4" max="40" step="0.5" data-p="fsz" value="${textFs(p)}"></div><div class="field"><label>Text align</label><select data-p="ta">${opt('left', p.ta || 'left', 'Left')}${opt('center', p.ta || 'left', 'Center')}${opt('right', p.ta || 'left', 'Right')}</select></div>`;
       body = `<div class="field"><label>Text</label><textarea data-p="text" rows="2" placeholder="Type anything (Enter = new line)">${esc(p.text)}</textarea></div>`;
     } else {
-      top = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div><div class="field"><label>Text align</label><select data-p="ta">${opt('left', p.ta || 'center', 'Left')}${opt('center', p.ta || 'center', 'Center')}${opt('right', p.ta || 'center', 'Right')}</select></div>`;
+      top = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div><div class="field"><label>Font size</label><input type="number" min="4" max="40" step="0.5" data-p="fsz" value="${+p.fsz > 0 ? p.fsz : ''}" placeholder="Auto"></div><div class="field"><label>Text align</label><select data-p="ta">${opt('left', p.ta || 'center', 'Left')}${opt('center', p.ta || 'center', 'Center')}${opt('right', p.ta || 'center', 'Right')}</select></div>`;
       body = `<div class="field"><label>Copy on the plate</label><textarea data-p="text" rows="2">${esc(p.text)}</textarea></div>
         <div class="plate-img">${p.img ? `<img src="${p.img}" alt="Logo">` : ''}<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden data-img="${i}"></label>${p.img ? `<button type="button" class="btn small ghost" data-noimg="${i}">Remove image</button>` : ''}</div>`;
     }
@@ -839,7 +849,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
   const segs = lp.length ? lp.map((v, j) => [scores[j], scores[j + 1]]) : [[0, totL]];
   const items = (d.plates || []).map((p) => {
     const st = pin(p.start); if (!isFinite(st) || p.panel < 1 || p.panel > R.length) return null;
-    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 1 : (Math.max(...String(p.text || 'TEXT').split('\n').map((x) => x.trim().length)) * ({ XS: 6, S: 8, M: 11, L: 15 }[p.size] || 11) * 0.6 + 6) / ((x1 - x0) / totL);
+    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 1 : (Math.max(...String(p.text || 'TEXT').split('\n').map((x) => x.trim().length)) * textFs(p) * 0.6 + 6) / ((x1 - x0) / totL);
     return { row: p.panel - 1, a: st, b: st + w };
   }).filter(Boolean);
   const shadedRows = new Set();
@@ -921,7 +931,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const selBox = (x, y, w, h) => { if (p.i === selIdx) o.push(`<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="3" fill="none" stroke="#1a73e8" stroke-width="2.5" stroke-dasharray="5 3" pointer-events="none"/>`); };
     const rot = (cx) => (p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : '');
     if (p.kind === 'text') {
-      const fs = { XS: 6, S: 8, M: 11, L: 15 }[p.size] || 11;
+      const fs = textFs(p);
       let ls = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
       if (!ls.length) ls = ['TEXT'];
       const lh = fs * 1.2, hh = ls.length * lh + fs * 0.3;
@@ -948,12 +958,18 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const cx = (xa + xb) / 2, hMax = setH || r.h * 0.9, base = setH || Math.min(r.h * 0.8, 52);
     const raw = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
     let fs = 9, lines = [];
-    for (; fs >= 5; fs -= 0.5) {
-      const per = Math.max(3, Math.floor((xb - xa - 6) / (fs * 0.58)));
-      lines = raw.flatMap((x) => wrapHard(x, per));
-      if (lines.length * fs * 1.18 + 6 <= hMax) break;
+    if (+p.fsz > 0) { // size typed by hand: keep it, just wrap
+      fs = clampFs(p.fsz);
+      lines = raw.flatMap((x) => wrapHard(x, Math.max(3, Math.floor((xb - xa - 6) / (fs * 0.58)))));
+    } else {
+      for (; fs >= 5; fs -= 0.5) {
+        const per = Math.max(3, Math.floor((xb - xa - 6) / (fs * 0.58)));
+        lines = raw.flatMap((x) => wrapHard(x, per));
+        if (lines.length * fs * 1.18 + 6 <= hMax) break;
+      }
+      fs = Math.max(5, fs);
+      autoFs[p.i] = fs;
     }
-    fs = Math.max(5, fs);
     const lh = fs * 1.18;
     const maxL = Math.max(1, Math.floor((hMax - 6) / lh));
     if (lines.length > maxL) { lines = lines.slice(0, maxL); lines[maxL - 1] += '…'; }
