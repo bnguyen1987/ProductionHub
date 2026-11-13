@@ -523,7 +523,7 @@ async function readLayout(input) {
       const tst = /mullen|burst/i.test(bm.test || '') ? 'Mullen' : /ect/i.test(bm.test || '') ? 'ECT' : def.test;
       const wall = /double/i.test(bm.wall || '') ? 'double' : /single/i.test(bm.wall || '') ? 'single' : def.wall;
       const tl = lp.length ? sum(lp) : pin(L.blankL);
-      const bmcIn = 46 / pxIn;
+      const bmcIn = 1; // a BMC is 1" round
       const ps = placeStart(bm, bmcIn, lp);
       const hasPos = ps !== null || (bm.start_in !== null && bm.start_in !== undefined && isFinite(+bm.start_in));
       const bp = parseInt(bm.panel, 10);
@@ -531,7 +531,7 @@ async function readLayout(input) {
       const bStart = ps !== null ? ps : hasPos ? +bm.start_in : Math.max(0, (isFinite(tl) ? tl : 60) / 2 - 3);
       const extra = str(bm.extra_text);
       L.plates.push({ kind: 'bmc', panel, start: fx(bStart), test: tst, wall, rating: String(parseInt(bm.value, 10) || def.rating), flip: !!bm.upside_down, nodim: !!extra });
-      if (extra) L.plates.push({ kind: 'text', panel, start: fx(Math.round((bStart + 56 / pxIn) * 16) / 16), text: extra, size: 'M', flip: !!bm.upside_down });
+      if (extra) L.plates.push({ kind: 'text', panel, start: fx(Math.round((bStart + Math.max(1.5, 26 / pxIn)) * 16) / 16), text: extra, size: 'M', flip: !!bm.upside_down });
       const line = `Handwritten BMC note converted to a BMC stamp${bm.written ? ` (old sheet: "${str(bm.written)}")` : ''}.`;
       L.changes = (L.changes ? L.changes + '\n' : '') + line;
       bmcMsg = ` <br>Found a BMC note and made a stamp (${esc(bmcLabel(L.plates.find((x) => x.kind === 'bmc')))}).${hasPos && bm.panel ? '' : ' Its spot was not on the sheet, so it is in the middle of a panel. Move it if needed.'}`;
@@ -632,7 +632,7 @@ function drawing(d, selIdx = -1) {
   const segs = lp.length ? lp.map((v, j) => [scores[j], scores[j + 1]]) : [[0, totL]];
   const items = (d.plates || []).map((p) => {
     const st = pin(p.start); if (!isFinite(st) || p.panel < 1 || p.panel > R.length) return null;
-    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 30 / ((x1 - x0) / totL) : Math.max(0.5, Math.max(...String(p.text || 'TEXT').split('\n').map((x) => x.length)) * 6.6 / ((x1 - x0) / totL));
+    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 1 : Math.max(0.5, Math.max(...String(p.text || 'TEXT').split('\n').map((x) => x.length)) * 6.6 / ((x1 - x0) / totL));
     return { row: p.panel - 1, a: st, b: st + w };
   }).filter(Boolean);
   const shadedRows = new Set();
@@ -700,11 +700,12 @@ function drawing(d, selIdx = -1) {
       return;
     }
     if (p.kind === 'bmc') {
-      const rr = Math.max(13, Math.min(r.h * 0.42, 24)), xa = X(p.s), cx = xa + rr;
-      const b = bmcOf(p);
-      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(cx)}><circle cx="${cx.toFixed(1)}" cy="${r.m.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.3"/><circle cx="${cx.toFixed(1)}" cy="${r.m.toFixed(1)}" r="${(rr - 2.5).toFixed(1)}" fill="none" stroke="${INK}" stroke-width=".6"/>${t(cx, r.m - 1, 'BMC', { size: rr > 18 ? 8 : 6.5, weight: 700 })}${t(cx, r.m + (rr > 18 ? 8 : 6.5), `${b.v} ${b.tst === 'ECT' ? 'ECT' : 'LB'}`, { size: rr > 18 ? 6.5 : 5.5 })}</g></g>`);
+      // A BMC is 1" round. Drawn to scale when that is big enough to read, never smaller than 22 px; measured as 1".
+      const D = 1, rr = Math.min(r.h * 0.45, Math.max(11, (D * pxIn) / 2)), cx = X(p.s + D / 2), xa = cx - rr;
+      const b = bmcOf(p), big = rr >= 15;
+      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(cx)}><circle cx="${cx.toFixed(1)}" cy="${r.m.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.2"/><circle cx="${cx.toFixed(1)}" cy="${r.m.toFixed(1)}" r="${(rr - 2).toFixed(1)}" fill="none" stroke="${INK}" stroke-width=".5"/>${big ? t(cx, r.m - 1, 'BMC', { size: 7.5, weight: 700 }) + t(cx, r.m + 7, `${b.v} ${b.tst === 'ECT' ? 'ECT' : 'LB'}`, { size: 6 }) : t(cx, r.m + 2.2, 'BMC', { size: 6, weight: 700 })}</g></g>`);
       selBox(xa, r.m - rr, rr * 2, rr * 2);
-      p.xa = xa; p.xb = xa + rr * 2; p.e = p.s + (rr * 2) / pxIn;
+      p.xa = Math.min(xa, X(p.s)); p.xb = Math.max(cx + rr, X(p.s + D)); p.e = p.s + D;
       return;
     }
     const w = isFinite(p.w) && p.w > 0 ? p.w : totL * 0.1;
