@@ -469,3 +469,8 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .ls-dtexts .ls-dtext{font-size:12.5px;line-height:1.4;min-height:70px}
 .lsheet.ls-print .ls-dtexts .ls-dtext{min-height:56px}
 .lsheet .ls-pics figcaption{font-size:10.5px}
+/* plates have no printed border (only a faint dashed guide on screen) */
+.lsheet.ls-print .ls-pbox{stroke:none}
+.lsheet .ls-pics img{border:0}
+.lsheet.ls-print .ls-pics img{border:0}
+#printSheet .lsheet .ls-pics figure{border:0;border-radius:0;padding:0;box-shadow:none;background:none}

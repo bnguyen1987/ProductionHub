@@ -349,10 +349,24 @@ function fit() {
 
 // ---- logo images on plates ----
 // Shrink a canvas region to a small JPEG data URL (max 520 px wide), trimming white margins; rotate 180° when asked.
-function toLogo(src, sx, sy, sw, sh, flip = false) {
+function toLogo(src, sx, sy, sw, sh, flip = false, stripLines = false) {
   sx = Math.max(0, Math.round(sx)); sy = Math.max(0, Math.round(sy));
   sw = Math.min(src.width - sx, Math.round(sw)); sh = Math.min(src.height - sy, Math.round(sh));
   if (sw < 4 || sh < 4) return '';
+  if (stripLines) {
+    // drop straight drawing lines (old plate borders / score lines) that run along the edges of a cut-out
+    const px = src.getContext('2d').getImageData(sx, sy, sw, sh).data;
+    const dark = (x, y) => { const i = (y * sw + x) * 4; return px[i] + px[i + 1] + px[i + 2] < 520; };
+    // a 3-pixel strip, so slightly wavy hand-drawn lines count too
+    const colLine = (x) => { let n = 0; for (let y = 0; y < sh; y++) if (dark(x, y) || (x > 0 && dark(x - 1, y)) || (x < sw - 1 && dark(x + 1, y))) n++; return n > sh * 0.5; };
+    const rowLine = (y) => { let n = 0; for (let x = 0; x < sw; x++) if (dark(x, y) || (y > 0 && dark(x, y - 1)) || (y < sh - 1 && dark(x, y + 1))) n++; return n > sw * 0.5; };
+    let l = 0, r = sw - 1, t = 0, b = sh - 1;
+    for (let x = 0; x < sw * 0.22; x++) if (colLine(x)) l = x + 1;
+    for (let x = sw - 1; x > sw * 0.78; x--) if (colLine(x)) r = x - 1;
+    for (let y = 0; y < sh * 0.18; y++) if (rowLine(y)) t = y + 1;
+    for (let y = sh - 1; y > sh * 0.82; y--) if (rowLine(y)) b = y - 1;
+    if (r - l > 8 && b - t > 8) { sx += l; sy += t; sw = r - l + 1; sh = b - t + 1; }
+  }
   // trim near-white margins
   const d = src.getContext('2d').getImageData(sx, sy, sw, sh).data;
   let x0 = sw, y0 = sh, x1 = -1, y1 = -1;
@@ -418,7 +432,7 @@ async function cutLogos(files, aiPlates) {
       if (!pages[key]) pages[key] = await pageCanvas(files[fi], pg, 2400);
       const c = pages[key], W = c.width, H = c.height;
       const padX = (b[2] - b[0]) * 0.06 * W, padY = (b[3] - b[1]) * 0.08 * H;
-      const url = toLogo(c, b[0] * W - padX, b[1] * H - padY, (b[2] - b[0]) * W + 2 * padX, (b[3] - b[1]) * H + 2 * padY, !!p.flip);
+      const url = toLogo(c, b[0] * W - padX, b[1] * H - padY, (b[2] - b[0]) * W + 2 * padX, (b[3] - b[1]) * H + 2 * padY, !!p.flip, true);
       if (url) { p.img = url; n++; }
     } catch (e) { console.warn('logo cut', e); }
   }
@@ -780,9 +794,9 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const lines = String(p.text || '').toUpperCase().split('\n').flatMap((x) => wrap(x, per)).slice(0, maxL);
     const y1 = m - ((lines.length - 1) * (fs + 1.5)) / 2 + fs * 0.35;
     const txt = p.img
-      ? `<image href="${p.img}" x="${(xa + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(xb - xa - 4).toFixed(1)}" height="${(h - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet"/>`
+      ? `<image href="${p.img}" x="${(xa + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(xb - xa - 4).toFixed(1)}" height="${(h - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="mix-blend-mode:multiply"/>`
       : lines.map((ln, k) => t(cx, y1 + k * (fs + 1.5), ln, { size: fs, weight: 600 })).join('');
-    o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : ''}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.3"/>${txt}</g></g>`);
+    o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : ''}><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
     p.xa = xa; p.xb = xb; p.e = p.s + w;
   });
