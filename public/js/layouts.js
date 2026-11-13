@@ -839,14 +839,11 @@ function drawing(d, selIdx = -1, drawH = 270) {
       const a = X(scores[i]), b = X(scores[i + 1]), lab = f(v), narrow = b - a < lab.length * 6.2 + 6;
       o.push(narrow ? t(i === 0 ? a - 3 : b + 3, y0 - 7, lab, { size: 10, weight: 700, anchor: i === 0 ? 'end' : 'start' }) : t((a + b) / 2, y0 - 7, lab, { size: 10, weight: 700 }));
     });
-    // bottom: running total at each score
-    let last = -Infinity, lift = false;
-    scores.slice(1).forEach((sc) => {
-      const x = X(sc), lab = f(sc);
-      lift = x - last < lab.length * 6.2 + 4 ? !lift : false; // stagger labels that would touch
-      o.push(`<line x1="${x.toFixed(1)}" y1="${y0 + H + 3}" x2="${x.toFixed(1)}" y2="${y0 + H + (lift ? 20 : 9)}" stroke="${INK}" stroke-width=".8"/>`);
-      o.push(t(x, y0 + H + (lift ? 30 : 19), lab, { size: 10, weight: 700 }));
-      last = x;
+    // bottom: running total at the end of each panel, centered under that panel (same layout as the top row)
+    scores.forEach((sc) => o.push(`<line x1="${X(sc).toFixed(1)}" y1="${y0 + H + 3}" x2="${X(sc).toFixed(1)}" y2="${y0 + H + 16}" stroke="${INK}" stroke-width=".8"/>`));
+    lp.forEach((v, i) => {
+      const a = X(scores[i]), b = X(scores[i + 1]), lab = f(scores[i + 1]), narrow = b - a < lab.length * 6.2 + 6;
+      o.push(narrow ? t(i === 0 ? a - 3 : b + 3, y0 + H + 13, lab, { size: 10, weight: 700, anchor: i === 0 ? 'end' : 'start' }) : t((a + b) / 2, y0 + H + 13, lab, { size: 10, weight: 700 }));
     });
   }
   const blankNote = isFinite(bl) && bl > 0 && lp.length && !near(bl, totL) ? ` (blank ${f(bl)})` : '';
