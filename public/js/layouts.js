@@ -824,7 +824,11 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const pr = shadedRows.has(i);
     cumW += rows[i];
     o.push(t(x0 - 14, wp.length ? r.m - 3 : r.m + 3.5, `P${i + 1}${pr ? ' *' : ''}`, { anchor: 'end', fill: pr ? RED : '#888', size: 9.5 }));
-    if (wp.length) o.push(t(x0 - 14, r.m + 10, f(rows[i]), { anchor: 'end', size: 10, weight: 700 }));
+    if (wp.length) {
+      o.push(t(x0 - 14, r.m + 10, f(rows[i]), { anchor: 'end', size: 10, weight: 700 }));
+      o.push(`<line x1="${x0 - 7}" y1="${(r.y + 1.5).toFixed(1)}" x2="${x0 - 7}" y2="${(r.y + r.h - 1.5).toFixed(1)}" stroke="${INK}" stroke-width=".8" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
+      o.push(`<line x1="${x0 - 11}" y1="${r.y.toFixed(1)}" x2="${x0 - 3}" y2="${r.y.toFixed(1)}" stroke="${INK}" stroke-width=".8"/>`);
+    }
     o.push(`<line x1="${x1 + 4}" y1="${r.y.toFixed(1)}" x2="${x1 + 14}" y2="${r.y.toFixed(1)}" stroke="${INK}"/>`);
     if (wp.length) o.push(t(x1 + 46, r.m + 3.5, f(cumW), { size: 10.5, weight: 700 }));
   });
@@ -834,17 +838,17 @@ function drawing(d, selIdx = -1, drawH = 270) {
   const yb = y0 + H + 18;
   if (lp.length) {
     // top: size of each length panel
-    scores.forEach((sc) => o.push(`<line x1="${X(sc).toFixed(1)}" y1="${y0 - 16}" x2="${X(sc).toFixed(1)}" y2="${y0 - 3}" stroke="${INK}" stroke-width=".8"/>`));
-    lp.forEach((v, i) => {
-      const a = X(scores[i]), b = X(scores[i + 1]), lab = f(v), narrow = b - a < lab.length * 6.2 + 6;
-      o.push(narrow ? t(i === 0 ? a - 3 : b + 3, y0 - 7, lab, { size: 10, weight: 700, anchor: i === 0 ? 'end' : 'start' }) : t((a + b) / 2, y0 - 7, lab, { size: 10, weight: 700 }));
+    const dimRow = (yl, label) => lp.forEach((v, i) => {
+      const a = X(scores[i]), b = X(scores[i + 1]), lab = label(i), w = lab.length * 6.2 + 6, narrow = b - a < w + 4;
+      o.push(arrow(a + 0.5, b - 0.5, yl, INK));
+      if (narrow) o.push(t(i === 0 ? a - 3 : b + 3, yl + 3.5, lab, { size: 10, weight: 700, anchor: i === 0 ? 'end' : 'start' }));
+      else o.push(`<rect x="${((a + b) / 2 - w / 2).toFixed(1)}" y="${(yl - 7).toFixed(1)}" width="${w.toFixed(1)}" height="13" fill="#fff"/>` + t((a + b) / 2, yl + 3.5, lab, { size: 10, weight: 700 }));
     });
+    scores.forEach((sc) => o.push(`<line x1="${X(sc).toFixed(1)}" y1="${y0 - 18}" x2="${X(sc).toFixed(1)}" y2="${y0 - 3}" stroke="${INK}" stroke-width=".8"/>`));
+    dimRow(y0 - 10, (i) => f(lp[i]));
     // bottom: running total at the end of each panel, centered under that panel (same layout as the top row)
-    scores.forEach((sc) => o.push(`<line x1="${X(sc).toFixed(1)}" y1="${y0 + H + 3}" x2="${X(sc).toFixed(1)}" y2="${y0 + H + 16}" stroke="${INK}" stroke-width=".8"/>`));
-    lp.forEach((v, i) => {
-      const a = X(scores[i]), b = X(scores[i + 1]), lab = f(scores[i + 1]), narrow = b - a < lab.length * 6.2 + 6;
-      o.push(narrow ? t(i === 0 ? a - 3 : b + 3, y0 + H + 13, lab, { size: 10, weight: 700, anchor: i === 0 ? 'end' : 'start' }) : t((a + b) / 2, y0 + H + 13, lab, { size: 10, weight: 700 }));
-    });
+    scores.forEach((sc) => o.push(`<line x1="${X(sc).toFixed(1)}" y1="${y0 + H + 3}" x2="${X(sc).toFixed(1)}" y2="${y0 + H + 18}" stroke="${INK}" stroke-width=".8"/>`));
+    dimRow(y0 + H + 11, (i) => f(scores[i + 1]));
   }
   const blankNote = isFinite(bl) && bl > 0 && lp.length && !near(bl, totL) ? ` (blank ${f(bl)})` : '';
   o.push(t((x0 + x1) / 2, yb + 24, lp.length ? `${f(totL)} scored length${blankNote}` : isFinite(bl) && bl > 0 ? `${f(bl)} blank length` : '', { size: 10.5, weight: 600 }));
