@@ -653,7 +653,7 @@ function addEdits() {
 }
 
 // ---- the sheet ----
-function sheetHtml(d, selIdx = -1) {
+function sheetHtml(d, selIdx = -1, opt = {}) {
   const cell = (t, v, k) => `<div class="ls-cell" data-edit="${k}"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`;
   const blank = d.blankW || d.blankL ? `${show(d.blankW) || '?'} x ${show(d.blankL) || '?'}` : '';
   const notes = d.notes.split('\n').map((x) => x.trim()).filter(Boolean);
@@ -666,7 +666,7 @@ function sheetHtml(d, selIdx = -1) {
   const dtexts = allT.map((x, k) => ({ x: String(x || ''), k })).filter((o) => o.x.trim()).slice(0, 4);
   const changes = d.changes.split('\n').map((x) => x.trim().replace(/^[-•]\s*/, '')).filter(Boolean);
   const head2 = [d.specNo && `Spec # ${esc(d.specNo)}`, d.fileNo && `File # ${esc(d.fileNo)}`].filter(Boolean).join('&nbsp; | &nbsp;');
-  return `<div class="lsheet">
+  return `<div class="lsheet${opt.print ? ' ls-print' : ''}">
     <div class="ls-top"><div class="ls-title">PRINT LAYOUT SHEET</div><div class="ls-co">GoldenWest Packaging Group&nbsp; | &nbsp;Ontario, CA${head2 ? `<br>${head2}` : ''}</div></div>
     <div class="ls-grid">
       ${cell('CUSTOMER', d.customer, 'customer')}${cell('SHIP TO', d.shipTo, 'shipTo')}${cell('FILE #', d.fileNo, 'fileNo')}
@@ -675,8 +675,8 @@ function sheetHtml(d, selIdx = -1) {
       ${cell('PRINT', d.print, 'print')}${cell('ROUTING', d.routing, 'routing')}${cell('VIEW', d.view, 'view')}
     </div>
     <div class="ls-h">BLANK LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
-    ${drawing(d, selIdx)}
-    <div class="ls-boxes">
+    ${drawing(d, selIdx, opt.H)}
+    <div class="ls-boxes"${opt.boxesH ? ` style="min-height:${opt.boxesH}px"` : ''}>
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
       <div class="ls-box ls-detail"><div class="ls-bh">PRINT DETAIL (ZOOMED IN)</div>
         ${pics.length ? `<div class="ls-pics">${pics.map((x) => `<figure><img src="${x.img}" alt=""><figcaption>${esc(x.caption)}</figcaption></figure>`).join('')}</div>` : '<div class="ls-empty ls-nopic">No close-up yet. Add one under "Print detail box", or add a logo to a plate.</div>'}
@@ -688,9 +688,9 @@ function sheetHtml(d, selIdx = -1) {
 
 // SVG of the blank: width panels as rows (height exaggerated), length scores as columns, plates and the gaps between them.
 let mkSeq = 0;
-function drawing(d, selIdx = -1) {
+function drawing(d, selIdx = -1, drawH = 270) {
   const uid = 'm' + (++mkSeq) + '-'; // own arrowhead ids per copy (the hidden preview's ids would not print)
-  const x0 = 64, x1 = 850, y0 = 14, H = 270;
+  const x0 = 64, x1 = 850, y0 = 14, H = drawH || 270;
   const wp = nums(d.widthPanels), lp = nums(d.lengthPanels);
   const bw = pin(d.blankW), bl = pin(d.blankL);
   const rows = wp.length ? wp : [isFinite(bw) && bw > 0 ? bw : 1];
@@ -860,11 +860,33 @@ function wrap(s, n) {
   return out.map((x) => (x.length > n ? x.slice(0, n - 1) + '…' : x));
 }
 
+// Fill one landscape letter page (about 998 × 758 px printable at 0.3" margins):
+// measure the sheet as it prints, then give the spare height to the drawing (and the rest to the bottom boxes).
+// A sheet that is too tall is scaled down instead.
 function printSheet() {
-  // fit on one landscape letter page (about 998 × 758 px printable at 0.3" margins)
-  const sh = $('#lSheet .lsheet'), h = sh ? sh.offsetHeight : 760;
-  const k = Math.min(0.99, 740 / h);
-  openPrint(`<style>@page{size:letter landscape;margin:0.3in}</style><div class="lsheet-print" style="zoom:${k.toFixed(3)}">${sheetHtml(L)}</div>`);
+  const AVAIL = 736;
+  const measure = (o) => {
+    const m = document.createElement('div');
+    m.style.cssText = 'position:absolute;left:-10000px;top:0;width:1000px;visibility:hidden;font-size:12.5px;line-height:1.35;color:#000;background:#fff';
+    m.innerHTML = sheetHtml(L, -1, { print: true, ...o });
+    document.body.appendChild(m);
+    const r = { h: m.firstElementChild.offsetHeight, boxes: (m.querySelector('.ls-boxes') || {}).offsetHeight || 0 };
+    m.remove();
+    return r;
+  };
+  let o = { H: 270 }, k = 0.998;
+  const m0 = measure(o);
+  if (m0.h < AVAIL) {
+    const extra = AVAIL - m0.h, add = Math.min(extra, 260);
+    o = { H: 270 + add, boxesH: extra - add > 4 ? m0.boxes + (extra - add) : 0 };
+  } else {
+    // too tall: make the drawing shorter first (its height is exaggerated anyway), then shrink only what is left over
+    const H = Math.max(150, 270 - (m0.h - AVAIL));
+    o = { H };
+    const m1 = measure(o);
+    if (m1.h > AVAIL) k = Math.min(0.998, AVAIL / m1.h);
+  }
+  openPrint(`<style>@page{size:letter landscape;margin:0.3in}</style><div class="lsheet-print" style="zoom:${k.toFixed(3)}">${sheetHtml(L, -1, { print: true, ...o })}</div>`);
 }
 
 // ---- saved layouts ----

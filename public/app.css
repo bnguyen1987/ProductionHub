@@ -445,3 +445,10 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .ls-dtexts .ls-dtext{flex:1;min-width:0;border:1px solid #ccd3db;padding:5px 7px;font-size:10.5px;min-height:56px;line-height:1.35;overflow-wrap:anywhere}
 .lsheet .ls-dtexts .ls-dnew{border-style:dashed;display:flex;align-items:center;justify-content:center;flex:0 0 90px}
 #printSheet .ls-dnew{display:none}
+.lsheet.ls-print{width:1000px;padding:0}
+.lsheet.ls-print .ls-add,.lsheet.ls-print .ls-nopic,.lsheet.ls-print .ls-dnew{display:none}
+#printSheet .lsheet.ls-print .ls-pics img,.lsheet.ls-print .ls-pics img{height:88px;max-height:none;width:100%;object-fit:contain}
+.lsheet.ls-print .ls-pics{padding:6px 8px}
+.lsheet.ls-print .ls-cell{min-height:32px;padding:3px 8px}
+.lsheet.ls-print .ls-h{margin:8px 0 0}
+.lsheet.ls-print .ls-dtexts .ls-dtext{min-height:44px}
