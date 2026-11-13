@@ -44,6 +44,10 @@ grade_number: the number in the board grade (200 in "200 C Kraft", 32 in "32 ECT
 
 const LAYOUT_PROMPT = `You are reading an OLD print layout / specification sheet for a corrugated box plant (often a scan or photo, sometimes with handwritten corrections).
 The goal is to redraw it as a clean new spec sheet, so read every number carefully.
+You may get several attachments, or one PDF with several pages. At this plant the FIRST attachment (or page 1) is usually the BOX MEASUREMENT drawing (box size, blank size, score / panel dimensions) and the SECOND attachment (or page 2) is usually the PRINT LAYOUT (where the print goes, plate copy, ink, BMC).
+Take box size, blank size, width_panels and length_panels from the measurement drawing. Take printed panels, plates, the BMC and print notes from the print layout. Header fields (customer, ship to, file/spec #, board, routing, dates) can come from either page.
+If the two attachments disagree on a size or score, use the measurement drawing and add a line to "changes" saying what the print layout had.
+If the attachments come in a different order (for example the print layout first), work out which is which from what they show.
 Write all dimensions as inches with sixteenths fractions, like "34 1/16" or "4 7/8" (spec sheets may write 33\`08 or 33-8, which means 33 8/16 = 33 1/2).
 HANDWRITTEN corrections, cross-outs or notes win over the printed value: use the corrected value in the fields and list each one in "changes" with the old value, e.g. "Board updated: 200# C Kraft -> ECT 32 C" or "Panel scores updated (old sheet: 4 3/4 | 9 5/8 | 4 15/16 | 9 5/8 | 4 13/16)".
 Panels: width_panels are the score panels ACROSS the sheet width, top to bottom as drawn (they add up to the blank width). length_panels are the score panels ALONG the sheet length, left to right (they add up to the scored length; for an RSC this is glue flap, L, W, L, W). Leave a list empty if the sheet does not show it.
@@ -70,28 +74,34 @@ export default async (req: Request) => {
 
   let body: any;
   try { body = await req.json(); } catch { return Response.json({ error: "Bad request" }, { status: 400 }); }
-  const { task, data, mediaType } = body || {};
-  if (!["ink", "quote", "dieline", "layout"].includes(task) || typeof data !== "string" || !mediaType) {
+  const { task } = body || {};
+  // One file ({data, mediaType}) or, for layouts, several ({files:[{data, mediaType, name}]}).
+  const files: any[] = Array.isArray(body?.files) ? body.files.slice(0, 4) : [{ data: body?.data, mediaType: body?.mediaType }];
+  if (!["ink", "quote", "dieline", "layout"].includes(task) || !files.length || files.some((f) => typeof f?.data !== "string" || !f?.mediaType)) {
     return Response.json({ error: "Missing file or task" }, { status: 400 });
   }
   if (!process.env.ANTHROPIC_BASE_URL && !process.env.ANTHROPIC_API_KEY) {
     return Response.json({ error: "AI is not active on this site yet. Manual entry still works." }, { status: 503 });
   }
 
-  const isPdf = mediaType === "application/pdf";
-  if (!isPdf && !/^image\/(jpeg|png|webp|gif)$/.test(mediaType)) {
+  if (files.some((f) => f.mediaType !== "application/pdf" && !/^image\/(jpeg|png|webp|gif)$/.test(f.mediaType))) {
     return Response.json({ error: "Upload a photo (JPG/PNG) or a PDF." }, { status: 400 });
   }
-  const fileBlock: any = isPdf
-    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data } }
-    : { type: "image", source: { type: "base64", media_type: mediaType, data } };
+  const blockOf = (f: any): any => f.mediaType === "application/pdf"
+    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: f.data } }
+    : { type: "image", source: { type: "base64", media_type: f.mediaType, data: f.data } };
+  const content: any[] = [];
+  files.forEach((f, i) => {
+    if (files.length > 1) content.push({ type: "text", text: `Attachment ${i + 1}${f.name ? ` (${String(f.name).slice(0, 80)})` : ""}:` });
+    content.push(blockOf(f));
+  });
 
   try {
     const client = new Anthropic();
     const msg = await client.messages.create({
       model: MODEL,
       max_tokens: task === "layout" ? 3000 : 1200,
-      messages: [{ role: "user", content: [fileBlock, { type: "text", text: task === "ink" ? INK_PROMPT : task === "dieline" ? DIELINE_PROMPT : task === "layout" ? LAYOUT_PROMPT : QUOTE_PROMPT }] }],
+      messages: [{ role: "user", content: [...content, { type: "text", text: task === "ink" ? INK_PROMPT : task === "dieline" ? DIELINE_PROMPT : task === "layout" ? LAYOUT_PROMPT : QUOTE_PROMPT }] }],
     });
     const text = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
     const match = text.match(/\{[\s\S]*\}/);

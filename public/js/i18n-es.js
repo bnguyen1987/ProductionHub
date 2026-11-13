@@ -19,6 +19,11 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Drop the box measurements and the print layout': 'Suelte las medidas de la caja y el diseño de impresión',
+  '(box measurements)': '(medidas de la caja)',
+  'Pick both files at once: 1st the box measurements, 2nd the print layout (or one PDF with both pages). Handwritten changes are picked up too.': 'Escoja los dos archivos a la vez: 1ro las medidas de la caja, 2do el diseño de impresión (o un PDF con las dos páginas). También se leen los cambios escritos a mano.',
+  '(print layout)': '(diseño de impresión)',
+  'Those files are too large together (max about 4 MB). Upload just the print layout, or use photos/screenshots instead of PDFs.': 'Los archivos juntos son muy grandes (máx. unos 4 MB). Suba solo el diseño de impresión, o use fotos/capturas en vez de PDF.',
   '+ Add BMC': '+ Agregar BMC',
   '+ Add text': '+ Agregar texto',
   'Print, BMC and text on the sheet': 'Impresión, BMC y texto en la hoja',
@@ -543,6 +548,7 @@ export const ES = {
 export const PATTERNS = [
   [/^Size limit (\d+)" · Gross wt (\d+) lbs(?: · Facings (\d+) lbs\/MSF)?$/, (m, a, b, c) => `Límite de tamaño ${a}" · Peso bruto ${b} lbs${c ? ` · Liners ${c} lbs/MSF` : ''}`],
   [/^Found a BMC note and made a stamp \((.+)\)\.(.*)$/, (m, a, b) => `Se encontró una nota de BMC y se hizo un sello (${a}).${b ? ' No decía dónde va, así que está en medio de un panel. Muévalo si hace falta.' : ''}`],
+  [/^Reading (\d+) files… this can take 20–40 seconds\.$/, 'Leyendo $1 archivos… puede tardar de 20 a 40 segundos.'],
   [/^Reading (.+)… this can take 20–40 seconds\.$/, 'Leyendo $1… puede tardar de 20 a 40 segundos.'],
   [/^Added (\d+) lines?\.$/, 'Se agregaron $1 línea(s).'],
   [/^Adds up to$/, 'Suma'],

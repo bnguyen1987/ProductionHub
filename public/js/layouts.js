@@ -1,6 +1,6 @@
 // Print Layouts: upload an old print layout / spec sheet, the AI reads it, and the page redraws it as a clean new spec sheet.
 // Draft stays in this browser (localStorage). Saved layouts go to /api/layouts so anyone can open and reprint them.
-import { $, $$, esc, api, fileToPayload, setupDrop, parseInches, fmtIn, saveForm, loadForm } from './common.js';
+import { $, $$, esc, api, fileToPayload, parseInches, fmtIn, saveForm, loadForm } from './common.js';
 import { openPrint } from './printkit.js';
 
 const today = () => { const d = new Date(); return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`; };
@@ -58,9 +58,9 @@ export function render(v) {
         <section class="card">
           <h2><span class="n">1</span>Upload old layout</h2>
           <label class="drop" id="lDrop">
-            <input type="file" accept="application/pdf,image/*" aria-label="Upload old layout">
-            <div class="big">Drop a PDF or take a photo of the old layout</div>
-            <div class="hint">Handwritten changes on the sheet are picked up too</div>
+            <input type="file" accept="application/pdf,image/*" multiple aria-label="Upload old layout">
+            <div class="big">Drop the box measurements and the print layout</div>
+            <div class="hint">Pick both files at once: 1st the box measurements, 2nd the print layout (or one PDF with both pages). Handwritten changes are picked up too.</div>
           </label>
           <div id="lAiMsg" style="margin-top:10px"></div>
         </section>
@@ -124,7 +124,11 @@ export function render(v) {
       </div>
     </div>`;
 
-  setupDrop($('#lDrop'), readLayout);
+  const drop = $('#lDrop'), inp = drop.querySelector('input');
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('drag'); if (e.dataTransfer.files.length) readLayout([...e.dataTransfer.files]); });
+  inp.addEventListener('change', () => { if (inp.files.length) readLayout([...inp.files]); inp.value = ''; });
   view.addEventListener('input', onInput);
   view.addEventListener('change', onInput);
   const mid = () => { const lp = nums(L.lengthPanels), tl = lp.length ? sum(lp) : pin(L.blankL); return isFinite(tl) && tl > 0 ? fx(Math.max(0, tl / 2 - 3)) : '10'; };
@@ -280,12 +284,16 @@ function fit() {
 }
 
 // ---- AI read ----
-async function readLayout(file) {
+async function readLayout(input) {
+  const files = (Array.isArray(input) ? input : [input]).slice(0, 4);
   const msg = $('#lAiMsg');
-  msg.innerHTML = `<div class="alert info"><span class="spinner"></span> Reading ${esc(file.name)}… this can take 20–40 seconds.</div>`;
+  msg.innerHTML = `<div class="alert info"><span class="spinner"></span> Reading ${files.length > 1 ? `${files.length} files` : esc(files[0].name)}… this can take 20–40 seconds.</div>${files.length > 1 ? `<ol class="hint lay-files">${files.map((f, i) => `<li>${esc(f.name)}${i === 0 ? ' <b>(box measurements)</b>' : i === 1 ? ' <b>(print layout)</b>' : ''}</li>`).join('')}</ol>` : ''}`;
   try {
-    const payload = await fileToPayload(file);
-    const { result: r } = await api('/api/ai', { method: 'POST', body: JSON.stringify({ task: 'layout', ...payload }) });
+    const list = [];
+    for (const f of files) list.push({ ...(await fileToPayload(f)), name: f.name });
+    const size = list.reduce((t, x) => t + x.data.length, 0);
+    if (size > 5_200_000) throw new Error('Those files are too large together (max about 4 MB). Upload just the print layout, or use photos/screenshots instead of PDFs.');
+    const { result: r } = await api('/api/ai', { method: 'POST', body: JSON.stringify({ task: 'layout', files: list }) });
     const str = (x) => (x === null || x === undefined ? '' : String(x).trim());
     const arr = (x) => (Array.isArray(x) ? x : []);
     const n = arr(r.width_panels).length;
