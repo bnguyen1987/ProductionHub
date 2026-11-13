@@ -124,7 +124,6 @@ export async function runAi(task: string, files: any[]): Promise<{ status: numbe
     const stream = client.messages.stream({
       model: MODEL,
       max_tokens: task === "layout" ? 16000 : 1200,
-      temperature: 0,
       messages: [{ role: "user", content: [...content, { type: "text", text: PROMPTS[task] }] }],
     });
     const msg: any = await stream.finalMessage();
