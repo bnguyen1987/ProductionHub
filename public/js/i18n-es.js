@@ -19,6 +19,7 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Extra small': 'Extra chico',
   'Move down': 'Mover abajo',
   'Move up': 'Mover arriba',
   'Move:': 'Mover:',

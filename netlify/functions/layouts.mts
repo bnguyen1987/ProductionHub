@@ -19,7 +19,7 @@ function clean(b: any) {
     start: s(p?.start, 20), width: s(p?.width, 20), text: s(p?.text, 200), flip: !!p?.flip, hl: !!p?.hl, nodim: !!p?.nodim, dy: Math.max(-0.45, Math.min(0.45, Number(p?.dy) || 0)),
     img: typeof p?.img === "string" && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(p.img) && p.img.length < 400_000 ? p.img : "",
     kind: ["plate", "bmc", "text"].includes(p?.kind) ? p.kind : "plate",
-    test: p?.test === "Mullen" ? "Mullen" : "ECT", wall: p?.wall === "double" ? "double" : "single", rating: s(p?.rating, 6), size: ["S", "M", "L"].includes(p?.size) ? p.size : "M",
+    test: p?.test === "Mullen" ? "Mullen" : "ECT", wall: p?.wall === "double" ? "double" : "single", rating: s(p?.rating, 6), size: ["XS", "S", "M", "L"].includes(p?.size) ? p.size : "M",
   }));
   doc.notes = s(b.notes, 4000);
   doc.changes = s(b.changes, 4000);

@@ -321,7 +321,7 @@ function paintPlates() {
       <div class="field"><label>Rating</label><select data-p="rating">${ratings.map((r) => opt(r, b.v, b.tst === 'ECT' ? r + ' ECT' : r + ' lb')).join('')}</select></div>
       <div class="hint bmc-vals">${b.row ? `Size limit ${b.row[1]}" · Gross wt ${b.row[0]} lbs${b.row[2] ? ` · Facings ${b.row[2]} lbs/MSF` : ''}` : 'Not a standard rating. Check the values on the stamp.'}</div>`;
     } else if (kind === 'text') {
-      mid = `<div class="field"><label>Size</label><select data-p="size">${opt('S', p.size, 'Small')}${opt('M', p.size || 'M', 'Medium')}${opt('L', p.size, 'Large')}</select></div>
+      mid = `<div class="field"><label>Size</label><select data-p="size">${opt('XS', p.size, 'Extra small')}${opt('S', p.size, 'Small')}${opt('M', p.size || 'M', 'Medium')}${opt('L', p.size, 'Large')}</select></div>
       <div class="field grow"><label>Text</label><textarea data-p="text" rows="2" placeholder="Type anything (Enter = new line)">${esc(p.text)}</textarea></div>`;
     } else {
       mid = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div>
@@ -763,7 +763,7 @@ function drawing(d, selIdx = -1) {
     const selBox = (x, y, w, h) => { if (p.i === selIdx) o.push(`<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="3" fill="none" stroke="#1a73e8" stroke-width="2.5" stroke-dasharray="5 3" pointer-events="none"/>`); };
     const rot = (cx) => (p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : '');
     if (p.kind === 'text') {
-      const fs = { S: 8, M: 11, L: 15 }[p.size] || 11;
+      const fs = { XS: 6, S: 8, M: 11, L: 15 }[p.size] || 11;
       let ls = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
       if (!ls.length) ls = ['TEXT'];
       const lh = fs * 1.2, hh = ls.length * lh + fs * 0.3;
