@@ -413,3 +413,12 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .ls-seal{width:140px;height:140px;display:block;margin:0 auto}
 .lsheet .ls-bmcpos{font-size:9.5px;color:#333}
 .lay-files{margin:6px 0 0;padding-left:20px}
+#lSheet .ls-plate{touch-action:none}
+#lSheet .ls-plate:active{cursor:grabbing}
+#lSheet .dragging [stroke="#1a73e8"]{display:none}
+#lSheet [data-edit]{cursor:text;border-radius:2px}
+#lSheet [data-edit]:hover{outline:2px dashed #1a73e8;outline-offset:-2px;background:#f0f6ff}
+.lsheet .ls-add{list-style:none;color:#1a73e8;font-size:10.5px;margin-left:-14px}
+#printSheet .ls-add{display:none}
+.lay-preview{position:relative}
+.sheet-editor{position:absolute;z-index:30;background:var(--panel);border:1px solid var(--accent);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px;display:flex;flex-direction:column;gap:8px}

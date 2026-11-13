@@ -206,4 +206,5 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - Plate start is measured from the left edge of the blank. "Add my edits to the changes" lists fields changed after the read.
 - Saved layouts: `/api/layouts` (Netlify Blobs store `print-layouts`, key `l/<id>`). Draft also kept in localStorage `gwprod_layout`.
 - Upload takes several files: 1st = box measurement drawing (sizes, scores), 2nd = print layout (plates, BMC, print notes). The AI is told which is which and to trust the measurements when they disagree.
+- On the preview: drag a plate, BMC or text to move it (snaps to 1/16", drops onto the panel under it). Click any words (header boxes, notes, changes, sign-off, blank size) to edit them in a small box; tap a selected item again to change its copy.
 - Items on the sheet (`plates`) have a `kind`: plate, bmc (Box Maker's Certificate stamp: test ECT/Mullen, wall, rating → size limit / gross wt / facings from the freight-rule table) or text (typed words, S/M/L). Tap any item to select, highlight (prints yellow) or delete (undo). The AI turns a handwritten BMC note into a stamp. Print scales to fit one page.

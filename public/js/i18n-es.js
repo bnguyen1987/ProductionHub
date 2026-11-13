@@ -19,6 +19,13 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Edit text': 'Editar texto',
+  'Drag a print, BMC or text to move it. Tap it to highlight or delete it. Tap any words on the sheet to change them.': 'Arrastre una impresión, BMC o texto para moverlo. Tóquelo para resaltarlo o borrarlo. Toque cualquier palabra de la hoja para cambiarla.',
+  'New note': 'Nota nueva',
+  'New change': 'Cambio nuevo',
+  'Change line': 'Línea de cambio',
+  'Blank size (width x length)': 'Tamaño del blank (ancho x largo)',
+  'Delete line': 'Borrar línea',
   'The AI took too long. Try again.': 'La IA tardó demasiado. Intente otra vez.',
   'Could not start the AI. Try again.': 'No se pudo iniciar la IA. Intente otra vez.',
   'The sheet had more on it than the AI could write back. Try uploading just the print layout page.': 'La hoja tenía más de lo que la IA pudo escribir. Intente subir solo la página del diseño de impresión.',
@@ -549,6 +556,7 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^Note (\d+)$/, 'Nota $1'],
   [/^Size limit (\d+)" · Gross wt (\d+) lbs(?: · Facings (\d+) lbs\/MSF)?$/, (m, a, b, c) => `Límite de tamaño ${a}" · Peso bruto ${b} lbs${c ? ` · Liners ${c} lbs/MSF` : ''}`],
   [/^Found a BMC note and made a stamp \((.+)\)\.(.*)$/, (m, a, b) => `Se encontró una nota de BMC y se hizo un sello (${a}).${b ? ' No decía dónde va, así que está en medio de un panel. Muévalo si hace falta.' : ''}`],
   [/^Reading (\d+) files… this can take up to a minute\.$/, 'Leyendo $1 archivos… puede tardar hasta un minuto.'],

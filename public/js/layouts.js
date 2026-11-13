@@ -17,7 +17,7 @@ const INFO = [
 // Fields compared by "Add my edits"
 const TRACK = [['style', 'Style'], ['size', 'Size'], ['board', 'Board'], ['blankW', 'Blank width'], ['blankL', 'Blank length'], ['print', 'Print'], ['routing', 'Routing'], ['widthPanels', 'Panel scores'], ['lengthPanels', 'Length scores']];
 
-let L, view, saved = [], ro = null, sel = -1, undo = null;
+let L, view, saved = [], ro = null, sel = -1, undo = null, dragged = false;
 
 // ---- inches ----
 const pin = (s) => parseInches(String(s ?? '').replace(/["”]/g, '').trim());
@@ -142,9 +142,21 @@ export function render(v) {
   $('#lNew').onclick = () => { if (!confirm('Clear this layout and start over?')) return; L = EMPTY(); sel = -1; undo = null; fill(); $('#lAiMsg').innerHTML = ''; $('#lSaveMsg').innerHTML = ''; };
   $('#lFind').oninput = paintList;
   $('#lSheet').addEventListener('click', (e) => {
+    if (dragged) { dragged = false; return; }
+    const ed = e.target.closest('[data-edit]');
+    if (ed) { openEditor(ed.dataset.edit, ed); return; }
     const g = e.target.closest('[data-pi]');
-    select(g ? +g.dataset.pi : -1);
+    const pi = g ? +g.dataset.pi : -1;
+    if (pi >= 0 && pi === sel && L.plates[pi] && L.plates[pi].kind !== 'bmc') { openEditor('item:' + pi, g); return; } // tap a selected item again to change its words
+    closeEditor();
+    select(pi);
   });
+  $('#lSheet').addEventListener('dblclick', (e) => {
+    const g = e.target.closest('[data-pi]');
+    const p = g && L.plates[+g.dataset.pi];
+    if (p && p.kind !== 'bmc') openEditor('item:' + g.dataset.pi, g);
+  });
+  $('#lSheet').addEventListener('pointerdown', startDrag);
   $('#lPlates').addEventListener('focusin', (e) => { const r = e.target.closest('[data-plate]'); if (r && +r.dataset.plate !== sel) select(+r.dataset.plate, false); });
   document.addEventListener('keydown', onKey);
   $('#lName').value = loadForm('layout_name') || '';
@@ -183,15 +195,16 @@ function paintSelBar() {
   if (p) {
     const what = p.kind === 'bmc' ? `<b>Selected BMC:</b> P${p.panel} · ${esc(bmcLabel(p))}` : `<b>${p.kind === 'text' ? 'Selected text:' : 'Selected print:'}</b> P${p.panel}${p.text ? ' · ' + esc(p.text) : ''}`;
     bar.innerHTML = `<span>${what}</span>
-      <span class="btn-row"><button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
+      <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
       <button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
+    if ($('#lEditSel')) $('#lEditSel').onclick = () => { const g = $(`#lSheet [data-pi="${sel}"]`); openEditor('item:' + sel, g || $('#lSheet')); };
     $('#lDelSel').onclick = () => delPlate(sel);
     $('#lDone').onclick = () => select(-1);
   } else if (undo) {
     bar.innerHTML = `<span>Deleted.</span><span class="btn-row"><button type="button" class="btn small" id="lUndo">Undo</button></span>`;
     $('#lUndo').onclick = () => { L.plates.splice(Math.min(undo.i, L.plates.length), 0, undo.p); const i = undo.i; undo = null; select(i); };
-  } else bar.innerHTML = L.plates.length ? '<span class="hint">Tap a print, BMC or text on the sheet to highlight or delete it.</span>' : '';
+  } else bar.innerHTML = L.plates.length ? '<span class="hint">Drag a print, BMC or text to move it. Tap it to highlight or delete it. Tap any words on the sheet to change them.</span>' : '';
 }
 
 function fill() {
@@ -281,6 +294,91 @@ function fit() {
   const k = Math.min(1, wrap.clientWidth / 1000);
   sh.style.transform = `scale(${k})`;
   wrap.style.height = Math.ceil(sh.offsetHeight * k) + 'px';
+}
+
+// ---- edit text right on the sheet ----
+const LABELS = { customer: 'Customer', shipTo: 'Ship to', fileNo: 'File #', design: 'Design no.', ident: 'Ident', style: 'Style', size: 'Size (L × W × D)', board: 'Board / flute',
+  blank: 'Blank size (width x length)', print: 'Print / ink', routing: 'Routing', view: 'View', origDate: 'Original date', revDate: 'Revised', sales: 'Sales', designer: 'Designer', approved: 'Approved by' };
+function editValue(key) {
+  if (key === 'blank') return L.blankW || L.blankL ? `${show(L.blankW)} x ${show(L.blankL)}` : '';
+  const [k, i] = key.split(':');
+  if (k === 'notes' || k === 'changes') return i === 'new' ? '' : L[k].split('\n').map((x) => x.trim()).filter(Boolean)[+i] || '';
+  if (k === 'item') return (L.plates[+i] || {}).text || '';
+  return L[key] ?? '';
+}
+function setValue(key, v) {
+  v = v.trim();
+  if (key === 'blank') { const m = v.split(/\s*[x×X]\s*/); L.blankW = m[0] || ''; L.blankL = m[1] || ''; return; }
+  const [k, i] = key.split(':');
+  if (k === 'notes' || k === 'changes') {
+    const arr = L[k].split('\n').map((x) => x.trim()).filter(Boolean);
+    if (i === 'new') { if (v) arr.push(v); } else if (v) arr[+i] = v; else arr.splice(+i, 1);
+    L[k] = arr.join('\n'); return;
+  }
+  if (k === 'item') { if (L.plates[+i]) L.plates[+i].text = v; return; }
+  L[key] = key === 'view' ? (/^in/i.test(v) ? 'Inside' : 'Outside') : v;
+}
+function openEditor(key, anchor) {
+  closeEditor();
+  const card = $('.lay-preview'), cr = card.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
+  const [k, i] = key.split(':');
+  const label = k === 'notes' ? (i === 'new' ? 'New note' : 'Note ' + (+i + 1)) : k === 'changes' ? (i === 'new' ? 'New change' : 'Change line') : k === 'item' ? ((L.plates[+i] || {}).kind === 'text' ? 'Text' : 'Copy on the plate') : LABELS[key] || key;
+  const long = k === 'notes' || k === 'changes' || key === 'customer' || key === 'shipTo';
+  const box = document.createElement('div');
+  box.className = 'sheet-editor';
+  box.innerHTML = `<div class="lbl">${esc(label)}</div>${long ? '<textarea rows="3"></textarea>' : '<input type="text">'}
+    <div class="btn-row"><button type="button" class="btn small primary" data-ok>Save</button><button type="button" class="btn small ghost" data-x>Cancel</button>${(k === 'notes' || k === 'changes') && i !== 'new' ? '<button type="button" class="btn small ghost danger" data-rm>Delete line</button>' : ''}</div>`;
+  card.appendChild(box);
+  const w = Math.min(380, cr.width - 16);
+  box.style.width = w + 'px';
+  box.style.left = Math.max(8, Math.min(ar.left - cr.left, cr.width - w - 8)) + 'px';
+  box.style.top = (ar.bottom - cr.top + 4) + 'px';
+  const f = box.querySelector('input,textarea');
+  f.value = editValue(key);
+  f.focus(); f.select();
+  const ok = () => { setValue(key, f.value); closeEditor(); fill(); };
+  box.querySelector('[data-ok]').onclick = ok;
+  box.querySelector('[data-x]').onclick = closeEditor;
+  const rm = box.querySelector('[data-rm]'); if (rm) rm.onclick = () => { setValue(key, ''); closeEditor(); fill(); };
+  f.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ok(); } else if (e.key === 'Escape') closeEditor(); });
+}
+function closeEditor() { $$('.sheet-editor').forEach((b) => b.remove()); }
+
+// ---- drag items on the sheet ----
+function startDrag(e) {
+  const g = e.target.closest('[data-pi]');
+  if (!g || e.button > 0) return;
+  const svg = g.ownerSVGElement, p = L.plates[+g.dataset.pi];
+  if (!svg || !p) return;
+  const toSvg = (ev) => { const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); };
+  const a = toSvg(e), x0 = +svg.dataset.x0, x1 = +svg.dataset.x1, totL = +svg.dataset.totl;
+  const rows = svg.dataset.rows.split(';').map((r) => r.split(',').map(Number));
+  const pxIn = (x1 - x0) / totL;
+  let moved = false, dx = 0, dy = 0;
+  g.setPointerCapture(e.pointerId);
+  const move = (ev) => {
+    const b = toSvg(ev); dx = b.x - a.x; dy = b.y - a.y;
+    if (!moved && Math.hypot(dx, dy) < 4) return;
+    if (!moved) { moved = true; svg.classList.add('dragging'); closeEditor(); }
+    g.setAttribute('transform', `translate(${dx.toFixed(1)} ${dy.toFixed(1)})`);
+  };
+  const up = () => {
+    g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up);
+    svg.classList.remove('dragging');
+    if (!moved) return;
+    dragged = true; setTimeout(() => (dragged = false), 60);
+    const r0 = rows[p.panel - 1] || rows[0];
+    const y = r0[0] + r0[1] / 2 + dy;
+    let k = rows.findIndex(([ry, rh]) => y >= ry && y < ry + rh);
+    if (k < 0) k = y < rows[0][0] ? 0 : rows.length - 1;
+    const w = p.kind === 'plate' && isFinite(pin(p.width)) ? pin(p.width) : 0;
+    let s = (isFinite(pin(p.start)) ? pin(p.start) : 0) + dx / pxIn;
+    s = Math.max(0, Math.min(totL - w, Math.round(s * 16) / 16));
+    p.start = f(s); p.panel = k + 1;
+    sel = +g.dataset.pi; undo = null;
+    paintPlates(); update();
+  };
+  g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
 }
 
 // ---- AI read ----
@@ -376,7 +474,7 @@ function addEdits() {
 
 // ---- the sheet ----
 function sheetHtml(d, selIdx = -1) {
-  const cell = (t, v) => `<div class="ls-cell"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`;
+  const cell = (t, v, k) => `<div class="ls-cell" data-edit="${k}"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`;
   const blank = d.blankW || d.blankL ? `${show(d.blankW) || '?'} x ${show(d.blankL) || '?'}` : '';
   const notes = d.notes.split('\n').map((x) => x.trim()).filter(Boolean);
   const changes = d.changes.split('\n').map((x) => x.trim().replace(/^[-•]\s*/, '')).filter(Boolean);
@@ -386,19 +484,19 @@ function sheetHtml(d, selIdx = -1) {
   return `<div class="lsheet">
     <div class="ls-top"><div class="ls-title">SPECIFICATION SHEET</div><div class="ls-co">GoldenWest Packaging Group&nbsp; | &nbsp;Ontario, CA${head2 ? `<br>${head2}` : ''}</div></div>
     <div class="ls-grid">
-      ${cell('CUSTOMER', d.customer)}${cell('SHIP TO', d.shipTo)}${cell('FILE #', d.fileNo)}
-      ${cell('DESIGN NO.', d.design)}${cell('IDENT', d.ident)}${cell('STYLE', d.style)}
-      ${cell('SIZE (L X W X D)', d.size)}${cell('BOARD / FLUTE', d.board)}${cell('BLANK SIZE', blank)}
-      ${cell('PRINT', d.print)}${cell('ROUTING', d.routing)}${cell('VIEW', d.view)}
+      ${cell('CUSTOMER', d.customer, 'customer')}${cell('SHIP TO', d.shipTo, 'shipTo')}${cell('FILE #', d.fileNo, 'fileNo')}
+      ${cell('DESIGN NO.', d.design, 'design')}${cell('IDENT', d.ident, 'ident')}${cell('STYLE', d.style, 'style')}
+      ${cell('SIZE (L X W X D)', d.size, 'size')}${cell('BOARD / FLUTE', d.board, 'board')}${cell('BLANK SIZE', blank, 'blank')}
+      ${cell('PRINT', d.print, 'print')}${cell('ROUTING', d.routing, 'routing')}${cell('VIEW', d.view, 'view')}
     </div>
     <div class="ls-h">BLANK LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
     ${drawing(d, selIdx)}
     <div class="ls-boxes${bmcs.length ? ' has-bmc' : ''}">
-      <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x) => `<li>${esc(x)}</li>`).join('') || '<li class="ls-empty">No notes</li>'}</ol></div>
+      <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
       ${bmcs.length ? `<div class="ls-box ls-bmcbox"><div class="ls-bh">BOX CERTIFICATE (BMC)</div><div class="ls-seals">${bmcs.map((b, k) => `<div>${sealSvg(b, 'd' + k)}<div class="ls-bmcpos">On P${b.panel}, ${esc(show(b.start))}" from left edge${b.flip ? ', upside down' : ''}</div></div>`).join('')}</div></div>` : ''}
-      <div class="ls-box"><div class="ls-bh">REVISION - CHANGES${d.origDate ? ` FROM ${esc(d.origDate)} SHEET` : ''}</div><ul>${changes.map((x) => `<li>${esc(x)}</li>`).join('') || '<li class="ls-empty">No changes listed</li>'}</ul></div>
+      <div class="ls-box"><div class="ls-bh">REVISION - CHANGES${d.origDate ? ` FROM ${esc(d.origDate)} SHEET` : ''}</div><ul>${changes.map((x, k) => `<li data-edit="changes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="changes:new">+ add change</li></ul></div>
     </div>
-    <div class="ls-foot">${[['ORIGINAL DATE', d.origDate], ['REVISED', d.revDate], ['SALES', d.sales], ['DESIGNER', d.designer], ['APPROVED BY', d.approved]].map(([t, v]) => `<div><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`).join('')}</div>
+    <div class="ls-foot">${[['ORIGINAL DATE', d.origDate, 'origDate'], ['REVISED', d.revDate, 'revDate'], ['SALES', d.sales, 'sales'], ['DESIGNER', d.designer, 'designer'], ['APPROVED BY', d.approved, 'approved']].map(([t, v, k]) => `<div data-edit="${k}"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`).join('')}</div>
   </div>`;
 }
 
@@ -459,7 +557,7 @@ function drawing(d, selIdx = -1) {
     if (p.kind === 'text') {
       const fs = { S: 8, M: 11, L: 15 }[p.size] || 11, txt = String(p.text || '').trim() || 'TEXT';
       const w = txt.length * fs * 0.6 + 6, xa = X(p.s), y = r.m - fs * 0.75;
-      o.push(`<g class="ls-plate" data-pi="${p.i}"${rot(xa + w / 2)}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${(fs * 1.5).toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}"/>${t(xa + 3, r.m + fs * 0.35, txt, { size: fs, weight: 700, anchor: 'start' })}</g>`);
+      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(xa + w / 2)}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${(fs * 1.5).toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}"/>${t(xa + 3, r.m + fs * 0.35, txt, { size: fs, weight: 700, anchor: 'start' })}</g></g>`);
       selBox(xa, y, w, fs * 1.5);
       p.skip = true;
       return;
@@ -467,7 +565,7 @@ function drawing(d, selIdx = -1) {
     if (p.kind === 'bmc') {
       const rr = Math.max(13, Math.min(r.h * 0.42, 24)), xa = X(p.s), cx = xa + rr;
       const b = bmcOf(p);
-      o.push(`<g class="ls-plate" data-pi="${p.i}"${rot(cx)}><circle cx="${cx.toFixed(1)}" cy="${r.m.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.3"/><circle cx="${cx.toFixed(1)}" cy="${r.m.toFixed(1)}" r="${(rr - 2.5).toFixed(1)}" fill="none" stroke="${INK}" stroke-width=".6"/>${t(cx, r.m - 1, 'BMC', { size: rr > 18 ? 8 : 6.5, weight: 700 })}${t(cx, r.m + (rr > 18 ? 8 : 6.5), `${b.v} ${b.tst === 'ECT' ? 'ECT' : 'LB'}`, { size: rr > 18 ? 6.5 : 5.5 })}</g>`);
+      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(cx)}><circle cx="${cx.toFixed(1)}" cy="${r.m.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.3"/><circle cx="${cx.toFixed(1)}" cy="${r.m.toFixed(1)}" r="${(rr - 2.5).toFixed(1)}" fill="none" stroke="${INK}" stroke-width=".6"/>${t(cx, r.m - 1, 'BMC', { size: rr > 18 ? 8 : 6.5, weight: 700 })}${t(cx, r.m + (rr > 18 ? 8 : 6.5), `${b.v} ${b.tst === 'ECT' ? 'ECT' : 'LB'}`, { size: rr > 18 ? 6.5 : 5.5 })}</g></g>`);
       selBox(xa, r.m - rr, rr * 2, rr * 2);
       p.xa = xa; p.xb = xa + rr * 2; p.e = p.s + (rr * 2) / pxIn;
       return;
@@ -482,7 +580,7 @@ function drawing(d, selIdx = -1) {
     const lines = wrap(p.text.toUpperCase(), per).slice(0, maxL);
     const y1 = r.m - ((lines.length - 1) * (fs + 1.5)) / 2 + fs * 0.35;
     const txt = lines.map((ln, k) => t(cx, y1 + k * (fs + 1.5), ln, { size: fs, weight: 600 })).join('');
-    o.push(`<g class="ls-plate" data-pi="${p.i}"${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${r.m.toFixed(1)})"` : ''}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.3"/>${txt}</g>`);
+    o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${r.m.toFixed(1)})"` : ''}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.3"/>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
     p.xa = xa; p.xb = xb; p.e = p.s + w;
   });
@@ -506,7 +604,7 @@ function drawing(d, selIdx = -1) {
   }
 
   const mk = (id, c) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" fill="${c}"/></marker>`;
-  return `<svg class="ls-svg" viewBox="0 0 1000 ${yb + 34}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk('lak', INK)}${mk('lar', RED)}</defs>${o.join('')}</svg>`;
+  return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 34}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk('lak', INK)}${mk('lar', RED)}</defs>${o.join('')}</svg>`;
 }
 
 // The full BMC stamp: double ring, curved text, test values in the middle.
