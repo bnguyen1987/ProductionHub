@@ -16,7 +16,7 @@ function clean(b: any) {
   doc.printPanels = (Array.isArray(b.printPanels) ? b.printPanels : []).map((n: any) => parseInt(n, 10)).filter((n: number) => n >= 1 && n <= 20).slice(0, 20);
   doc.plates = (Array.isArray(b.plates) ? b.plates : []).slice(0, 40).map((p: any) => ({
     panel: Math.max(1, Math.min(20, parseInt(p?.panel, 10) || 1)),
-    start: s(p?.start, 20), width: s(p?.width, 20), text: s(p?.text, 200), flip: !!p?.flip, hl: !!p?.hl, nodim: !!p?.nodim, dy: Math.max(-0.45, Math.min(0.45, Number(p?.dy) || 0)), hgt: Math.max(0, Math.min(0.98, Number(p?.hgt) || 0)),
+    start: s(p?.start, 20), width: s(p?.width, 20), text: s(p?.text, 200), flip: !!p?.flip, hl: !!p?.hl, nodim: !!p?.nodim, dy: Math.max(-0.45, Math.min(0.45, Number(p?.dy) || 0)), hgt: Math.max(0, Math.min(0.98, Number(p?.hgt) || 0)), ta: ["left", "center", "right"].includes(p?.ta) ? p.ta : "",
     img: typeof p?.img === "string" && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(p.img) && p.img.length < 400_000 ? p.img : "",
     kind: ["plate", "bmc", "text"].includes(p?.kind) ? p.kind : "plate",
     test: p?.test === "Mullen" ? "Mullen" : "ECT", wall: p?.wall === "double" ? "double" : "single", rating: s(p?.rating, 6), size: ["XS", "S", "M", "L"].includes(p?.size) ? p.size : "M",

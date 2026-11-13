@@ -19,6 +19,11 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Center': 'Centro',
+  'Text:': 'Texto:',
+  'Right': 'Derecha',
+  'Left': 'Izquierda',
+  'Text align': 'Alineación del texto',
   'Center top-to-bottom in its panel': 'Centrar de arriba a abajo en su panel',
   'Center left-right in its panel': 'Centrar de izquierda a derecha en su panel',
   'Center ↕': 'Centrar ↕',

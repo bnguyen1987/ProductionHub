@@ -481,3 +481,4 @@ details.fold[open]{padding-bottom:16px}
 #lSheet .ls-handle{cursor:ew-resize;touch-action:none}
 #lSheet .ls-handle[data-handle="h"]{cursor:ns-resize}
 .lsheet.ls-print .ls-handle{display:none}
+.sel-bar [data-ta][aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}

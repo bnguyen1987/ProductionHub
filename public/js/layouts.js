@@ -231,6 +231,7 @@ function paintSelBar() {
         <button type="button" class="btn small" id="lMvR" aria-label="Move right">▶</button>
         <button type="button" class="btn small" id="lMvU" aria-label="Move up">▲</button><button type="button" class="btn small" id="lMvD" aria-label="Move down">▼</button>
         <button type="button" class="btn small" id="lCtrH" title="Center left-right in its panel">Center ↔</button><button type="button" class="btn small" id="lCtrV" title="Center top-to-bottom in its panel">Center ↕</button></span>
+      ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Text:</span>${['left', 'center', 'right'].map((a) => `<button type="button" class="btn small" data-ta="${a}" aria-pressed="${(p.ta || (p.kind === 'text' ? 'left' : 'center')) === a}">${a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right'}</button>`).join('')}</span>` : ''}
       <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
       <button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
@@ -239,6 +240,7 @@ function paintSelBar() {
     $('#lMvR').onclick = () => nudge(0.5);
     $('#lMvU').onclick = () => movePanel(-1);
     $('#lCtrH').onclick = () => centerItem(sel);
+    $$('[data-ta]', bar).forEach((b) => b.onclick = () => { p.ta = b.dataset.ta; paintPlates(); update(); });
     $('#lCtrV').onclick = () => { p.dy = 0; paintPlates(); update(); };
     $('#lMvD').onclick = () => movePanel(1);
     $('#lMvS').onchange = (e) => { const v = pin(e.target.value); if (isFinite(v)) { p.start = e.target.value.trim(); nudge(0); } };
@@ -413,10 +415,10 @@ function paintPlates() {
         <div class="field"><label>Rating</label><select data-p="rating">${ratings.map((r) => opt(r, b.v, b.tst === 'ECT' ? r + ' ECT' : r + ' lb')).join('')}</select></div>`;
       body = `<div class="hint bmc-vals">${b.row ? `Size limit ${b.row[1]}" · Gross wt ${b.row[0]} lbs${b.row[2] ? ` · Facings ${b.row[2]} lbs/MSF` : ''}` : 'Not a standard rating. Check the values on the stamp.'}</div>`;
     } else if (kind === 'text') {
-      top = `<div class="field"><label>Size</label><select data-p="size">${opt('XS', p.size, 'Extra small')}${opt('S', p.size, 'Small')}${opt('M', p.size || 'M', 'Medium')}${opt('L', p.size, 'Large')}</select></div>`;
+      top = `<div class="field"><label>Size</label><select data-p="size">${opt('XS', p.size, 'Extra small')}${opt('S', p.size, 'Small')}${opt('M', p.size || 'M', 'Medium')}${opt('L', p.size, 'Large')}</select></div><div class="field"><label>Text align</label><select data-p="ta">${opt('left', p.ta || 'left', 'Left')}${opt('center', p.ta || 'left', 'Center')}${opt('right', p.ta || 'left', 'Right')}</select></div>`;
       body = `<div class="field"><label>Text</label><textarea data-p="text" rows="2" placeholder="Type anything (Enter = new line)">${esc(p.text)}</textarea></div>`;
     } else {
-      top = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div>`;
+      top = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div><div class="field"><label>Text align</label><select data-p="ta">${opt('left', p.ta || 'center', 'Left')}${opt('center', p.ta || 'center', 'Center')}${opt('right', p.ta || 'center', 'Right')}</select></div>`;
       body = `<div class="field"><label>Copy on the plate</label><textarea data-p="text" rows="2">${esc(p.text)}</textarea></div>
         <div class="plate-img">${p.img ? `<img src="${p.img}" alt="Logo">` : ''}<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden data-img="${i}"></label>${p.img ? `<button type="button" class="btn small ghost" data-noimg="${i}">Remove image</button>` : ''}</div>`;
     }
@@ -925,7 +927,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
       const lh = fs * 1.2, hh = ls.length * lh + fs * 0.3;
       const w = Math.max(...ls.map((x) => x.length)) * fs * 0.6 + 6, xa = X(p.s), y = m - hh / 2;
       const base = m - ((ls.length - 1) * lh) / 2 + fs * 0.35;
-      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(xa + w / 2)}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}"/>${ls.map((x, k) => t(xa + 3, base + k * lh, x, { size: fs, weight: 700, anchor: 'start' })).join('')}</g></g>`);
+      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(xa + w / 2)}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}"/>${ls.map((x, k) => t(p.ta === 'center' ? xa + w / 2 : p.ta === 'right' ? xa + w - 3 : xa + 3, base + k * lh, x, { size: fs, weight: 700, anchor: p.ta === 'center' ? 'middle' : p.ta === 'right' ? 'end' : 'start' })).join('')}</g></g>`);
       selBox(xa, y, w, hh);
       p.skip = true;
       return;
@@ -959,7 +961,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const y1 = m - ((lines.length - 1) * lh) / 2 + fs * 0.35;
     const txt = p.img
       ? `<image href="${p.img}" x="${(xa + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(xb - xa - 4).toFixed(1)}" height="${(h - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="mix-blend-mode:multiply"/>`
-      : lines.map((ln, k) => t(cx, y1 + k * lh, ln, { size: fs, weight: 600 })).join('');
+      : lines.map((ln, k) => t(p.ta === 'left' ? xa + 4 : p.ta === 'right' ? xb - 4 : cx, y1 + k * lh, ln, { size: fs, weight: 600, anchor: p.ta === 'left' ? 'start' : p.ta === 'right' ? 'end' : 'middle' })).join('');
     o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : ''}><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
     if (p.i === selIdx) { // resize handles: right edge = width, bottom edge = height
