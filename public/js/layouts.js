@@ -592,8 +592,39 @@ function openEditor(key, anchor) {
 }
 function closeEditor() { $$('.sheet-editor').forEach((b) => b.remove()); }
 
+// ---- resize a plate with its handles ----
+function startResize(e) {
+  const hd = e.target.closest('[data-hpi]'), svg = hd.ownerSVGElement, p = L.plates[+hd.dataset.hpi];
+  if (!svg || !p) return;
+  e.preventDefault(); e.stopPropagation();
+  // the drawing is redrawn while dragging, so convert with whichever <svg> is on screen now
+  const toSvg = (ev) => { const cur = $('#lSheet svg') || svg, pt = cur.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY; return pt.matrixTransform(cur.getScreenCTM().inverse()); };
+  const a = toSvg(e), pxIn = (+svg.dataset.x1 - +svg.dataset.x0) / +svg.dataset.totl;
+  const rows = svg.dataset.rows.split(';').map((r) => r.split(',').map(Number)), rh = (rows[p.panel - 1] || rows[0])[1];
+  const box = svg.querySelector(`[data-pi="${hd.dataset.hpi}"] .ls-pbox`);
+  const w0 = isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : (box ? +box.getAttribute('width') / pxIn : 10);
+  const h0 = box ? +box.getAttribute('height') : rh * 0.6;
+  const kind = hd.dataset.handle;
+  hd.setPointerCapture(e.pointerId);
+  const move = (ev) => {
+    const b = toSvg(ev);
+    if (kind === 'w') p.width = f(Math.max(1, Math.round((w0 + (b.x - a.x) / pxIn) * 16) / 16));
+    else p.hgt = Math.round(Math.max(0.15, Math.min(0.98, (h0 + 2 * (b.y - a.y)) / rh)) * 100) / 100;
+    $('#lSheet').innerHTML = sheetHtml(L, sel); // quick redraw while dragging
+  };
+  const up = () => {
+    hd.removeEventListener('pointermove', move); hd.removeEventListener('pointerup', up); hd.removeEventListener('pointercancel', up);
+    document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
+    dragged = true; setTimeout(() => (dragged = false), 60);
+    paintPlates(); update();
+  };
+  // the handle is redrawn while dragging, so listen on the document
+  document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+}
+
 // ---- drag items on the sheet ----
 function startDrag(e) {
+  if (e.target.closest('[data-hpi]')) return startResize(e);
   const g = e.target.closest('[data-pi]');
   if (!g || e.button > 0) return;
   const svg = g.ownerSVGElement, p = L.plates[+g.dataset.pi];
@@ -911,7 +942,8 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const w = isFinite(p.w) && p.w > 0 ? p.w : totL * 0.1;
     const xa = X(p.s), xb = Math.max(X(p.s + w), xa + 24);
     // Fit all of the copy: shrink the type (9 → 5 px) and let the box grow up to ~90% of the panel height.
-    const cx = (xa + xb) / 2, hMax = r.h * 0.9, base = Math.min(r.h * 0.8, 52);
+    const setH = +p.hgt > 0 ? Math.max(0.15, Math.min(0.98, +p.hgt)) * r.h : 0; // height set by hand (share of the panel)
+    const cx = (xa + xb) / 2, hMax = setH || r.h * 0.9, base = setH || Math.min(r.h * 0.8, 52);
     const raw = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
     let fs = 9, lines = [];
     for (; fs >= 5; fs -= 0.5) {
@@ -923,13 +955,17 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const lh = fs * 1.18;
     const maxL = Math.max(1, Math.floor((hMax - 6) / lh));
     if (lines.length > maxL) { lines = lines.slice(0, maxL); lines[maxL - 1] += '…'; }
-    const h = p.img ? base : Math.max(base, Math.min(hMax, lines.length * lh + 8)), y = m - h / 2;
+    const h = p.img || setH ? base : Math.max(base, Math.min(hMax, lines.length * lh + 8)), y = m - h / 2;
     const y1 = m - ((lines.length - 1) * lh) / 2 + fs * 0.35;
     const txt = p.img
       ? `<image href="${p.img}" x="${(xa + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(xb - xa - 4).toFixed(1)}" height="${(h - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="mix-blend-mode:multiply"/>`
       : lines.map((ln, k) => t(cx, y1 + k * lh, ln, { size: fs, weight: 600 })).join('');
     o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : ''}><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
+    if (p.i === selIdx) { // resize handles: right edge = width, bottom edge = height
+      o.push(`<rect class="ls-handle" data-handle="w" data-hpi="${p.i}" x="${(xb + 1).toFixed(1)}" y="${(m - 7).toFixed(1)}" width="9" height="14" rx="2" fill="#1a73e8" stroke="#fff" stroke-width="1.5"/>`);
+      o.push(`<rect class="ls-handle" data-handle="h" data-hpi="${p.i}" x="${(cx - 7).toFixed(1)}" y="${(y + h + 1).toFixed(1)}" width="14" height="9" rx="2" fill="#1a73e8" stroke="#fff" stroke-width="1.5"/>`);
+    }
     p.xa = xa; p.xb = xb; p.e = p.s + w;
   });
   // gaps: from the nearest score (or plate) on the left of each plate, and from the last plate to the next score
