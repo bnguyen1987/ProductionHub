@@ -848,8 +848,13 @@ function printSheet() {
   let o = { H: 270 }, k = 0.998;
   const m0 = measure(o);
   if (m0.h < AVAIL) {
-    const extra = AVAIL - m0.h, add = Math.min(extra, 260);
-    o = { H: 270 + add, boxesH: extra - add > 4 ? m0.boxes + (extra - add) : 0 };
+    // spare height: first make the notes / detail boxes at least ~190 px (about 2"), then grow the drawing, then the boxes again
+    let extra = AVAIL - m0.h;
+    const box = Math.min(extra, Math.max(0, 190 - m0.boxes));
+    extra -= box;
+    const add = Math.min(extra, 260);
+    extra -= add;
+    o = { H: 270 + add, boxesH: box + extra > 4 ? m0.boxes + box + extra : 0 };
   } else {
     // too tall: make the drawing shorter first (its height is exaggerated anyway), then shrink only what is left over
     const H = Math.max(150, 270 - (m0.h - AVAIL));

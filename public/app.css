@@ -461,3 +461,11 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .ls-grid .ls-cell span{font-size:8.5px}
 .lsheet .ls-grid .ls-cell b{font-size:11.5px;margin-top:1px;line-height:1.25}
 .lsheet.ls-print .ls-grid .ls-cell{min-height:0;padding:3px 6px}
+/* bigger notes / detail boxes */
+.lsheet .ls-box{min-height:150px}
+.lsheet .ls-bh{font-size:12px;padding:5px 9px}
+.lsheet .ls-box ol,.lsheet .ls-box ul{font-size:13px;line-height:1.4;margin:8px 0;padding-left:28px}
+.lsheet .ls-box li{margin:2px 0}
+.lsheet .ls-dtexts .ls-dtext{font-size:12.5px;line-height:1.4;min-height:70px}
+.lsheet.ls-print .ls-dtexts .ls-dtext{min-height:56px}
+.lsheet .ls-pics figcaption{font-size:10.5px}
