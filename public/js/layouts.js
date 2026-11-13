@@ -307,30 +307,33 @@ function paintPlates() {
     const kind = p.kind || 'plate';
     const head = `<div class="field"><label>${kind === 'bmc' ? 'BMC on' : kind === 'text' ? 'Text on' : 'Panel'}</label><select data-p="panel">${Array.from({ length: Math.max(n, p.panel) }, (_, k) => opt(k + 1, p.panel, 'P' + (k + 1))).join('')}</select></div>
       <div class="field"><label>Start (in)</label><input type="text" inputmode="decimal" data-p="start" value="${esc(p.start)}"></div>`;
-    let mid;
+    // Each row: fields across the top, then the copy box, picture buttons and the options line.
+    let top = '', body = '';
     if (kind === 'bmc') {
       const b = bmcOf(p), ratings = Object.keys(BMC[b.w][b.tst]);
       if (b.v && !ratings.includes(b.v)) ratings.unshift(b.v);
-      mid = `<div class="field"><label>Test</label><select data-p="test">${opt('ECT', b.tst)}${opt('Mullen', b.tst, 'Mullen (burst)')}</select></div>
-      <div class="field"><label>Wall</label><select data-p="wall">${opt('single', b.w, 'Single')}${opt('double', b.w, 'Double')}</select></div>
-      <div class="field"><label>Rating</label><select data-p="rating">${ratings.map((r) => opt(r, b.v, b.tst === 'ECT' ? r + ' ECT' : r + ' lb')).join('')}</select></div>
-      <div class="hint bmc-vals">${b.row ? `Size limit ${b.row[1]}" · Gross wt ${b.row[0]} lbs${b.row[2] ? ` · Facings ${b.row[2]} lbs/MSF` : ''}` : 'Not a standard rating. Check the values on the stamp.'}</div>`;
+      top = `<div class="field"><label>Test</label><select data-p="test">${opt('ECT', b.tst)}${opt('Mullen', b.tst, 'Mullen (burst)')}</select></div>
+        <div class="field"><label>Wall</label><select data-p="wall">${opt('single', b.w, 'Single')}${opt('double', b.w, 'Double')}</select></div>
+        <div class="field"><label>Rating</label><select data-p="rating">${ratings.map((r) => opt(r, b.v, b.tst === 'ECT' ? r + ' ECT' : r + ' lb')).join('')}</select></div>`;
+      body = `<div class="hint bmc-vals">${b.row ? `Size limit ${b.row[1]}" · Gross wt ${b.row[0]} lbs${b.row[2] ? ` · Facings ${b.row[2]} lbs/MSF` : ''}` : 'Not a standard rating. Check the values on the stamp.'}</div>`;
     } else if (kind === 'text') {
-      mid = `<div class="field"><label>Size</label><select data-p="size">${opt('XS', p.size, 'Extra small')}${opt('S', p.size, 'Small')}${opt('M', p.size || 'M', 'Medium')}${opt('L', p.size, 'Large')}</select></div>
-      <div class="field grow"><label>Text</label><textarea data-p="text" rows="2" placeholder="Type anything (Enter = new line)">${esc(p.text)}</textarea></div>`;
+      top = `<div class="field"><label>Size</label><select data-p="size">${opt('XS', p.size, 'Extra small')}${opt('S', p.size, 'Small')}${opt('M', p.size || 'M', 'Medium')}${opt('L', p.size, 'Large')}</select></div>`;
+      body = `<div class="field"><label>Text</label><textarea data-p="text" rows="2" placeholder="Type anything (Enter = new line)">${esc(p.text)}</textarea></div>`;
     } else {
-      mid = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div>
-      <div class="field grow"><label>Copy on the plate</label><textarea data-p="text" rows="2">${esc(p.text)}</textarea></div>
-      <div class="plate-img">${p.img ? `<img src="${p.img}" alt="Logo">` : ''}<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden data-img="${i}"></label>${p.img ? `<button type="button" class="btn small ghost" data-noimg="${i}">Remove image</button>` : ''}</div>`;
+      top = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div>`;
+      body = `<div class="field"><label>Copy on the plate</label><textarea data-p="text" rows="2">${esc(p.text)}</textarea></div>
+        <div class="plate-img">${p.img ? `<img src="${p.img}" alt="Logo">` : ''}<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden data-img="${i}"></label>${p.img ? `<button type="button" class="btn small ghost" data-noimg="${i}">Remove image</button>` : ''}</div>`;
     }
     return `
     <div class="plate-row k-${kind}${i === sel ? ' sel' : ''}" data-plate="${i}">
-      ${head}
-      ${mid}
-      <label class="chk"><input type="checkbox" data-p="flip" ${p.flip ? 'checked' : ''}> Upside down</label>
-      <label class="chk"><input type="checkbox" data-p="hl" ${p.hl ? 'checked' : ''}> Highlight</label>
-      ${kind !== 'text' ? `<label class="chk"><input type="checkbox" data-p="dims" ${p.nodim ? '' : 'checked'}> Distances</label>` : ''}
-      <button type="button" class="btn small ghost danger" data-del="${i}" aria-label="Remove">✕</button>
+      <div class="pr-top">${head}${top}</div>
+      ${body}
+      <div class="pr-opts">
+        <label class="chk"><input type="checkbox" data-p="flip" ${p.flip ? 'checked' : ''}> Upside down</label>
+        <label class="chk"><input type="checkbox" data-p="hl" ${p.hl ? 'checked' : ''}> Highlight</label>
+        ${kind !== 'text' ? `<label class="chk"><input type="checkbox" data-p="dims" ${p.nodim ? '' : 'checked'}> Distances</label>` : ''}
+        <button type="button" class="btn small ghost danger" data-del="${i}" aria-label="Remove">✕</button>
+      </div>
     </div>`; }).join('') : '<p class="hint" style="margin:0">Nothing on the sheet yet.</p>';
   $$('[data-del]', $('#lPlates')).forEach((b) => b.onclick = () => delPlate(+b.dataset.del));
   $$('[data-noimg]', $('#lPlates')).forEach((b) => b.onclick = () => { const p = L.plates[+b.dataset.noimg]; if (p) { p.img = ''; paintPlates(); update(); } });
