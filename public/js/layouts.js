@@ -194,10 +194,14 @@ function nudge(dIn) {
   p.start = f(Math.round(st * 16) / 16);
   paintPlates(); update();
 }
+// Up/down: step 0.15 of the panel height; past the edge it moves onto the next panel.
 function movePanel(d) {
   const p = L.plates[sel]; if (!p) return;
   const n = Math.max(1, nums(L.widthPanels).length);
-  p.panel = Math.max(1, Math.min(n, p.panel + d));
+  let dy = (+p.dy || 0) + d * 0.15;
+  if (dy < -0.451 && p.panel > 1) { p.panel--; dy = 0.45; }
+  else if (dy > 0.451 && p.panel < n) { p.panel++; dy = -0.45; }
+  p.dy = Math.round(Math.max(-0.45, Math.min(0.45, dy)) * 100) / 100;
   paintPlates(); update();
 }
 function select(i, repaintRows = true) {
@@ -226,13 +230,16 @@ function paintSelBar() {
         <select id="lMvP" aria-label="Panel">${Array.from({ length: nP }, (_, k) => `<option value="${k + 1}" ${p.panel === k + 1 ? 'selected' : ''}>P${k + 1}</option>`).join('')}</select>
         <button type="button" class="btn small" id="lMvL" aria-label="Move left">◀</button>
         <input type="text" id="lMvS" value="${esc(show(p.start))}" aria-label="Start in inches from the left edge" title="Inches from the left edge of the blank">
-        <button type="button" class="btn small" id="lMvR" aria-label="Move right">▶</button></span>
+        <button type="button" class="btn small" id="lMvR" aria-label="Move right">▶</button>
+        <button type="button" class="btn small" id="lMvU" aria-label="Move up">▲</button><button type="button" class="btn small" id="lMvD" aria-label="Move down">▼</button></span>
       <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
       <button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
-    $('#lMvP').onchange = (e) => { p.panel = +e.target.value; paintPlates(); update(); };
+    $('#lMvP').onchange = (e) => { p.panel = +e.target.value; p.dy = 0; paintPlates(); update(); };
     $('#lMvL').onclick = () => nudge(-0.5);
     $('#lMvR').onclick = () => nudge(0.5);
+    $('#lMvU').onclick = () => movePanel(-1);
+    $('#lMvD').onclick = () => movePanel(1);
     $('#lMvS').onchange = (e) => { const v = pin(e.target.value); if (isFinite(v)) { p.start = e.target.value.trim(); nudge(0); } };
     if ($('#lDims')) $('#lDims').onclick = () => { p.nodim = !p.nodim; paintPlates(); update(); };
     if ($('#lEditSel')) $('#lEditSel').onclick = () => { const g = $(`#lSheet [data-pi="${sel}"]`); openEditor('item:' + sel, g || $('#lSheet')); };
@@ -490,9 +497,11 @@ function startDrag(e) {
     if (!moved) return;
     dragged = true; setTimeout(() => (dragged = false), 60);
     const r0 = rows[p.panel - 1] || rows[0];
-    const y = r0[0] + r0[1] / 2 + dy;
+    const y = r0[0] + r0[1] / 2 + (+p.dy || 0) * r0[1] + dy;
     let k = rows.findIndex(([ry, rh]) => y >= ry && y < ry + rh);
     if (k < 0) k = y < rows[0][0] ? 0 : rows.length - 1;
+    const rk = rows[k];
+    p.dy = Math.round(Math.max(-0.45, Math.min(0.45, (y - (rk[0] + rk[1] / 2)) / rk[1])) * 100) / 100;
     const w = p.kind === 'plate' && isFinite(pin(p.width)) ? pin(p.width) : 0;
     let s = (isFinite(pin(p.start)) ? pin(p.start) : 0) + dx / pxIn;
     s = Math.max(0, Math.min(totL - w, Math.round(s * 16) / 16));
@@ -586,8 +595,9 @@ async function readLayout(input) {
       const panel = bp >= 1 && (!n || bp <= n) ? bp : (Array.from({ length: n || 1 }, (_, k) => k + 1).find((k) => !pp.includes(k)) || 1);
       const bStart = ps !== null ? ps : hasPos ? +bm.start_in : Math.max(0, (isFinite(tl) ? tl : 60) / 2 - 3);
       const extra = str(bm.extra_text);
-      L.plates.push({ kind: 'bmc', panel, start: fx(bStart), test: tst, wall, rating: String(parseInt(bm.value, 10) || def.rating), flip: !!bm.upside_down, nodim: !!extra });
-      if (extra) L.plates.push({ kind: 'text', panel, start: fx(Math.round((bStart + Math.max(1.5, 26 / pxIn)) * 16) / 16), text: extra, size: 'M', flip: !!bm.upside_down });
+      L.plates.push({ kind: 'bmc', panel, start: fx(bStart), test: tst, wall, rating: String(parseInt(bm.value, 10) || def.rating), flip: !!bm.upside_down, nodim: !!extra, dy: extra ? (bm.upside_down ? 0.2 : -0.2) : 0 });
+      // size text written with the BMC goes centered under the stamp (above it when upside down)
+      if (extra) L.plates.push({ kind: 'text', panel, start: fx(Math.round(Math.max(lp.reduce((a, v) => (a + v <= bStart + 1e-6 ? a + v : a), 0) + 0.25, bStart + 0.5 - textIn(extra) / 2) * 16) / 16), text: extra, size: 'M', flip: !!bm.upside_down, dy: bm.upside_down ? -0.24 : 0.24 });
       const line = `Handwritten BMC note converted to a BMC stamp${bm.written ? ` (old sheet: "${str(bm.written)}")` : ''}.`;
       L.changes = (L.changes ? L.changes + '\n' : '') + line;
       bmcMsg = ` <br>Found a BMC note and made a stamp (${esc(bmcLabel(L.plates.find((x) => x.kind === 'bmc')))}).${hasPos && bm.panel ? '' : ' Its spot was not on the sheet, so it is in the middle of a panel. Move it if needed.'}`;
@@ -748,15 +758,17 @@ function drawing(d, selIdx = -1) {
   const pxIn = (x1 - x0) / totL;
   plates.forEach((p) => {
     const r = R[p.panel - 1];
+    const m = r.m + Math.max(-0.45, Math.min(0.45, +p.dy || 0)) * r.h; // up/down inside the panel
+    p.cy = m;
     const selBox = (x, y, w, h) => { if (p.i === selIdx) o.push(`<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="3" fill="none" stroke="#1a73e8" stroke-width="2.5" stroke-dasharray="5 3" pointer-events="none"/>`); };
-    const rot = (cx) => (p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${r.m.toFixed(1)})"` : '');
+    const rot = (cx) => (p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : '');
     if (p.kind === 'text') {
       const fs = { S: 8, M: 11, L: 15 }[p.size] || 11;
       let ls = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
       if (!ls.length) ls = ['TEXT'];
       const lh = fs * 1.2, hh = ls.length * lh + fs * 0.3;
-      const w = Math.max(...ls.map((x) => x.length)) * fs * 0.6 + 6, xa = X(p.s), y = r.m - hh / 2;
-      const base = r.m - ((ls.length - 1) * lh) / 2 + fs * 0.35;
+      const w = Math.max(...ls.map((x) => x.length)) * fs * 0.6 + 6, xa = X(p.s), y = m - hh / 2;
+      const base = m - ((ls.length - 1) * lh) / 2 + fs * 0.35;
       o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(xa + w / 2)}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}"/>${ls.map((x, k) => t(xa + 3, base + k * lh, x, { size: fs, weight: 700, anchor: 'start' })).join('')}</g></g>`);
       selBox(xa, y, w, hh);
       p.skip = true;
@@ -766,24 +778,24 @@ function drawing(d, selIdx = -1) {
       // A BMC is 1" round. Drawn to scale when that is big enough to read, never smaller than 22 px; measured as 1".
       const D = 1, rr = Math.min(r.h * 0.45, Math.max(11, (D * pxIn) / 2)), cx = X(p.s + D / 2), xa = cx - rr;
       const b = bmcOf(p), big = rr >= 15;
-      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(cx)}><circle cx="${cx.toFixed(1)}" cy="${r.m.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.2"/><circle cx="${cx.toFixed(1)}" cy="${r.m.toFixed(1)}" r="${(rr - 2).toFixed(1)}" fill="none" stroke="${INK}" stroke-width=".5"/>${big ? t(cx, r.m - 1, 'BMC', { size: 7.5, weight: 700 }) + t(cx, r.m + 7, `${b.v} ${b.tst === 'ECT' ? 'ECT' : 'LB'}`, { size: 6 }) : t(cx, r.m + 2.2, 'BMC', { size: 6, weight: 700 })}</g></g>`);
-      selBox(xa, r.m - rr, rr * 2, rr * 2);
+      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(cx)}><circle cx="${cx.toFixed(1)}" cy="${m.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.2"/><circle cx="${cx.toFixed(1)}" cy="${m.toFixed(1)}" r="${(rr - 2).toFixed(1)}" fill="none" stroke="${INK}" stroke-width=".5"/>${big ? t(cx, m - 1, 'BMC', { size: 7.5, weight: 700 }) + t(cx, m + 7, `${b.v} ${b.tst === 'ECT' ? 'ECT' : 'LB'}`, { size: 6 }) : t(cx, m + 2.2, 'BMC', { size: 6, weight: 700 })}</g></g>`);
+      selBox(xa, m - rr, rr * 2, rr * 2);
       p.xa = Math.min(xa, X(p.s)); p.xb = Math.max(cx + rr, X(p.s + D)); p.e = p.s + D;
       return;
     }
     const w = isFinite(p.w) && p.w > 0 ? p.w : totL * 0.1;
     const xa = X(p.s), xb = Math.max(X(p.s + w), xa + 24);
-    const h = Math.min(r.h * 0.8, 52), y = r.m - h / 2;
+    const h = Math.min(r.h * 0.8, 52), y = m - h / 2;
     const cx = (xa + xb) / 2;
     const fs = h < 26 ? 7 : 8.5;
     const per = Math.max(4, Math.floor((xb - xa - 8) / (fs * 0.64)));
     const maxL = Math.max(1, Math.floor((h - 4) / (fs + 1.5)));
     const lines = String(p.text || '').toUpperCase().split('\n').flatMap((x) => wrap(x, per)).slice(0, maxL);
-    const y1 = r.m - ((lines.length - 1) * (fs + 1.5)) / 2 + fs * 0.35;
+    const y1 = m - ((lines.length - 1) * (fs + 1.5)) / 2 + fs * 0.35;
     const txt = p.img
       ? `<image href="${p.img}" x="${(xa + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(xb - xa - 4).toFixed(1)}" height="${(h - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet"/>`
       : lines.map((ln, k) => t(cx, y1 + k * (fs + 1.5), ln, { size: fs, weight: 600 })).join('');
-    o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${r.m.toFixed(1)})"` : ''}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.3"/>${txt}</g></g>`);
+    o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : ''}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.3"/>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
     p.xa = xa; p.xb = xb; p.e = p.s + w;
   });
@@ -791,13 +803,13 @@ function drawing(d, selIdx = -1) {
   for (let i = 1; i <= R.length; i++) {
     const row = plates.filter((p) => p.panel === i && !p.skip && !p.nodim).sort((a, b) => a.s - b.s);
     if (!row.length) continue;
-    const y = R[i - 1].m;
     let prevEnd = null, prevKind = '';
     row.forEach((p, k) => {
       const sc = scores.filter((s) => s <= p.s + 1e-6).pop() ?? 0;
       const fromPlate = prevEnd !== null && prevEnd >= sc - 1e-6;
       const a = fromPlate ? prevEnd : sc;
       const gap = p.s - a;
+      const y = p.cy;
       if (gap > 0.01) gapMark(o, X(a), p.xa, y, fromPlate && prevKind !== 'bmc' && p.kind !== 'bmc' ? `${f(gap)}" between plates` : `${f(gap)}"`, RED, t, arrow);
       prevEnd = Math.max(prevEnd ?? -Infinity, p.e); prevKind = p.kind;
       // gap to the next score, when that score comes before the next plate
