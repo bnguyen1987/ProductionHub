@@ -830,10 +830,19 @@ function drawing(d, selIdx = -1, drawH = 270) {
       o.push(`<line x1="${x0 - 11}" y1="${r.y.toFixed(1)}" x2="${x0 - 3}" y2="${r.y.toFixed(1)}" stroke="${INK}" stroke-width=".8"/>`);
     }
     o.push(`<line x1="${x1 + 4}" y1="${r.y.toFixed(1)}" x2="${x1 + 14}" y2="${r.y.toFixed(1)}" stroke="${INK}"/>`);
-    if (wp.length) o.push(t(x1 + 46, r.m + 3.5, f(cumW), { size: 10.5, weight: 700 }));
+    if (wp.length) {
+      o.push(`<line x1="${x1 + 9}" y1="${(r.y + 1.5).toFixed(1)}" x2="${x1 + 9}" y2="${(r.y + r.h - 1.5).toFixed(1)}" stroke="${INK}" stroke-width=".8" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
+      o.push(t(x1 + 48, r.m + 3.5, f(cumW), { size: 10.5, weight: 700 }));
+    }
   });
   o.push(`<line x1="${x1 + 4}" y1="${y0 + H}" x2="${x1 + 14}" y2="${y0 + H}" stroke="${INK}"/>`);
-  if (!wp.length && isFinite(bw) && bw > 0) o.push(t(x1 + 46, y0 + H / 2, f(bw), { size: 10.5, weight: 700 }));
+  // overall width down the right side
+  const W = wp.length ? totW : bw;
+  if (isFinite(W) && W > 0) {
+    o.push(`<line x1="${x1 + 84}" y1="${y0}" x2="${x1 + 84}" y2="${y0 + H}" stroke="${INK}" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
+    o.push(`<line x1="${x1 + 78}" y1="${y0}" x2="${x1 + 90}" y2="${y0}" stroke="${INK}" stroke-width=".8"/><line x1="${x1 + 78}" y1="${y0 + H}" x2="${x1 + 90}" y2="${y0 + H}" stroke="${INK}" stroke-width=".8"/>`);
+    o.push(t(x1 + 100, y0 + H / 2, f(W), { size: 11, weight: 700, tr: `rotate(90 ${x1 + 100} ${y0 + H / 2})` }));
+  }
 
   const yb = y0 + H + 18;
   if (lp.length) {
