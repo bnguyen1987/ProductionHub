@@ -16,7 +16,7 @@ function clean(b: any) {
   doc.printPanels = (Array.isArray(b.printPanels) ? b.printPanels : []).map((n: any) => parseInt(n, 10)).filter((n: number) => n >= 1 && n <= 20).slice(0, 20);
   doc.plates = (Array.isArray(b.plates) ? b.plates : []).slice(0, 40).map((p: any) => ({
     panel: Math.max(1, Math.min(20, parseInt(p?.panel, 10) || 1)),
-    start: s(p?.start, 20), width: s(p?.width, 20), text: s(p?.text, 200), flip: !!p?.flip,
+    start: s(p?.start, 20), width: s(p?.width, 20), text: s(p?.text, 200), flip: !!p?.flip, hl: !!p?.hl,
   }));
   doc.notes = s(b.notes, 4000);
   doc.changes = s(b.changes, 4000);

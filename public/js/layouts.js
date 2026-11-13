@@ -17,7 +17,7 @@ const INFO = [
 // Fields compared by "Add my edits"
 const TRACK = [['style', 'Style'], ['size', 'Size'], ['board', 'Board'], ['blankW', 'Blank width'], ['blankL', 'Blank length'], ['print', 'Print'], ['routing', 'Routing'], ['widthPanels', 'Panel scores'], ['lengthPanels', 'Length scores']];
 
-let L, view, saved = [], ro = null;
+let L, view, saved = [], ro = null, sel = -1, undo = null;
 
 // ---- inches ----
 const pin = (s) => parseInches(String(s ?? '').replace(/["”]/g, '').trim());
@@ -54,6 +54,7 @@ export function render(v) {
         <section class="card lay-preview">
           <h2>New spec sheet <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:500">updates as you edit below</span></h2>
           <div class="lsheet-wrap" id="lWrap"><div id="lSheet" data-no-i18n></div></div>
+          <div id="lSelBar" class="sel-bar"></div>
           <div class="btn-row" style="margin-top:12px">
             <button type="button" class="btn primary" id="lPrint">Print / save PDF</button>
             <input type="text" id="lName" placeholder="Your name" aria-label="Your name" style="max-width:170px">
@@ -111,8 +112,14 @@ export function render(v) {
   $('#lEdits').onclick = addEdits;
   $('#lPrint').onclick = printSheet;
   $('#lSave').onclick = save;
-  $('#lNew').onclick = () => { if (!confirm('Clear this layout and start over?')) return; L = EMPTY(); fill(); $('#lAiMsg').innerHTML = ''; $('#lSaveMsg').innerHTML = ''; };
+  $('#lNew').onclick = () => { if (!confirm('Clear this layout and start over?')) return; L = EMPTY(); sel = -1; undo = null; fill(); $('#lAiMsg').innerHTML = ''; $('#lSaveMsg').innerHTML = ''; };
   $('#lFind').oninput = paintList;
+  $('#lSheet').addEventListener('click', (e) => {
+    const g = e.target.closest('[data-pi]');
+    select(g ? +g.dataset.pi : -1);
+  });
+  $('#lPlates').addEventListener('focusin', (e) => { const r = e.target.closest('[data-plate]'); if (r && +r.dataset.plate !== sel) select(+r.dataset.plate, false); });
+  document.addEventListener('keydown', onKey);
   $('#lName').value = loadForm('layout_name') || '';
   ro = new ResizeObserver(fit);
   ro.observe($('#lWrap'));
@@ -120,7 +127,44 @@ export function render(v) {
   loadList();
 }
 
-export function destroy() { if (ro) ro.disconnect(); ro = null; }
+export function destroy() { if (ro) ro.disconnect(); ro = null; document.removeEventListener('keydown', onKey); sel = -1; undo = null; }
+
+// ---- select / highlight / delete a print on the sheet ----
+function onKey(e) {
+  if (sel < 0 || e.target.closest('input,textarea,select,[contenteditable]')) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delPlate(sel); }
+  else if (e.key === 'Escape') select(-1);
+}
+function select(i, repaintRows = true) {
+  sel = i >= 0 && i < L.plates.length ? i : -1;
+  if (sel >= 0) undo = null;
+  if (repaintRows) paintPlates(); else markRows();
+  update();
+}
+function delPlate(i) {
+  if (i < 0 || i >= L.plates.length) return;
+  undo = { p: L.plates[i], i };
+  L.plates.splice(i, 1);
+  sel = -1;
+  paintPlates(); update();
+}
+function markRows() { $$('.plate-row', view).forEach((r) => r.classList.toggle('sel', +r.dataset.plate === sel)); }
+function paintSelBar() {
+  const bar = $('#lSelBar');
+  if (!bar) return;
+  const p = L.plates[sel];
+  if (p) {
+    bar.innerHTML = `<span><b>Selected print:</b> P${p.panel}${p.text ? ' · ' + esc(p.text) : ''}</span>
+      <span class="btn-row"><button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
+      <button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
+    $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
+    $('#lDelSel').onclick = () => delPlate(sel);
+    $('#lDone').onclick = () => select(-1);
+  } else if (undo) {
+    bar.innerHTML = `<span>Print deleted.</span><span class="btn-row"><button type="button" class="btn small" id="lUndo">Undo</button></span>`;
+    $('#lUndo').onclick = () => { L.plates.splice(Math.min(undo.i, L.plates.length), 0, undo.p); const i = undo.i; undo = null; select(i); };
+  } else bar.innerHTML = L.plates.length ? '<span class="hint">Tap a print on the sheet to highlight or delete it.</span>' : '';
+}
 
 function fill() {
   $$('[data-l]', view).forEach((el) => { el.value = L[el.dataset.l] ?? ''; });
@@ -136,7 +180,7 @@ function onInput(e) {
     const p = L.plates[+row.dataset.plate];
     const k = t.dataset.p;
     if (!p || !k) return;
-    p[k] = k === 'flip' ? t.checked : k === 'panel' ? +t.value : t.value;
+    p[k] = k === 'flip' || k === 'hl' ? t.checked : k === 'panel' ? +t.value : t.value;
     update();
   }
 }
@@ -148,7 +192,8 @@ function update() {
   $('#lWChk').innerHTML = chk(wp, bw, 'width');
   $('#lLChk').innerHTML = lp.length ? chk(lp, bl, 'length').replace(/<span class="pill warn">blank length is ([^<]+)<\/span>/, (m, x) => `<span class="hint">scored length · blank is ${x}</span>`) : '';
   paintPP();
-  $('#lSheet').innerHTML = sheetHtml(L);
+  $('#lSheet').innerHTML = sheetHtml(L, sel);
+  paintSelBar();
   fit();
 }
 
@@ -170,15 +215,16 @@ function paintPP() {
 function paintPlates() {
   const n = Math.max(nums(L.widthPanels).length, 1);
   $('#lPlates').innerHTML = L.plates.length ? L.plates.map((p, i) => `
-    <div class="plate-row" data-plate="${i}">
+    <div class="plate-row${i === sel ? ' sel' : ''}" data-plate="${i}">
       <div class="field"><label>Panel</label><select data-p="panel">${Array.from({ length: Math.max(n, p.panel) }, (_, k) => `<option value="${k + 1}" ${p.panel === k + 1 ? 'selected' : ''}>P${k + 1}</option>`).join('')}</select></div>
       <div class="field"><label>Start (in)</label><input type="text" inputmode="decimal" data-p="start" value="${esc(p.start)}"></div>
       <div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div>
       <div class="field grow"><label>Copy on the plate</label><input type="text" data-p="text" value="${esc(p.text)}"></div>
       <label class="chk"><input type="checkbox" data-p="flip" ${p.flip ? 'checked' : ''}> Upside down</label>
+      <label class="chk"><input type="checkbox" data-p="hl" ${p.hl ? 'checked' : ''}> Highlight</label>
       <button type="button" class="btn small ghost danger" data-del="${i}" aria-label="Remove plate">✕</button>
     </div>`).join('') : '<p class="hint" style="margin:0">No plates yet.</p>';
-  $$('[data-del]', $('#lPlates')).forEach((b) => b.onclick = () => { L.plates.splice(+b.dataset.del, 1); paintPlates(); update(); });
+  $$('[data-del]', $('#lPlates')).forEach((b) => b.onclick = () => delPlate(+b.dataset.del));
 }
 
 function fit() {
@@ -248,7 +294,7 @@ function addEdits() {
 }
 
 // ---- the sheet ----
-function sheetHtml(d) {
+function sheetHtml(d, selIdx = -1) {
   const cell = (t, v) => `<div class="ls-cell"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`;
   const blank = d.blankW || d.blankL ? `${show(d.blankW) || '?'} x ${show(d.blankL) || '?'}` : '';
   const notes = d.notes.split('\n').map((x) => x.trim()).filter(Boolean);
@@ -263,7 +309,7 @@ function sheetHtml(d) {
       ${cell('PRINT', d.print)}${cell('ROUTING', d.routing)}${cell('VIEW', d.view)}
     </div>
     <div class="ls-h">BLANK LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
-    ${drawing(d)}
+    ${drawing(d, selIdx)}
     <div class="ls-boxes">
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x) => `<li>${esc(x)}</li>`).join('') || '<li class="ls-empty">No notes</li>'}</ol></div>
       <div class="ls-box"><div class="ls-bh">REVISION - CHANGES${d.origDate ? ` FROM ${esc(d.origDate)} SHEET` : ''}</div><ul>${changes.map((x) => `<li>${esc(x)}</li>`).join('') || '<li class="ls-empty">No changes listed</li>'}</ul></div>
@@ -273,7 +319,7 @@ function sheetHtml(d) {
 }
 
 // SVG of the blank: width panels as rows (height exaggerated), length scores as columns, plates and the gaps between them.
-function drawing(d) {
+function drawing(d, selIdx = -1) {
   const x0 = 64, x1 = 850, y0 = 14, H = 270;
   const wp = nums(d.widthPanels), lp = nums(d.lengthPanels);
   const bw = pin(d.blankW), bl = pin(d.blankL);
@@ -320,7 +366,7 @@ function drawing(d) {
   o.push(t((x0 + x1) / 2, yb + 22, lp.length ? `${f(totL)} scored length${blankNote}` : isFinite(bl) && bl > 0 ? `${f(bl)} blank length` : '', { size: 10.5, weight: 600 }));
 
   // plates
-  const plates = (d.plates || []).map((p) => ({ ...p, s: pin(p.start), w: pin(p.width) })).filter((p) => isFinite(p.s) && p.panel >= 1 && p.panel <= R.length);
+  const plates = (d.plates || []).map((p, i) => ({ ...p, i, s: pin(p.start), w: pin(p.width) })).filter((p) => isFinite(p.s) && p.panel >= 1 && p.panel <= R.length);
   plates.forEach((p) => {
     const r = R[p.panel - 1];
     const w = isFinite(p.w) && p.w > 0 ? p.w : totL * 0.1;
@@ -333,7 +379,8 @@ function drawing(d) {
     const lines = wrap(p.text.toUpperCase(), per).slice(0, maxL);
     const y1 = r.m - ((lines.length - 1) * (fs + 1.5)) / 2 + fs * 0.35;
     const txt = lines.map((ln, k) => t(cx, y1 + k * (fs + 1.5), ln, { size: fs, weight: 600 })).join('');
-    o.push(`<g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${r.m.toFixed(1)})"` : ''}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="#fff" stroke="${INK}" stroke-width="1.3"/>${txt}</g>`);
+    o.push(`<g class="ls-plate" data-pi="${p.i}"${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${r.m.toFixed(1)})"` : ''}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.3"/>${txt}</g>`);
+    if (p.i === selIdx) o.push(`<rect x="${(xa - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(xb - xa + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="3" fill="none" stroke="#1a73e8" stroke-width="2.5" stroke-dasharray="5 3" pointer-events="none"/>`);
     p.xa = xa; p.xb = xb; p.e = p.s + w;
   });
   // gaps: from the nearest score (or plate) on the left of each plate, and from the last plate to the next score

@@ -19,6 +19,14 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Selected print:': 'Impresión seleccionada:',
+  'Highlight': 'Resaltar',
+  'Remove highlight': 'Quitar resaltado',
+  'Delete': 'Borrar',
+  'Done': 'Listo',
+  'Print deleted.': 'Impresión borrada.',
+  'Undo': 'Deshacer',
+  'Tap a print on the sheet to highlight or delete it.': 'Toque una impresión en la hoja para resaltarla o borrarla.',
   'Print / ink': 'Impresión / tinta',
   'e.g. 34 1/16': 'p. ej. 34 1/16',
   'e.g. 133 1/16': 'p. ej. 133 1/16',

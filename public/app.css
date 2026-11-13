@@ -399,3 +399,8 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .ls-foot b{font-size:12.5px;display:block;margin-top:2px}
 #printSheet .lsheet-print .lsheet{width:100%;padding:0}
 #printSheet .lsheet-print{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#lSheet .ls-plate{cursor:pointer}
+#lSheet .ls-plate:hover rect{stroke:#1a73e8;stroke-width:2}
+.sel-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;min-height:20px}
+.sel-bar:has(.btn){padding:8px 10px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-soft)}
+.plate-row.sel{background:var(--accent-soft);border-radius:8px;padding-left:8px;padding-right:8px}
