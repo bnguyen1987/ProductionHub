@@ -19,6 +19,9 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Duplicate': 'Duplicar',
+  'Check placement': 'Revise la ubicación',
+  '(not printed)': '(no se imprime)',
   'Text boxes in the detail box (up to 4, side by side)': 'Recuadros de texto en el detalle (hasta 4, lado a lado)',
   '+ Add text box': '+ Agregar recuadro de texto',
   'The detail box holds up to 4 text boxes.': 'El detalle lleva hasta 4 recuadros de texto.',
@@ -595,6 +598,12 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^(.+) on P(\d+) has no width\. Fill in Width so the distances are right\.$/, '$1 en P$2 no tiene ancho. Llene el Ancho para que las distancias salgan bien.'],
+  [/^(.+) on P(\d+) runs off the end of the blank\.$/, '$1 en P$2 se sale del blank.'],
+  [/^(.+) on P(\d+) is beside the glue tab, where there is no flap\.$/, '$1 en P$2 está junto a la ceja de pegue, donde no hay solapa.'],
+  [/^(.+) on P(\d+) sits on the glue tab\.$/, '$1 en P$2 está sobre la ceja de pegue.'],
+  [/^(.+) on P(\d+) crosses the (score|slot) at (.+)\.$/, (m, a, b, c, d) => `${a} en P${b} cruza ${c === 'slot' ? 'la ranura' : 'el doblez'} en ${d}.`],
+  [/^(.+) and (.+) overlap on P(\d+)\.$/, '$1 y $2 se enciman en P$3.'],
   [/^Text box (\d+)$/, 'Recuadro de texto $1'],
   [/^Copied (\d+) logos? from the layout\. If one looks wrong, use Change image or Remove image on that plate\.$/, 'Se copiaron $1 logo(s) del diseño. Si alguno se ve mal, use Cambiar imagen o Quitar imagen en esa placa.'],
   [/^Logos were not copied\. Use Add image on a plate to put the real logo in\.$/, 'No se copiaron los logos. Use Agregar imagen en una placa para poner el logo real.'],

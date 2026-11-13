@@ -12,7 +12,7 @@ const EMPTY = () => ({
 });
 const INFO = [
   ['customer', 'Customer'], ['shipTo', 'Ship to'], ['fileNo', 'File #'], ['specNo', 'Spec #'],
-  ['design', 'Design no.'], ['ident', 'Ident'], ['style', 'Style'], ['size', 'Size (L × W × D)'],
+  ['style', 'Style'], ['size', 'Size (L × W × D)'],
   ['board', 'Board / flute'], ['print', 'Print / ink'], ['routing', 'Routing'],
 ];
 // Fields compared by "Add my edits"
@@ -73,6 +73,7 @@ export function render(v) {
         <section class="card lay-preview">
           <h2>New spec sheet <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:500">updates as you edit below</span></h2>
           <div class="lsheet-wrap" id="lWrap"><div id="lSheet" data-no-i18n></div></div>
+          <div id="lWarn"></div>
           <div id="lSelBar" class="sel-bar"></div>
           <div class="btn-row" style="margin-top:12px">
             <button type="button" class="btn primary" id="lPrint">Print / save PDF</button>
@@ -226,7 +227,7 @@ function paintSelBar() {
         <button type="button" class="btn small" id="lMvR" aria-label="Move right">▶</button>
         <button type="button" class="btn small" id="lMvU" aria-label="Move up">▲</button><button type="button" class="btn small" id="lMvD" aria-label="Move down">▼</button></span>
       <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
-      <button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
+      <button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
     $('#lMvP').onchange = (e) => { p.panel = +e.target.value; p.dy = 0; paintPlates(); update(); };
     $('#lMvL').onclick = () => nudge(-0.5);
@@ -237,6 +238,7 @@ function paintSelBar() {
     if ($('#lDims')) $('#lDims').onclick = () => { p.nodim = !p.nodim; paintPlates(); update(); };
     if ($('#lEditSel')) $('#lEditSel').onclick = () => { const g = $(`#lSheet [data-pi="${sel}"]`); openEditor('item:' + sel, g || $('#lSheet')); };
     $('#lDelSel').onclick = () => delPlate(sel);
+    $('#lDup').onclick = () => duplicate(sel);
     $('#lDone').onclick = () => select(-1);
   } else if (undo) {
     bar.innerHTML = `<span>Deleted.</span><span class="btn-row"><button type="button" class="btn small" id="lUndo">Undo</button></span>`;
@@ -281,8 +283,82 @@ function update() {
   $('#lLChk').innerHTML = lp.length ? chk(lp, bl, 'length').replace(/<span class="pill warn">blank length is ([^<]+)<\/span>/, (m, x) => `<span class="hint">scored length · blank is ${x}</span>`) : '';
   paintPP();
   $('#lSheet').innerHTML = sheetHtml(L, sel);
+  paintWarn();
   paintSelBar();
   fit();
+}
+
+// ---- sheet geometry in inches (same rules as the drawing) ----
+function geom(d = L) {
+  const wp = nums(d.widthPanels), lp = nums(d.lengthPanels), bl = pin(d.blankL), bw = pin(d.blankW);
+  const rows = wp.length ? wp : [isFinite(bw) && bw > 0 ? bw : 1];
+  const totL = lp.length ? sum(lp) : (isFinite(bl) && bl > 0 ? bl : 100);
+  const scores = [0]; lp.forEach((v) => scores.push(scores[scores.length - 1] + v));
+  const tab = rows.length >= 2 && lp.length >= 4 && (d.glueTab === 'on' || (d.glueTab !== 'off' && lp[0] > 0 && lp[0] <= 2.5));
+  const flap = new Set(!tab ? [] : rows.length >= 3 ? [0, rows.length - 1] : [rows[0] <= rows[1] ? 0 : 1]);
+  const pxIn = 786 / totL; // drawing scale (x1 - x0 = 786)
+  return { wp, lp, rows, totL, scores, tab, flap, pxIn };
+}
+// Inches an item covers along the length: [start, end]
+function span(p, g) {
+  const s = pin(p.start);
+  if (!isFinite(s)) return null;
+  let w;
+  if (p.kind === 'bmc') w = 1;
+  else if (p.kind === 'text') w = (Math.max(1, ...String(p.text || 'TEXT').split('\n').map((x) => x.trim().length)) * ({ XS: 6, S: 8, M: 11, L: 15 }[p.size] || 11) * 0.6 + 6) / g.pxIn;
+  else w = isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : g.totL * 0.1;
+  return [s, s + w];
+}
+const itemName = (p) => (p.kind === 'bmc' ? 'BMC' : p.kind === 'text' ? `Text "${String(p.text || '').split('\n')[0].slice(0, 22)}"` : `Plate${p.text ? ` "${String(p.text).split('\n')[0].slice(0, 22)}"` : ''}`);
+
+// ---- placement warnings: crossing a score, off the blank, on the glue tab, overlapping, no width ----
+function placementWarnings() {
+  const g = geom(), out = [], tol = 1 / 32;
+  const items = L.plates.map((p, i) => ({ p, i, sp: span(p, g) }));
+  items.forEach(({ p, i, sp }) => {
+    if (!sp) return;
+    const [a, b] = sp, who = `${itemName(p)} on P${p.panel}`;
+    if (p.kind === 'plate' && !(isFinite(pin(p.width)) && pin(p.width) > 0)) out.push({ i, msg: `${who} has no width. Fill in Width so the distances are right.` });
+    if (a < -tol || b > g.totL + tol) out.push({ i, msg: `${who} runs off the end of the blank.` });
+    if (g.tab && g.flap.has(p.panel - 1) && a < g.lp[0] - tol) out.push({ i, msg: `${who} is beside the glue tab, where there is no flap.` });
+    else if (g.tab && a < g.lp[0] - tol && p.kind !== 'text') out.push({ i, msg: `${who} sits on the glue tab.` });
+    const sc = g.scores.slice(1, -1).find((x) => x > a + tol && x < b - tol);
+    if (sc !== undefined && !(g.tab && sc === g.lp[0] && a < g.lp[0] - tol)) out.push({ i, msg: `${who} crosses the ${g.flap.has(p.panel - 1) ? 'slot' : 'score'} at ${f(sc)}".` });
+  });
+  for (let x = 0; x < items.length; x++) for (let y = x + 1; y < items.length; y++) {
+    const A = items[x], B = items[y];
+    if (!A.sp || !B.sp || A.p.panel !== B.p.panel || A.p.kind === 'text' && B.p.kind === 'text') continue;
+    const ov = Math.min(A.sp[1], B.sp[1]) - Math.max(A.sp[0], B.sp[0]);
+    if (ov > 1 / 16 && Math.abs((+A.p.dy || 0) - (+B.p.dy || 0)) < 0.3) out.push({ i: B.i, msg: `${itemName(A.p)} and ${itemName(B.p)} overlap on P${A.p.panel}.` });
+  }
+  return out;
+}
+function paintWarn() {
+  const box = $('#lWarn');
+  if (!box) return;
+  const w = placementWarnings();
+  box.innerHTML = w.length ? `<div class="alert warn lay-warn"><b>Check placement</b> <span class="hint">(not printed)</span><ul>${w.slice(0, 8).map((x) => `<li><a href="#" data-wsel="${x.i}">${esc(x.msg)}</a></li>`).join('')}</ul></div>` : '';
+  $$('[data-wsel]', box).forEach((a) => a.onclick = (e) => { e.preventDefault(); select(+a.dataset.wsel); });
+}
+
+// ---- duplicate: copy an item onto the next panel of the same size, same spot within it ----
+function duplicate(i) {
+  const p = L.plates[i];
+  if (!p) return;
+  const g = geom(), c = JSON.parse(JSON.stringify(p));
+  const s = pin(p.start), sp = span(p, g);
+  if (isFinite(s) && g.lp.length) {
+    const k = g.scores.findIndex((x, j) => j < g.lp.length && s >= x - 1e-6 && s < g.scores[j + 1] - 1e-6);
+    const len = g.lp[k], off = s - g.scores[k];
+    const same = g.lp.map((v, j) => j).filter((j) => j !== k && Math.abs(g.lp[j] - len) <= 0.13);
+    const taken = (j) => L.plates.some((q) => q !== p && q.panel === p.panel && (q.kind || 'plate') === (p.kind || 'plate') && isFinite(pin(q.start)) && pin(q.start) >= g.scores[j] - 1e-6 && pin(q.start) < g.scores[j + 1] - 1e-6);
+    const j = same.find((x) => x > k && !taken(x)) ?? same.find((x) => !taken(x));
+    if (j !== undefined) c.start = f(Math.round((g.scores[j] + Math.min(off, g.lp[j] - (sp ? sp[1] - sp[0] : 0))) * 16) / 16);
+    else if (sp) c.start = f(Math.min(g.totL - (sp[1] - sp[0]), sp[1] + 1));
+  } else if (sp) c.start = f(sp[1] + 1);
+  L.plates.splice(i + 1, 0, c);
+  sel = i + 1; undo = null;
+  paintPlates(); update();
 }
 
 function paintPP() {
@@ -332,10 +408,12 @@ function paintPlates() {
         <label class="chk"><input type="checkbox" data-p="flip" ${p.flip ? 'checked' : ''}> Upside down</label>
         <label class="chk"><input type="checkbox" data-p="hl" ${p.hl ? 'checked' : ''}> Highlight</label>
         ${kind !== 'text' ? `<label class="chk"><input type="checkbox" data-p="dims" ${p.nodim ? '' : 'checked'}> Distances</label>` : ''}
+        <button type="button" class="btn small ghost" data-dup="${i}">Duplicate</button>
         <button type="button" class="btn small ghost danger" data-del="${i}" aria-label="Remove">✕</button>
       </div>
     </div>`; }).join('') : '<p class="hint" style="margin:0">Nothing on the sheet yet.</p>';
   $$('[data-del]', $('#lPlates')).forEach((b) => b.onclick = () => delPlate(+b.dataset.del));
+  $$('[data-dup]', $('#lPlates')).forEach((b) => b.onclick = () => duplicate(+b.dataset.dup));
   $$('[data-noimg]', $('#lPlates')).forEach((b) => b.onclick = () => { const p = L.plates[+b.dataset.noimg]; if (p) { p.img = ''; paintPlates(); update(); } });
 }
 
@@ -658,7 +736,7 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
     <div class="ls-top"><div class="ls-title">PRINT LAYOUT SHEET</div><div class="ls-co">GoldenWest Packaging Group&nbsp; | &nbsp;Ontario, CA${head2 ? `<br>${head2}` : ''}</div></div>
     <div class="ls-grid">
       ${cell('CUSTOMER', d.customer, 'customer', 2)}${cell('SHIP TO', d.shipTo, 'shipTo', 3)}${cell('FILE #', d.fileNo, 'fileNo')}${cell('STYLE', d.style, 'style')}${cell('VIEW', d.view, 'view')}
-      ${cell('DESIGN NO.', d.design, 'design')}${cell('IDENT', d.ident, 'ident')}${cell('SIZE (L X W X D)', d.size, 'size')}${cell('BOARD / FLUTE', d.board, 'board')}${cell('BLANK SIZE', blank, 'blank')}${cell('PRINT', d.print, 'print', 2)}${cell('ROUTING', d.routing, 'routing')}
+      ${cell('SIZE (L X W X D)', d.size, 'size', 2)}${cell('BOARD / FLUTE', d.board, 'board')}${cell('BLANK SIZE', blank, 'blank', 2)}${cell('PRINT', d.print, 'print', 2)}${cell('ROUTING', d.routing, 'routing')}
     </div>
     <div class="ls-h">BOX LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
     ${drawing(d, selIdx, opt.H)}
