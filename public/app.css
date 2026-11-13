@@ -477,3 +477,4 @@ details.fold[open]{padding-bottom:16px}
 .lay-warn{margin-top:10px}
 .lay-warn ul{margin:6px 0 0;padding-left:20px}
 .lay-warn a{color:inherit}
+#lSheet .ls-co [data-edit]:hover{background:rgba(255,255,255,.18);outline-color:#fff}

@@ -13,7 +13,7 @@ const EMPTY = () => ({
 const INFO = [
   ['customer', 'Customer'], ['shipTo', 'Ship to'], ['fileNo', 'File #'], ['specNo', 'Spec #'],
   ['style', 'Style'], ['size', 'Size (L × W × D)'],
-  ['board', 'Board / flute'], ['print', 'Print / ink'], ['routing', 'Routing'],
+  ['board', 'Board / flute'], ['print', 'Print / ink'], ['routing', 'Routing'], ['revDate', 'Revision date'],
 ];
 // Fields compared by "Add my edits"
 const TRACK = [['style', 'Style'], ['size', 'Size'], ['board', 'Board'], ['blankW', 'Blank width'], ['blankL', 'Blank length'], ['print', 'Print'], ['routing', 'Routing'], ['widthPanels', 'Panel scores'], ['lengthPanels', 'Length scores']];
@@ -524,7 +524,7 @@ async function cutLogos(files, aiPlates) {
 
 // ---- edit text right on the sheet ----
 const LABELS = { customer: 'Customer', shipTo: 'Ship to', fileNo: 'File #', design: 'Design no.', ident: 'Ident', style: 'Style', size: 'Size (L × W × D)', board: 'Board / flute',
-  blank: 'Blank size (width x length)',  print: 'Print / ink', routing: 'Routing', view: 'View', origDate: 'Original date', revDate: 'Revised', sales: 'Sales', designer: 'Designer', approved: 'Approved by' };
+  blank: 'Blank size (width x length)',  print: 'Print / ink', routing: 'Routing', view: 'View', origDate: 'Original date', revDate: 'Revision date', sales: 'Sales', designer: 'Designer', approved: 'Approved by' };
 function editValue(key) {
   if (key === 'blank') return L.blankW || L.blankL ? `${show(L.blankW)} x ${show(L.blankL)}` : '';
   const [k, i] = key.split(':');
@@ -736,7 +736,7 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
   const allT = Array.isArray(d.detailTexts) ? d.detailTexts : d.detailText ? [d.detailText] : [];
   const dtexts = allT.map((x, k) => ({ x: String(x || ''), k })).filter((o) => o.x.trim()).slice(0, 4);
   const changes = d.changes.split('\n').map((x) => x.trim().replace(/^[-•]\s*/, '')).filter(Boolean);
-  const head2 = [d.specNo && `Spec # ${esc(d.specNo)}`, d.fileNo && `File # ${esc(d.fileNo)}`].filter(Boolean).join('&nbsp; | &nbsp;');
+  const head2 = [d.specNo && `Spec # ${esc(d.specNo)}`, d.fileNo && `File # ${esc(d.fileNo)}`, `<span data-edit="revDate">Revised ${esc(d.revDate) || '—'}</span>`].filter(Boolean).join('&nbsp; | &nbsp;');
   return `<div class="lsheet${opt.print ? ' ls-print' : ''}">
     <div class="ls-top"><div class="ls-title">PRINT LAYOUT SHEET</div><div class="ls-co">GoldenWest Packaging Group&nbsp; | &nbsp;Ontario, CA${head2 ? `<br>${head2}` : ''}</div></div>
     <div class="ls-grid">
