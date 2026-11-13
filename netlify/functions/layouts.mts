@@ -8,7 +8,7 @@ const store = () => getStore({ name: "print-layouts", consistency: "strong" });
 const s = (v: any, n = 200) => (typeof v === "string" ? v.trim().slice(0, n) : "");
 const okId = (id: string) => /^[A-Za-z0-9_-]{4,40}$/.test(id);
 const FIELDS = ["customer", "shipTo", "fileNo", "specNo", "design", "ident", "style", "size", "board", "blankW", "blankL",
-  "print", "routing", "view", "widthPanels", "lengthPanels", "origDate", "revDate", "sales", "designer", "approved", "glueTab"];
+  "print", "routing", "view", "widthPanels", "lengthPanels", "origDate", "revDate", "sales", "designer", "approved", "glueTab", "units"];
 
 function clean(b: any) {
   const doc: any = {};

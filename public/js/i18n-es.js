@@ -19,6 +19,9 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Measurements on the sheet': 'Medidas en la hoja',
+  '10:05 (inches:sixteenths)': '10:05 (pulgadas:dieciseisavos)',
+  '10 5/16 (fractions)': '10 5/16 (fracciones)',
   'Duplicate': 'Duplicar',
   'Check placement': 'Revise la ubicación',
   '(not printed)': '(no se imprime)',

@@ -23,6 +23,9 @@ let L, view, saved = [], ro = null, sel = -1, undo = null, dragged = false;
 // ---- inches ----
 const pin = (s) => parseInches(String(s ?? '').replace(/["”]/g, '').trim());
 const f = (x) => fmtIn(x, '');
+// Plant style: inches:sixteenths (10:05 = 10 5/16"). Used on the sheet unless "fractions" is picked.
+const c16 = (x) => { if (!isFinite(x)) return '–'; let w = Math.floor(x + 1e-9), n = Math.round((x - w) * 16); if (n === 16) { w++; n = 0; } return `${w}:${String(n).padStart(2, '0')}`; };
+const fmtFor = (d) => (d && d.units === 'frac' ? { f: (x) => fmtIn(x, ''), q: (x) => fmtIn(x, '"') } : { f: c16, q: c16 });
 const fx = (x) => (Math.abs(x * 16 - Math.round(x * 16)) < 0.02 ? f(x) : String(+x.toFixed(3)));
 const show = (s) => { const v = pin(s); return isFinite(v) ? f(v) : String(s ?? '').trim(); };
 const list = (s) => String(s || '').split(/[,|;]/).map((x) => x.trim()).filter(Boolean);
@@ -113,6 +116,7 @@ export function render(v) {
           <div id="lWChk" class="hint" style="margin:4px 0 10px"></div>
           <div class="field"><label>Scores along the length, left to right</label><input type="text" data-l="lengthPanels" placeholder="4 3/4, 123 1/16, 4 3/4"></div>
           <div id="lLChk" class="hint" style="margin:4px 0 10px"></div>
+          <div class="field" style="max-width:260px;margin-bottom:10px"><label>Measurements on the sheet</label><select data-l="units"><option value="">10:05 (inches:sixteenths)</option><option value="frac">10 5/16 (fractions)</option></select></div>
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Glue tab and slots</label><select data-l="glueTab"><option value="">Auto (RSC-type: small 1st length panel)</option><option value="on">Show</option><option value="off">Don't show</option></select></div>
           <div class="lbl" style="margin:4px 0 6px">Printed panels <span class="hint" style="font-weight:500">only the panels with a plate, BMC or text get shaded; a row picked here with nothing on it is shaded whole</span></div>
           <div class="seg" id="lPP"></div>
@@ -721,7 +725,8 @@ async function readLayout(input) {
 // ---- the sheet ----
 function sheetHtml(d, selIdx = -1, opt = {}) {
   const cell = (t, v, k, span = 1) => `<div class="ls-cell" data-edit="${k}"${span > 1 ? ` style="grid-column:span ${span}"` : ''}><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`;
-  const blank = d.blankW || d.blankL ? `${show(d.blankW) || '?'} x ${show(d.blankL) || '?'}` : '';
+  const F = fmtFor(d).f, sh = (v) => { const x = pin(v); return isFinite(x) ? F(x) : String(v ?? '').trim(); };
+  const blank = d.blankW || d.blankL ? `${sh(d.blankW) || '?'} x ${sh(d.blankL) || '?'}` : '';
   const notes = d.notes.split('\n').map((x) => x.trim()).filter(Boolean);
   // close-ups: plate logos (once each) + pictures added for the detail box, at most 3
   const seen = new Set(), pics = [];
@@ -752,8 +757,9 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
 // SVG of the blank: width panels as rows (height exaggerated), length scores as columns, plates and the gaps between them.
 let mkSeq = 0;
 function drawing(d, selIdx = -1, drawH = 270) {
+  const { f, q } = fmtFor(d); // q = with inch mark in fractions mode
   const uid = 'm' + (++mkSeq) + '-'; // own arrowhead ids per copy (the hidden preview's ids would not print)
-  const x0 = 64, x1 = 850, y0 = 14, H = drawH || 270;
+  const x0 = 64, x1 = 850, y0 = 30, H = drawH || 270;
   const wp = nums(d.widthPanels), lp = nums(d.lengthPanels);
   const bw = pin(d.blankW), bl = pin(d.blankL);
   const rows = wp.length ? wp : [isFinite(bw) && bw > 0 ? bw : 1];
@@ -811,26 +817,40 @@ function drawing(d, selIdx = -1, drawH = 270) {
       : `<line x1="${x}" y1="${r.y.toFixed(1)}" x2="${x}" y2="${(r.y + r.h).toFixed(1)}" stroke="${INK}" ${DASH}/>`));
   });
 
-  // panel names (left) and sizes (right)
+  // Measurements like the plant's measurement sheet:
+  // left = each width panel, right = running total down the side, top = each length panel, bottom = running total at each score.
+  let cumW = 0;
   R.forEach((r, i) => {
     const pr = shadedRows.has(i);
-    o.push(t(x0 - 14, r.m + 3.5, `P${i + 1}${pr ? ' *' : ''}`, { anchor: 'end', fill: pr ? RED : '#888', size: 10 }));
+    cumW += rows[i];
+    o.push(t(x0 - 14, wp.length ? r.m - 3 : r.m + 3.5, `P${i + 1}${pr ? ' *' : ''}`, { anchor: 'end', fill: pr ? RED : '#888', size: 9.5 }));
+    if (wp.length) o.push(t(x0 - 14, r.m + 10, f(rows[i]), { anchor: 'end', size: 10, weight: 700 }));
     o.push(`<line x1="${x1 + 4}" y1="${r.y.toFixed(1)}" x2="${x1 + 14}" y2="${r.y.toFixed(1)}" stroke="${INK}"/>`);
-    if (wp.length) o.push(t(x1 + 40, r.m + 3.5, f(rows[i]), { size: 10, weight: 600 }));
+    if (wp.length) o.push(t(x1 + 46, r.m + 3.5, f(cumW), { size: 10.5, weight: 700 }));
   });
   o.push(`<line x1="${x1 + 4}" y1="${y0 + H}" x2="${x1 + 14}" y2="${y0 + H}" stroke="${INK}"/>`);
-  o.push(`<line x1="${x1 + 84}" y1="${y0}" x2="${x1 + 84}" y2="${y0 + H}" stroke="${INK}" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
-  o.push(t(x1 + 100, y0 + H / 2, f(wp.length ? totW : bw) || '', { size: 11, weight: 700, tr: `rotate(90 ${x1 + 100} ${y0 + H / 2})` }));
+  if (!wp.length && isFinite(bw) && bw > 0) o.push(t(x1 + 46, y0 + H / 2, f(bw), { size: 10.5, weight: 700 }));
 
-  // length dims
   const yb = y0 + H + 18;
   if (lp.length) {
-    lp.forEach((v, i) => { o.push(arrow(X(scores[i]) + 1, X(scores[i + 1]) - 1, yb, INK)); const a = X(scores[i]), b = X(scores[i + 1]), lab = f(v), narrow = b - a < lab.length * 6 + 6;
-      o.push(narrow ? t(i === 0 ? a - 4 : b + 4, yb + 3.5, lab, { size: 10, weight: 600, anchor: i === 0 ? 'end' : 'start' }) : t((a + b) / 2, yb - 4, lab, { size: 10, weight: 600 })); });
-    scores.forEach((s) => o.push(`<line x1="${X(s).toFixed(1)}" y1="${y0 + H + 4}" x2="${X(s).toFixed(1)}" y2="${yb + 6}" stroke="${INK}"/>`));
+    // top: size of each length panel
+    scores.forEach((sc) => o.push(`<line x1="${X(sc).toFixed(1)}" y1="${y0 - 16}" x2="${X(sc).toFixed(1)}" y2="${y0 - 3}" stroke="${INK}" stroke-width=".8"/>`));
+    lp.forEach((v, i) => {
+      const a = X(scores[i]), b = X(scores[i + 1]), lab = f(v), narrow = b - a < lab.length * 6.2 + 6;
+      o.push(narrow ? t(i === 0 ? a - 3 : b + 3, y0 - 7, lab, { size: 10, weight: 700, anchor: i === 0 ? 'end' : 'start' }) : t((a + b) / 2, y0 - 7, lab, { size: 10, weight: 700 }));
+    });
+    // bottom: running total at each score
+    let last = -Infinity, lift = false;
+    scores.slice(1).forEach((sc) => {
+      const x = X(sc), lab = f(sc);
+      lift = x - last < lab.length * 6.2 + 4 ? !lift : false; // stagger labels that would touch
+      o.push(`<line x1="${x.toFixed(1)}" y1="${y0 + H + 3}" x2="${x.toFixed(1)}" y2="${y0 + H + (lift ? 20 : 9)}" stroke="${INK}" stroke-width=".8"/>`);
+      o.push(t(x, y0 + H + (lift ? 30 : 19), lab, { size: 10, weight: 700 }));
+      last = x;
+    });
   }
   const blankNote = isFinite(bl) && bl > 0 && lp.length && !near(bl, totL) ? ` (blank ${f(bl)})` : '';
-  o.push(t((x0 + x1) / 2, yb + 22, lp.length ? `${f(totL)} scored length${blankNote}` : isFinite(bl) && bl > 0 ? `${f(bl)} blank length` : '', { size: 10.5, weight: 600 }));
+  o.push(t((x0 + x1) / 2, yb + 24, lp.length ? `${f(totL)} scored length${blankNote}` : isFinite(bl) && bl > 0 ? `${f(bl)} blank length` : '', { size: 10.5, weight: 600 }));
 
   // plates
   const plates = (d.plates || []).map((p, i) => ({ ...p, i, s: pin(p.start), w: pin(p.width) })).filter((p) => isFinite(p.s) && p.panel >= 1 && p.panel <= R.length);
@@ -888,26 +908,28 @@ function drawing(d, selIdx = -1, drawH = 270) {
       const fromPlate = prevEnd !== null && prevEnd >= sc - 1e-6;
       const a = fromPlate ? prevEnd : sc;
       const gap = p.s - a;
-      const y = p.cy;
-      if (gap > 0.01) gapMark(o, X(a), p.xa, y, fromPlate && prevKind !== 'bmc' && p.kind !== 'bmc' ? `${f(gap)}" between plates` : `${f(gap)}"`, RED, t, arrow);
+      const y = p.cy, topY = R[i - 1].y + 10;
+      if (gap > 0.01) gapMark(o, X(a), p.xa, y, fromPlate && prevKind !== 'bmc' && p.kind !== 'bmc' ? `${q(gap)} between plates` : q(gap), RED, t, arrow, topY);
       prevEnd = Math.max(prevEnd ?? -Infinity, p.e); prevKind = p.kind;
       // gap to the next score, when that score comes before the next plate
       const next = row[k + 1], scR = scores.find((s) => s >= p.e - 1e-6) ?? totL;
-      if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01) { gapMark(o, p.xb, X(scR), y, `${f(scR - p.e)}"`, RED, t, arrow); prevEnd = scR; }
+      if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01) { gapMark(o, p.xb, X(scR), y, q(scR - p.e), RED, t, arrow, topY); prevEnd = scR; }
     });
   }
 
   const mk = (id, c) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" fill="${c}"/></marker>`;
-  return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 34}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk(uid + 'lak', INK)}${mk(uid + 'lar', RED)}</defs>${o.join('')}</svg>`;
+  return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 36}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk(uid + 'lak', INK)}${mk(uid + 'lar', RED)}</defs>${o.join('')}</svg>`;
 }
 
-function gapMark(o, xa, xb, y, label, c, t, arrow) {
+function gapMark(o, xa, xb, y, label, c, t, arrow, topY = null) {
   if (xb - xa < 8) return;
   o.push(arrow(xa + 1, xb - 1, y, c));
   const w = label.length * 5.4 + 8, cx = (xa + xb) / 2;
-  if (xb - xa < w + 24) { // short gap: label sits above the arrow so the arrow stays visible
-    o.push(`<rect x="${(cx - w / 2).toFixed(1)}" y="${(y - 17).toFixed(1)}" width="${w.toFixed(1)}" height="11" fill="#fff" fill-opacity=".85"/>`);
-    o.push(t(cx, y - 8, label, { size: 9, fill: c, weight: 700 }));
+  if (xb - xa < w + 24) { // short gap: label goes at the top of the panel (clear of the plate) so the arrow stays visible
+    const ly = topY !== null ? Math.min(topY, y - 8) : y - 8;
+    o.push(`<rect x="${(cx - w / 2).toFixed(1)}" y="${(ly - 9).toFixed(1)}" width="${w.toFixed(1)}" height="11" fill="#fff" fill-opacity=".85"/>`);
+    o.push(t(cx, ly, label, { size: 9, fill: c, weight: 700 }));
+    if (y - ly > 14) o.push(`<line x1="${cx.toFixed(1)}" y1="${(ly + 2).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(y - 2).toFixed(1)}" stroke="${c}" stroke-width=".6" stroke-dasharray="2 2"/>`);
     return;
   }
   o.push(`<rect x="${(cx - w / 2).toFixed(1)}" y="${(y - 6.5).toFixed(1)}" width="${w.toFixed(1)}" height="13" fill="#fff"/>`);
