@@ -365,3 +365,37 @@ details.fold[open]{padding-bottom:16px}
 .fc-label{display:block;font-size:12.5px;color:#4d5873;margin:0 0 8px}
 .fc-label textarea,.fc-label input{display:block;margin-top:4px}
 
+
+/* ---- Print Layouts ---- */
+.plate-row{display:grid;grid-template-columns:80px 1fr 1fr auto;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--line)}
+.plate-row .grow{grid-column:1/3}
+.plate-row .chk{display:flex;gap:6px;align-items:center;font-size:13.5px;min-height:42px;white-space:nowrap}
+.lsheet-wrap{overflow:hidden;border:1px solid var(--line);border-radius:6px;background:#fff}
+.lsheet-wrap .lsheet{transform-origin:0 0}
+.lay-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.lsheet{width:1000px;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;padding:14px 16px;box-sizing:border-box;font-size:12px;line-height:1.3}
+.lsheet .ls-top{display:flex;justify-content:space-between;align-items:center;background:#1f3a5f;color:#fff;padding:9px 16px}
+.lsheet .ls-title{font-size:22px;font-weight:700;letter-spacing:.02em}
+.lsheet .ls-co{text-align:right;font-size:12px;font-weight:600;line-height:1.45}
+.lsheet .ls-grid{display:grid;grid-template-columns:1fr 1fr 1fr;border:1px solid #9aa5b1;border-top:0;margin-top:10px;border-top:1px solid #9aa5b1}
+.lsheet .ls-cell{padding:4px 8px;border-right:1px solid #9aa5b1;border-bottom:1px solid #9aa5b1;min-height:36px}
+.lsheet .ls-cell:nth-child(3n){border-right:0}
+.lsheet .ls-cell:nth-last-child(-n+3){border-bottom:0}
+.lsheet .ls-cell span,.lsheet .ls-foot span{display:block;font-size:9.5px;font-weight:700;color:#1f3a5f;letter-spacing:.03em}
+.lsheet .ls-cell b{font-size:13px;display:block;margin-top:2px}
+.lsheet .ls-h{font-size:12px;font-weight:700;color:#1f3a5f;margin:12px 0 2px}
+.lsheet .ls-h i{font-weight:400;color:#555;font-size:10.5px;margin-left:6px}
+.lsheet .ls-svg{display:block;width:100%;height:auto}
+.lsheet .ls-boxes{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;margin-top:6px}
+.lsheet .ls-box{border:1px solid #9aa5b1}
+.lsheet .ls-bh{background:#1f3a5f;color:#fff;font-weight:700;font-size:11px;padding:4px 8px;letter-spacing:.03em}
+.lsheet .ls-box ol,.lsheet .ls-box ul{margin:6px 0;padding-left:26px;font-size:11px}
+.lsheet .ls-box ul{list-style:'- '}
+.lsheet .ls-box li{margin:1px 0}
+.lsheet .ls-empty{color:#888;list-style:none}
+.lsheet .ls-foot{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid #9aa5b1;margin-top:10px}
+.lsheet .ls-foot>div{padding:4px 8px;border-right:1px solid #9aa5b1;min-height:34px}
+.lsheet .ls-foot>div:last-child{border-right:0}
+.lsheet .ls-foot b{font-size:12.5px;display:block;margin-top:2px}
+#printSheet .lsheet-print .lsheet{width:100%;padding:0}
+#printSheet .lsheet-print{-webkit-print-color-adjust:exact;print-color-adjust:exact}

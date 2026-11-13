@@ -42,6 +42,23 @@ Return strict JSON only, no markdown fences, no commentary:
 drawing_box: where the outer cut lines of the whole blank (all pieces) sit on the page, as fractions of the page width/height from the top-left (0 to 1). Leave out the title block, dimension lines and border.
 grade_number: the number in the board grade (200 in "200 C Kraft", 32 in "32 ECT B"); grade_ect true when the grade is ECT. Flute BC for any double wall (BC, DW). Use null when a value is not in the document.`;
 
+const LAYOUT_PROMPT = `You are reading an OLD print layout / specification sheet for a corrugated box plant (often a scan or photo, sometimes with handwritten corrections).
+The goal is to redraw it as a clean new spec sheet, so read every number carefully.
+Write all dimensions as inches with sixteenths fractions, like "34 1/16" or "4 7/8" (spec sheets may write 33\`08 or 33-8, which means 33 8/16 = 33 1/2).
+HANDWRITTEN corrections, cross-outs or notes win over the printed value: use the corrected value in the fields and list each one in "changes" with the old value, e.g. "Board updated: 200# C Kraft -> ECT 32 C" or "Panel scores updated (old sheet: 4 3/4 | 9 5/8 | 4 15/16 | 9 5/8 | 4 13/16)".
+Panels: width_panels are the score panels ACROSS the sheet width, top to bottom as drawn (they add up to the blank width). length_panels are the score panels ALONG the sheet length, left to right (they add up to the scored length; for an RSC this is glue flap, L, W, L, W). Leave a list empty if the sheet does not show it.
+printed_panels: 1-based numbers of the width panels that receive print.
+plates: each print plate / copy block. panel = the 1-based width panel it sits on. start_in = inches from the LEFT edge of the blank to the left side of the plate (if the sheet says "start print 18 in from the score" and that score is at 4 3/4, start_in is 22.75). width_in = plate length along the sheet; if not given, work it out from the stated gaps ("60 in between plates") or estimate. text = the copy on the plate in a few words. upside_down = true if the copy is printed upside down on the drawing.
+Return strict JSON only, no markdown fences, no commentary:
+{"customer":string|null,"ship_to":string|null,"file_no":string|null,"spec_no":string|null,"design_no":string|null,"ident":string|null,
+"style":string|null,"size":string|null,"board":string|null,"blank_width":string|null,"blank_length":string|null,
+"print":string|null,"routing":string|null,"view":"Outside|Inside"|null,
+"width_panels":[string],"length_panels":[string],"printed_panels":[number],
+"plates":[{"panel":number,"start_in":number,"width_in":number,"text":string,"upside_down":boolean}],
+"notes":[string],"changes":[string],"original_date":string|null,"sales":string|null,"designer":string|null,
+"confidence":"high|medium|low","unclear":"one short sentence on anything you could not read, or empty"}
+size is the box size as written (L x W x D). print is like "1 color - BLACK ink". notes are short production/print notes in plain words (one idea each). Use null when a value is not on the sheet.`;
+
 export default async (req: Request) => {
   const denied = checkAccess(req);
   if (denied) return denied;
@@ -50,7 +67,7 @@ export default async (req: Request) => {
   let body: any;
   try { body = await req.json(); } catch { return Response.json({ error: "Bad request" }, { status: 400 }); }
   const { task, data, mediaType } = body || {};
-  if (!["ink", "quote", "dieline"].includes(task) || typeof data !== "string" || !mediaType) {
+  if (!["ink", "quote", "dieline", "layout"].includes(task) || typeof data !== "string" || !mediaType) {
     return Response.json({ error: "Missing file or task" }, { status: 400 });
   }
   if (!process.env.ANTHROPIC_BASE_URL && !process.env.ANTHROPIC_API_KEY) {
@@ -69,8 +86,8 @@ export default async (req: Request) => {
     const client = new Anthropic();
     const msg = await client.messages.create({
       model: MODEL,
-      max_tokens: 1200,
-      messages: [{ role: "user", content: [fileBlock, { type: "text", text: task === "ink" ? INK_PROMPT : task === "dieline" ? DIELINE_PROMPT : QUOTE_PROMPT }] }],
+      max_tokens: task === "layout" ? 3000 : 1200,
+      messages: [{ role: "user", content: [fileBlock, { type: "text", text: task === "ink" ? INK_PROMPT : task === "dieline" ? DIELINE_PROMPT : task === "layout" ? LAYOUT_PROMPT : QUOTE_PROMPT }] }],
     });
     const text = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
     const match = text.match(/\{[\s\S]*\}/);

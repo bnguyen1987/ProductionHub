@@ -199,3 +199,9 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 - The bubbles follow people as they move, hide when off-screen, and don't open machine cards. The sayings stay exactly as written in both languages.
 
 - Speech bubbles removed (Oct 26).
+
+## 16. Print Layouts tab (Nov 2026)
+- New tab `#layouts` (public/js/layouts.js). Upload an old print layout / spec sheet (PDF or photo); `/api/ai` task `layout` reads it (handwritten corrections win; old values go to the change list).
+- The page draws a clean spec sheet: header, info grid, blank layout SVG (width panels as rows with height exaggerated, length scores as columns, printed panels shaded, plates with gap arrows), notes, revision changes, sign-off row. Prints letter landscape.
+- Plate start is measured from the left edge of the blank. "Add my edits to the changes" lists fields changed after the read.
+- Saved layouts: `/api/layouts` (Netlify Blobs store `print-layouts`, key `l/<id>`). Draft also kept in localStorage `gwprod_layout`.
