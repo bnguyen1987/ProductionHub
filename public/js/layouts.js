@@ -181,6 +181,24 @@ function onKey(e) {
   if (sel < 0 || e.target.closest('input,textarea,select,[contenteditable]')) return;
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delPlate(sel); }
   else if (e.key === 'Escape') select(-1);
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); nudge((e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 1 : 1 / 16)); }
+  else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); movePanel(e.key === 'ArrowUp' ? -1 : 1); }
+}
+// Move the selected item: along the length (inches) or to another width panel.
+function nudge(dIn) {
+  const p = L.plates[sel]; if (!p) return;
+  const lp = nums(L.lengthPanels), tl = lp.length ? sum(lp) : pin(L.blankL);
+  const w = p.kind === 'plate' && isFinite(pin(p.width)) ? pin(p.width) : p.kind === 'bmc' ? 1 : 0;
+  let st = (isFinite(pin(p.start)) ? pin(p.start) : 0) + dIn;
+  st = Math.max(0, isFinite(tl) ? Math.min(tl - w, st) : st);
+  p.start = f(Math.round(st * 16) / 16);
+  paintPlates(); update();
+}
+function movePanel(d) {
+  const p = L.plates[sel]; if (!p) return;
+  const n = Math.max(1, nums(L.widthPanels).length);
+  p.panel = Math.max(1, Math.min(n, p.panel + d));
+  paintPlates(); update();
 }
 function select(i, repaintRows = true) {
   sel = i >= 0 && i < L.plates.length ? i : -1;
@@ -202,10 +220,20 @@ function paintSelBar() {
   const p = L.plates[sel];
   if (p) {
     const what = p.kind === 'bmc' ? `<b>Selected BMC:</b> P${p.panel} · ${esc(bmcLabel(p))}` : `<b>${p.kind === 'text' ? 'Selected text:' : 'Selected print:'}</b> P${p.panel}${p.text ? ' · ' + esc(p.text) : ''}`;
+    const nP = Math.max(1, nums(L.widthPanels).length, p.panel);
     bar.innerHTML = `<span>${what}</span>
+      <span class="btn-row sel-move"><span class="hint">Move:</span>
+        <select id="lMvP" aria-label="Panel">${Array.from({ length: nP }, (_, k) => `<option value="${k + 1}" ${p.panel === k + 1 ? 'selected' : ''}>P${k + 1}</option>`).join('')}</select>
+        <button type="button" class="btn small" id="lMvL" aria-label="Move left">◀</button>
+        <input type="text" id="lMvS" value="${esc(show(p.start))}" aria-label="Start in inches from the left edge" title="Inches from the left edge of the blank">
+        <button type="button" class="btn small" id="lMvR" aria-label="Move right">▶</button></span>
       <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
       <button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
+    $('#lMvP').onchange = (e) => { p.panel = +e.target.value; paintPlates(); update(); };
+    $('#lMvL').onclick = () => nudge(-0.5);
+    $('#lMvR').onclick = () => nudge(0.5);
+    $('#lMvS').onchange = (e) => { const v = pin(e.target.value); if (isFinite(v)) { p.start = e.target.value.trim(); nudge(0); } };
     if ($('#lDims')) $('#lDims').onclick = () => { p.nodim = !p.nodim; paintPlates(); update(); };
     if ($('#lEditSel')) $('#lEditSel').onclick = () => { const g = $(`#lSheet [data-pi="${sel}"]`); openEditor('item:' + sel, g || $('#lSheet')); };
     $('#lDelSel').onclick = () => delPlate(sel);
@@ -213,7 +241,7 @@ function paintSelBar() {
   } else if (undo) {
     bar.innerHTML = `<span>Deleted.</span><span class="btn-row"><button type="button" class="btn small" id="lUndo">Undo</button></span>`;
     $('#lUndo').onclick = () => { L.plates.splice(Math.min(undo.i, L.plates.length), 0, undo.p); const i = undo.i; undo = null; select(i); };
-  } else bar.innerHTML = L.plates.length ? '<span class="hint">Drag a print, BMC or text to move it. Tap it to highlight or delete it. Tap any words on the sheet to change them.</span>' : '';
+  } else bar.innerHTML = L.plates.length ? '<span class="hint">Drag a print, BMC or text to move it, or tap it and use the arrow keys / Move controls. Tap any words on the sheet to change them.</span>' : '';
 }
 
 function fill() {

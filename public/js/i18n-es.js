@@ -19,6 +19,12 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Move:': 'Mover:',
+  'Move left': 'Mover a la izquierda',
+  'Move right': 'Mover a la derecha',
+  'Start in inches from the left edge': 'Inicio en pulgadas desde la orilla izquierda',
+  'Inches from the left edge of the blank': 'Pulgadas desde la orilla izquierda del blank',
+  'Drag a print, BMC or text to move it, or tap it and use the arrow keys / Move controls. Tap any words on the sheet to change them.': 'Arrastre una impresión, BMC o texto para moverlo, o tóquelo y use las flechas / controles de Mover. Toque cualquier palabra de la hoja para cambiarla.',
   'Print detail box': 'Recuadro de detalle de impresión',
   'close-ups of the logo / print for the operator': 'acercamientos del logo / impresión para el operador',
   'Show the plate logos zoomed in': 'Mostrar los logos de las placas en grande',
