@@ -229,7 +229,8 @@ function paintSelBar() {
         <button type="button" class="btn small" id="lMvL" aria-label="Move left">◀</button>
         <input type="text" id="lMvS" value="${esc(show(p.start))}" aria-label="Start in inches from the left edge" title="Inches from the left edge of the blank">
         <button type="button" class="btn small" id="lMvR" aria-label="Move right">▶</button>
-        <button type="button" class="btn small" id="lMvU" aria-label="Move up">▲</button><button type="button" class="btn small" id="lMvD" aria-label="Move down">▼</button></span>
+        <button type="button" class="btn small" id="lMvU" aria-label="Move up">▲</button><button type="button" class="btn small" id="lMvD" aria-label="Move down">▼</button>
+        <button type="button" class="btn small" id="lCtrH" title="Center left-right in its panel">Center ↔</button><button type="button" class="btn small" id="lCtrV" title="Center top-to-bottom in its panel">Center ↕</button></span>
       <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
       <button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
@@ -237,6 +238,8 @@ function paintSelBar() {
     $('#lMvL').onclick = () => nudge(-0.5);
     $('#lMvR').onclick = () => nudge(0.5);
     $('#lMvU').onclick = () => movePanel(-1);
+    $('#lCtrH').onclick = () => centerItem(sel);
+    $('#lCtrV').onclick = () => { p.dy = 0; paintPlates(); update(); };
     $('#lMvD').onclick = () => movePanel(1);
     $('#lMvS').onchange = (e) => { const v = pin(e.target.value); if (isFinite(v)) { p.start = e.target.value.trim(); nudge(0); } };
     if ($('#lDims')) $('#lDims').onclick = () => { p.nodim = !p.nodim; paintPlates(); update(); };
@@ -346,6 +349,19 @@ function paintWarn() {
 }
 
 // ---- duplicate: copy an item onto the next panel of the same size, same spot within it ----
+// Center an item left-right inside the length panel it sits in (the panel under its middle).
+function centerItem(i) {
+  const p = L.plates[i];
+  if (!p) return;
+  const g = geom(), sp = span(p, g);
+  if (!sp) return;
+  const w = sp[1] - sp[0], mid = (sp[0] + sp[1]) / 2;
+  let a = 0, b = g.totL;
+  if (g.lp.length) { const k = Math.max(0, g.scores.findIndex((x, j) => j < g.lp.length && mid >= x - 1e-6 && mid < g.scores[j + 1] + 1e-6)); a = g.scores[k]; b = g.scores[k + 1]; }
+  p.start = f(Math.round(Math.max(a, a + (b - a - w) / 2) * 16) / 16);
+  paintPlates(); update();
+}
+
 function duplicate(i) {
   const p = L.plates[i];
   if (!p) return;

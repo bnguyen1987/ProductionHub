@@ -19,6 +19,10 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Center top-to-bottom in its panel': 'Centrar de arriba a abajo en su panel',
+  'Center left-right in its panel': 'Centrar de izquierda a derecha en su panel',
+  'Center ↕': 'Centrar ↕',
+  'Center ↔': 'Centrar ↔',
   'Revision date': 'Fecha de revisión',
   'Measurements on the sheet': 'Medidas en la hoja',
   '10:05 (inches:sixteenths)': '10:05 (pulgadas:dieciseisavos)',
