@@ -439,3 +439,9 @@ details.fold[open]{padding-bottom:16px}
 .sel-move{gap:6px}
 .sel-move select{width:auto;min-height:34px;padding:4px 8px}
 .sel-move input{width:84px;min-height:34px;padding:4px 8px}
+.det-texts{display:flex;flex-direction:column;gap:6px}
+.det-text{display:flex;gap:6px;align-items:flex-start}
+.lsheet .ls-dtexts{display:flex;gap:8px;padding:4px 8px 8px;flex-wrap:nowrap}
+.lsheet .ls-dtexts .ls-dtext{flex:1;min-width:0;border:1px solid #ccd3db;padding:5px 7px;font-size:10.5px;min-height:56px;line-height:1.35;overflow-wrap:anywhere}
+.lsheet .ls-dtexts .ls-dnew{border-style:dashed;display:flex;align-items:center;justify-content:center;flex:0 0 90px}
+#printSheet .ls-dnew{display:none}

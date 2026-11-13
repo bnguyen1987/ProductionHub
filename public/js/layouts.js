@@ -8,7 +8,7 @@ const today = () => { const d = new Date(); return `${String(d.getMonth() + 1).p
 const EMPTY = () => ({
   id: '', customer: '', shipTo: '', fileNo: '', specNo: '', design: '', ident: '', style: '', size: '', board: '',
   blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
-  printPanels: [], plates: [], notes: '', changes: '', detailText: '', details: [], detailLogos: true, origDate: '', revDate: today(), sales: '', designer: '', approved: '', orig: null,
+  printPanels: [], plates: [], notes: '', changes: '', detailTexts: [], details: [], detailLogos: true, origDate: '', revDate: today(), sales: '', designer: '', approved: '', orig: null,
 });
 const INFO = [
   ['customer', 'Customer'], ['shipTo', 'Ship to'], ['fileNo', 'File #'], ['specNo', 'Spec #'],
@@ -100,7 +100,9 @@ export function render(v) {
           <label class="chk" style="margin-bottom:6px"><input type="checkbox" id="lDetLogos"> Show the plate logos zoomed in</label>
           <div id="lDetPics" class="det-pics"></div>
           <label class="btn small" style="margin:6px 0">+ Add close-up picture<input type="file" accept="image/*" hidden id="lDetAdd"></label>
-          <div class="field"><label>Text in the detail box</label><textarea data-l="detailText" rows="3" placeholder="e.g. Logo must be centered. Match PMS black. Check registration."></textarea></div>
+          <div class="lbl" style="margin:8px 0 6px">Text boxes in the detail box (up to 4, side by side)</div>
+          <div id="lDetTexts" class="det-texts"></div>
+          <button type="button" class="btn small" id="lDetTextAdd" style="margin-top:6px">+ Add text box</button>
           <div class="field" style="margin-top:10px"><label>Changes from the old sheet (one per line, kept with the layout, not printed)</label><textarea data-l="changes" rows="4"></textarea></div>
           <div class="btn-row" style="margin-top:8px"><button type="button" class="btn small" id="lEdits">Add my edits to the changes</button><span class="hint" id="lEditsMsg"></span></div>
           <div class="row" style="margin-top:12px">
@@ -143,6 +145,7 @@ export function render(v) {
   $('#lAddBmc').onclick = () => addItem({ kind: 'bmc', panel: L.printPanels[0] || 1, start: mid(), ...bmcFromBoard(L.board), flip: false });
   $('#lAddText').onclick = () => addItem({ kind: 'text', panel: 1, start: mid(), text: '', size: 'M', flip: false });
   $('#lEdits').onclick = addEdits;
+  $('#lDetTextAdd').onclick = () => { if (L.detailTexts.length >= 4) return alert('The detail box holds up to 4 text boxes.'); L.detailTexts.push(''); paintDetails(); update(); const t = $$('#lDetTexts textarea').pop(); if (t) t.focus(); };
   $('#lDetLogos').onchange = (e) => { L.detailLogos = e.target.checked; update(); };
   $('#lDetAdd').onchange = (e) => { const f0 = e.target.files[0]; e.target.value = ''; if (f0) addDetail(f0); };
   $('#lPrint').onclick = printSheet;
@@ -254,6 +257,8 @@ function paintSelBar() {
 function fill() {
   $$('[data-l]', view).forEach((el) => { el.value = L[el.dataset.l] ?? ''; });
   if (!Array.isArray(L.details)) L.details = [];
+  if (!Array.isArray(L.detailTexts)) L.detailTexts = L.detailText ? [L.detailText] : []; // older drafts had one text
+  delete L.detailText;
   if (L.detailLogos === undefined) L.detailLogos = true;
   $('#lDetLogos').checked = !!L.detailLogos;
   paintDetails();
@@ -373,6 +378,13 @@ function toLogo(src, sx, sy, sw, sh, flip = false) {
   return c.toDataURL('image/jpeg', 0.85);
 }
 function paintDetails() {
+  const tb = $('#lDetTexts');
+  if (tb) {
+    tb.innerHTML = L.detailTexts.map((x, i) => `<div class="det-text"><textarea rows="3" data-dtx="${i}" placeholder="e.g. Fabri-Cote address, Black ink only">${esc(x)}</textarea><button type="button" class="btn small ghost danger" data-dtrm="${i}" aria-label="Remove text box">✕</button></div>`).join('');
+    $$('[data-dtx]', tb).forEach((ta) => ta.oninput = () => { L.detailTexts[+ta.dataset.dtx] = ta.value; update(); });
+    $$('[data-dtrm]', tb).forEach((b) => b.onclick = () => { L.detailTexts.splice(+b.dataset.dtrm, 1); paintDetails(); update(); });
+    const add = $('#lDetTextAdd'); if (add) add.disabled = L.detailTexts.length >= 4;
+  }
   const box = $('#lDetPics');
   if (!box) return;
   box.innerHTML = L.details.map((d, i) => `<div class="det-pic"><img src="${d.img}" alt="Close-up"><input type="text" data-dcap="${i}" value="${esc(d.caption || '')}" placeholder="Caption (optional)"><button type="button" class="btn small ghost danger" data-drm="${i}" aria-label="Remove picture">✕</button></div>`).join('');
@@ -423,12 +435,13 @@ async function cutLogos(files, aiPlates) {
 
 // ---- edit text right on the sheet ----
 const LABELS = { customer: 'Customer', shipTo: 'Ship to', fileNo: 'File #', design: 'Design no.', ident: 'Ident', style: 'Style', size: 'Size (L × W × D)', board: 'Board / flute',
-  blank: 'Blank size (width x length)', detailText: 'Text in the detail box', print: 'Print / ink', routing: 'Routing', view: 'View', origDate: 'Original date', revDate: 'Revised', sales: 'Sales', designer: 'Designer', approved: 'Approved by' };
+  blank: 'Blank size (width x length)',  print: 'Print / ink', routing: 'Routing', view: 'View', origDate: 'Original date', revDate: 'Revised', sales: 'Sales', designer: 'Designer', approved: 'Approved by' };
 function editValue(key) {
   if (key === 'blank') return L.blankW || L.blankL ? `${show(L.blankW)} x ${show(L.blankL)}` : '';
   const [k, i] = key.split(':');
   if (k === 'notes' || k === 'changes') return i === 'new' ? '' : L[k].split('\n').map((x) => x.trim()).filter(Boolean)[+i] || '';
   if (k === 'item') return (L.plates[+i] || {}).text || '';
+  if (k === 'dtext') return i === 'new' ? '' : L.detailTexts[+i] || '';
   return L[key] ?? '';
 }
 function setValue(key, v) {
@@ -440,6 +453,7 @@ function setValue(key, v) {
     if (i === 'new') { if (v) arr.push(v); } else if (v) arr[+i] = v; else arr.splice(+i, 1);
     L[k] = arr.join('\n'); return;
   }
+  if (k === 'dtext') { const lines = v.split('\n').map((x) => x.trimEnd()).join('\n').trim(); if (i === 'new') { if (lines && L.detailTexts.length < 4) L.detailTexts.push(lines); } else if (lines) L.detailTexts[+i] = lines; else L.detailTexts.splice(+i, 1); return; }
   if (k === 'item') { if (L.plates[+i]) L.plates[+i].text = v.split('\n').map((x) => x.trim()).filter(Boolean).join('\n'); return; }
   L[key] = key === 'view' ? (/^in/i.test(v) ? 'Inside' : 'Outside') : v;
 }
@@ -447,9 +461,9 @@ function openEditor(key, anchor) {
   closeEditor();
   const card = $('.lay-preview'), cr = card.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
   const [k, i] = key.split(':');
-  const label = k === 'notes' ? (i === 'new' ? 'New note' : 'Note ' + (+i + 1)) : k === 'changes' ? (i === 'new' ? 'New change' : 'Change line') : k === 'item' ? ((L.plates[+i] || {}).kind === 'text' ? 'Text' : 'Copy on the plate') : LABELS[key] || key;
-  const multi = k === 'item' || key === 'detailText'; // text items and plate copy can have several lines
-  const long = multi || key === 'detailText' || k === 'notes' || k === 'changes' || key === 'customer' || key === 'shipTo';
+  const label = k === 'dtext' ? (i === 'new' ? 'New text box' : 'Text box ' + (+i + 1)) : k === 'notes' ? (i === 'new' ? 'New note' : 'Note ' + (+i + 1)) : k === 'changes' ? (i === 'new' ? 'New change' : 'Change line') : k === 'item' ? ((L.plates[+i] || {}).kind === 'text' ? 'Text' : 'Copy on the plate') : LABELS[key] || key;
+  const multi = k === 'item' || k === 'dtext'; // text items and plate copy can have several lines
+  const long = multi || k === 'notes' || k === 'changes' || key === 'customer' || key === 'shipTo';
   const box = document.createElement('div');
   box.className = 'sheet-editor';
   box.innerHTML = `<div class="lbl">${esc(label)}</div>${long ? '<textarea rows="3"></textarea>' : '<input type="text">'}${multi ? '<div class="hint">Enter = new line. Save when done.</div>' : ''}
@@ -648,6 +662,8 @@ function sheetHtml(d, selIdx = -1) {
   if (d.detailLogos !== false) (d.plates || []).forEach((p) => { if (p.kind === 'plate' && p.img && !seen.has(p.img)) { seen.add(p.img); pics.push({ img: p.img, caption: `P${p.panel}${p.text ? ' · ' + String(p.text).split('\n')[0] : ''}` }); } });
   (d.details || []).forEach((x) => x && x.img && pics.push({ img: x.img, caption: x.caption || '' }));
   pics.splice(3);
+  const allT = Array.isArray(d.detailTexts) ? d.detailTexts : d.detailText ? [d.detailText] : [];
+  const dtexts = allT.map((x, k) => ({ x: String(x || ''), k })).filter((o) => o.x.trim()).slice(0, 4);
   const changes = d.changes.split('\n').map((x) => x.trim().replace(/^[-•]\s*/, '')).filter(Boolean);
   const head2 = [d.specNo && `Spec # ${esc(d.specNo)}`, d.fileNo && `File # ${esc(d.fileNo)}`].filter(Boolean).join('&nbsp; | &nbsp;');
   return `<div class="lsheet">
@@ -664,7 +680,7 @@ function sheetHtml(d, selIdx = -1) {
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
       <div class="ls-box ls-detail"><div class="ls-bh">PRINT DETAIL (ZOOMED IN)</div>
         ${pics.length ? `<div class="ls-pics">${pics.map((x) => `<figure><img src="${x.img}" alt=""><figcaption>${esc(x.caption)}</figcaption></figure>`).join('')}</div>` : '<div class="ls-empty ls-nopic">No close-up yet. Add one under "Print detail box", or add a logo to a plate.</div>'}
-        <div class="ls-dtext" data-edit="detailText">${esc(d.detailText || '').replace(/\n/g, '<br>') || '<span class="ls-add">+ add text</span>'}</div></div>
+        <div class="ls-dtexts">${dtexts.map((o) => `<div class="ls-dtext" data-edit="dtext:${o.k}">${esc(o.x).replace(/\n/g, '<br>')}</div>`).join('')}${allT.length < 4 ? '<div class="ls-dtext ls-dnew" data-edit="dtext:new"><span class="ls-add">+ add text box</span></div>' : ''}</div></div>
     </div>
     <div class="ls-foot">${[['ORIGINAL DATE', d.origDate, 'origDate'], ['REVISED', d.revDate, 'revDate'], ['SALES', d.sales, 'sales'], ['DESIGNER', d.designer, 'designer'], ['APPROVED BY', d.approved, 'approved']].map(([t, v, k]) => `<div data-edit="${k}"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`).join('')}</div>
   </div>`;

@@ -19,6 +19,12 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Text boxes in the detail box (up to 4, side by side)': 'Recuadros de texto en el detalle (hasta 4, lado a lado)',
+  '+ Add text box': '+ Agregar recuadro de texto',
+  'The detail box holds up to 4 text boxes.': 'El detalle lleva hasta 4 recuadros de texto.',
+  'Remove text box': 'Quitar recuadro de texto',
+  'New text box': 'Recuadro de texto nuevo',
+  'e.g. Fabri-Cote address, Black ink only': 'p. ej. Dirección de Fabri-Cote, solo tinta negra',
   'Extra small': 'Extra chico',
   'Move down': 'Mover abajo',
   'Move up': 'Mover arriba',
@@ -589,6 +595,7 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^Text box (\d+)$/, 'Recuadro de texto $1'],
   [/^Copied (\d+) logos? from the layout\. If one looks wrong, use Change image or Remove image on that plate\.$/, 'Se copiaron $1 logo(s) del diseño. Si alguno se ve mal, use Cambiar imagen o Quitar imagen en esa placa.'],
   [/^Logos were not copied\. Use Add image on a plate to put the real logo in\.$/, 'No se copiaron los logos. Use Agregar imagen en una placa para poner el logo real.'],
   [/^Cutting the logos out of the layout…$/, 'Recortando los logos del diseño…'],

@@ -23,7 +23,7 @@ function clean(b: any) {
   }));
   doc.notes = s(b.notes, 4000);
   doc.changes = s(b.changes, 4000);
-  doc.detailText = s(b.detailText, 2000);
+  doc.detailTexts = (Array.isArray(b.detailTexts) ? b.detailTexts : b.detailText ? [b.detailText] : []).slice(0, 4).map((x: any) => s(x, 1000)).filter(Boolean);
   doc.detailLogos = b.detailLogos !== false;
   const okImg = (v: any) => typeof v === "string" && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length < 400_000;
   doc.details = (Array.isArray(b.details) ? b.details : []).slice(0, 3).filter((x: any) => okImg(x?.img)).map((x: any) => ({ img: x.img, caption: s(x.caption, 80) }));
