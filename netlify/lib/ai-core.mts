@@ -73,6 +73,7 @@ POSITIONS (plates, texts, BMC): print layout drawings are usually hand drawn and
 plate source: where that plate's logo/artwork is drawn on the uploaded pages, so the page can cut it out. file = attachment number (1 if only one), page = page number inside that attachment (1-based), box = a snug box around the logo or copy block (include its border if it has one) as fractions of that page's width/height from the top-left (0 to 1). rotation = degrees to turn the cut-out clockwise so the artwork reads upright (0 if the page is upright; 90 if the page is scanned turned a quarter to the left, so the text runs bottom to top; 270 if it runs top to bottom; 180 if upside down). Use null if the artwork is not shown.
 BMC = Box Maker's (Manufacturer's) Certificate stamp. It is often only a handwritten note like "BMC 32 ECT P2", "cert on flap", "200# cert" or a hand-drawn circle. Set bmc.present true when the sheet asks for one. Take test/value from the note; if the note gives none, use the board grade (200# = Mullen 200, ECT 32 = ECT 32); double wall for BC/DW board. panel/start_in only if the sheet shows where it goes, else null. written = the note word for word.
 texts: other short words the old sheet places ON the blank drawing that are not print plates (e.g. "THIS SIDE UP" marks or handwritten callouts that belong on a panel). Leave empty if none; general instructions go in notes.
+Keep it short: at most 12 plates, 12 texts and 12 notes, each a few words. Never repeat an item. Ignore rows of #, dots or dashes (they are drawing marks).
 size is the box size as written (L x W x D). print is like "1 color - BLACK ink". notes are short production/print notes in plain words (one idea each). Use null when a value is not on the sheet.`;
 
 
@@ -87,6 +88,25 @@ export function checkFiles(body: any): { error?: string; files?: any[] } {
   return { files };
 }
 export const aiReady = () => !!(process.env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_API_KEY);
+
+// Cut-off JSON: cut back to the last complete value and close the open brackets. Returns the object or null.
+function salvageJson(text: string): any {
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+  const t = text.slice(start);
+  const stack: string[] = [];
+  let inStr = false, esc = false, lastCut = -1, cutStack: string[] = [];
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === "{" || c === "[") stack.push(c === "{" ? "}" : "]");
+    else if (c === "}" || c === "]") { stack.pop(); if (stack.length) { lastCut = i + 1; cutStack = [...stack]; } }
+    else if (c === ",") { lastCut = i; cutStack = [...stack]; }
+  }
+  if (lastCut < 0) return null;
+  try { return JSON.parse(t.slice(0, lastCut).replace(/,\s*$/, "") + cutStack.reverse().join("")); } catch { return null; }
+}
 
 // Runs one AI read. Returns { status, body } ready to send back.
 export async function runAi(task: string, files: any[]): Promise<{ status: number; body: any }> {
@@ -103,11 +123,17 @@ export async function runAi(task: string, files: any[]): Promise<{ status: numbe
     // Streamed, so a long read (busy scans take over a minute) is not cut off by the 60 s limit on a single wait.
     const stream = client.messages.stream({
       model: MODEL,
-      max_tokens: task === "layout" ? 8000 : 1200,
+      max_tokens: task === "layout" ? 16000 : 1200,
+      temperature: 0,
       messages: [{ role: "user", content: [...content, { type: "text", text: PROMPTS[task] }] }],
     });
     const msg: any = await stream.finalMessage();
     const text = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+    if (msg.stop_reason === "max_tokens") {
+      // ran out of room: keep every field that was finished
+      const fixed = salvageJson(text);
+      if (fixed) return { status: 200, body: { result: { ...fixed, unclear: [fixed.unclear, "The AI ran out of room, so some items at the end may be missing."].filter(Boolean).join(" ") } } };
+    }
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) { console.error("AI no JSON", task, msg.stop_reason, text.slice(0, 300)); return { status: 422, body: { error: "AI could not read that file. Try a clearer photo or enter values by hand." } }; }
     try { return { status: 200, body: { result: JSON.parse(match[0]) } }; }
