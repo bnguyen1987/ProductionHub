@@ -705,7 +705,7 @@ function drawing(d, selIdx = -1) {
   const segs = lp.length ? lp.map((v, j) => [scores[j], scores[j + 1]]) : [[0, totL]];
   const items = (d.plates || []).map((p) => {
     const st = pin(p.start); if (!isFinite(st) || p.panel < 1 || p.panel > R.length) return null;
-    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 1 : Math.max(0.5, Math.max(...String(p.text || 'TEXT').split('\n').map((x) => x.length)) * 6.6 / ((x1 - x0) / totL));
+    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 1 : (Math.max(...String(p.text || 'TEXT').split('\n').map((x) => x.trim().length)) * ({ XS: 6, S: 8, M: 11, L: 15 }[p.size] || 11) * 0.6 + 6) / ((x1 - x0) / totL);
     return { row: p.panel - 1, a: st, b: st + w };
   }).filter(Boolean);
   const shadedRows = new Set();
