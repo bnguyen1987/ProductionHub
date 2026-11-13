@@ -910,16 +910,24 @@ function drawing(d, selIdx = -1, drawH = 270) {
     }
     const w = isFinite(p.w) && p.w > 0 ? p.w : totL * 0.1;
     const xa = X(p.s), xb = Math.max(X(p.s + w), xa + 24);
-    const h = Math.min(r.h * 0.8, 52), y = m - h / 2;
-    const cx = (xa + xb) / 2;
-    const fs = h < 26 ? 7 : 8.5;
-    const per = Math.max(4, Math.floor((xb - xa - 8) / (fs * 0.64)));
-    const maxL = Math.max(1, Math.floor((h - 4) / (fs + 1.5)));
-    const lines = String(p.text || '').toUpperCase().split('\n').flatMap((x) => wrap(x, per)).slice(0, maxL);
-    const y1 = m - ((lines.length - 1) * (fs + 1.5)) / 2 + fs * 0.35;
+    // Fit all of the copy: shrink the type (9 → 5 px) and let the box grow up to ~90% of the panel height.
+    const cx = (xa + xb) / 2, hMax = r.h * 0.9, base = Math.min(r.h * 0.8, 52);
+    const raw = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
+    let fs = 9, lines = [];
+    for (; fs >= 5; fs -= 0.5) {
+      const per = Math.max(3, Math.floor((xb - xa - 6) / (fs * 0.58)));
+      lines = raw.flatMap((x) => wrapHard(x, per));
+      if (lines.length * fs * 1.18 + 6 <= hMax) break;
+    }
+    fs = Math.max(5, fs);
+    const lh = fs * 1.18;
+    const maxL = Math.max(1, Math.floor((hMax - 6) / lh));
+    if (lines.length > maxL) { lines = lines.slice(0, maxL); lines[maxL - 1] += '…'; }
+    const h = p.img ? base : Math.max(base, Math.min(hMax, lines.length * lh + 8)), y = m - h / 2;
+    const y1 = m - ((lines.length - 1) * lh) / 2 + fs * 0.35;
     const txt = p.img
       ? `<image href="${p.img}" x="${(xa + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(xb - xa - 4).toFixed(1)}" height="${(h - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="mix-blend-mode:multiply"/>`
-      : lines.map((ln, k) => t(cx, y1 + k * (fs + 1.5), ln, { size: fs, weight: 600 })).join('');
+      : lines.map((ln, k) => t(cx, y1 + k * lh, ln, { size: fs, weight: 600 })).join('');
     o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : ''}><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
     p.xa = xa; p.xb = xb; p.e = p.s + w;
@@ -962,6 +970,17 @@ function gapMark(o, xa, xb, y, label, c, t, arrow, topY = null) {
   o.push(t(cx, y + 3.5, label, { size: 9.5, fill: c, weight: 700 }));
 }
 
+// Word wrap that splits words longer than a line instead of cutting them off.
+function wrapHard(s, n) {
+  const out = []; let cur = '';
+  for (let w of String(s).split(/\s+/).filter(Boolean)) {
+    while (w.length > n) { if (cur) { out.push(cur); cur = ''; } out.push(w.slice(0, n)); w = w.slice(n); }
+    if (!w) continue;
+    if ((cur + ' ' + w).trim().length > n && cur) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim();
+  }
+  if (cur) out.push(cur);
+  return out;
+}
 function wrap(s, n) {
   const out = []; let cur = '';
   for (const w of String(s).split(/\s+/).filter(Boolean)) {
