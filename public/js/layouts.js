@@ -115,7 +115,7 @@ export function render(v) {
           <div class="field"><label>Scores along the length, left to right</label><input type="text" data-l="lengthPanels" placeholder="4 3/4, 123 1/16, 4 3/4"></div>
           <div id="lLChk" class="hint" style="margin:4px 0 10px"></div>
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Glue tab and slots</label><select data-l="glueTab"><option value="">Auto (RSC-type: small 1st length panel)</option><option value="on">Show</option><option value="off">Don't show</option></select></div>
-          <div class="lbl" style="margin:4px 0 6px">Printed panels</div>
+          <div class="lbl" style="margin:4px 0 6px">Printed panels <span class="hint" style="font-weight:500">only the panels with a plate, BMC or text get shaded; a row picked here with nothing on it is shaded whole</span></div>
           <div class="seg" id="lPP"></div>
           <div class="lbl" style="margin:14px 0 6px">Print, BMC and text on the sheet <span class="hint" style="font-weight:500">start = inches from the left edge of the blank</span></div>
           <div id="lPlates"></div>
@@ -591,7 +591,25 @@ function drawing(d, selIdx = -1) {
   const yE = y0 + H, xg = tab ? X(lp[0]) : x0;
   const bT = body.length ? body[0].y : y0, bB = body.length ? body[body.length - 1].y + body[body.length - 1].h : yE;
   const tp = Math.min(10, (bB - bT) * 0.2);
-  R.forEach((r, i) => { if (pp.has(i + 1)) { const xa = flap.has(i) ? xg : x0; o.push(`<rect x="${xa.toFixed(1)}" y="${r.y.toFixed(1)}" width="${(x1 - xa).toFixed(1)}" height="${r.h.toFixed(1)}" fill="#e6eef7"/>`); } });
+  // Shade only the panels/flaps that carry print: each cell (row × length panel) that a plate, BMC or text sits in.
+  // A row marked printed with nothing placed on it yet is shaded whole.
+  const segs = lp.length ? lp.map((v, j) => [scores[j], scores[j + 1]]) : [[0, totL]];
+  const items = (d.plates || []).map((p) => {
+    const st = pin(p.start); if (!isFinite(st) || p.panel < 1 || p.panel > R.length) return null;
+    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 30 / ((x1 - x0) / totL) : Math.max(0.5, String(p.text || 'TEXT').length * 6.6 / ((x1 - x0) / totL));
+    return { row: p.panel - 1, a: st, b: st + w };
+  }).filter(Boolean);
+  const shadedRows = new Set();
+  R.forEach((r, i) => {
+    const mine = items.filter((it) => it.row === i);
+    const cells = mine.length ? segs.map((sg, j) => (mine.some((it) => it.a < sg[1] - 1e-6 && it.b > sg[0] + 1e-6) ? j : -1)).filter((j) => j >= 0) : pp.has(i + 1) ? segs.map((_, j) => j) : [];
+    cells.forEach((j) => {
+      if (tab && j === 0 && flap.has(i)) return; // no flap beside the glue tab
+      const xa = j === 0 && tab && !flap.has(i) ? x0 : X(segs[j][0]), xb = X(segs[j][1]);
+      o.push(`<rect x="${xa.toFixed(1)}" y="${r.y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${r.h.toFixed(1)}" fill="#e6eef7"/>`);
+      shadedRows.add(i);
+    });
+  });
   if (tab) {
     o.push(`<path d="M${xg.toFixed(1)} ${y0}H${x1}V${yE}H${xg.toFixed(1)}V${bB.toFixed(1)}L${x0} ${(bB - tp).toFixed(1)}V${(bT + tp).toFixed(1)}L${xg.toFixed(1)} ${bT.toFixed(1)}Z" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`);
     if (xg - x0 >= 9 && bB - bT > 40) o.push(t((x0 + xg) / 2 + 2.5, (bT + bB) / 2, 'GLUE TAB', { size: 6.5, weight: 700, fill: '#555', tr: `rotate(-90 ${((x0 + xg) / 2 + 2.5).toFixed(1)} ${((bT + bB) / 2).toFixed(1)})` }));
@@ -607,7 +625,7 @@ function drawing(d, selIdx = -1) {
 
   // panel names (left) and sizes (right)
   R.forEach((r, i) => {
-    const pr = pp.has(i + 1);
+    const pr = shadedRows.has(i);
     o.push(t(x0 - 14, r.m + 3.5, `P${i + 1}${pr ? ' *' : ''}`, { anchor: 'end', fill: pr ? RED : '#888', size: 10 }));
     o.push(`<line x1="${x1 + 4}" y1="${r.y.toFixed(1)}" x2="${x1 + 14}" y2="${r.y.toFixed(1)}" stroke="${INK}"/>`);
     if (wp.length) o.push(t(x1 + 40, r.m + 3.5, f(rows[i]), { size: 10, weight: 600 }));

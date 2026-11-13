@@ -19,6 +19,7 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'only the panels with a plate, BMC or text get shaded; a row picked here with nothing on it is shaded whole': 'solo se sombrean los paneles con placa, BMC o texto; una fila marcada aquí sin nada se sombrea completa',
   'Add image': 'Agregar imagen',
   'Change image': 'Cambiar imagen',
   'Remove image': 'Quitar imagen',
