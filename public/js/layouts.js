@@ -492,7 +492,7 @@ function fit() {
 
 // ---- logo images on plates ----
 // Shrink a canvas region to a small JPEG data URL (max 520 px wide), trimming white margins; rotate 180° when asked.
-function toLogo(src, sx, sy, sw, sh, flip = false, stripLines = false) {
+function toLogo(src, sx, sy, sw, sh, flip = false, stripLines = false, rot = 0) {
   sx = Math.max(0, Math.round(sx)); sy = Math.max(0, Math.round(sy));
   sw = Math.min(src.width - sx, Math.round(sw)); sh = Math.min(src.height - sy, Math.round(sh));
   if (sw < 4 || sh < 4) return '';
@@ -518,13 +518,17 @@ function toLogo(src, sx, sy, sw, sh, flip = false, stripLines = false) {
     if (d[i] + d[i + 1] + d[i + 2] < 600) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   }
   if (x1 > x0 && y1 > y0) { const m = 3; sx += Math.max(0, x0 - m); sy += Math.max(0, y0 - m); sw = Math.min(x1 - x0 + 2 * m, src.width - sx); sh = Math.min(y1 - y0 + 2 * m, src.height - sy); }
-  const k = Math.min(1, 520 / sw);
+  // turn the cut-out upright (pages scanned sideways), plus 180° for plates printed upside down
+  const turn = ((Math.round((+rot || 0) / 90) * 90) + (flip ? 180 : 0)) % 360;
+  const side = turn === 90 || turn === 270;
+  const k = Math.min(1, 520 / (side ? sh : sw));
+  const dw = Math.max(1, Math.round(sw * k)), dh = Math.max(1, Math.round(sh * k));
   const c = document.createElement('canvas');
-  c.width = Math.max(1, Math.round(sw * k)); c.height = Math.max(1, Math.round(sh * k));
+  c.width = side ? dh : dw; c.height = side ? dw : dh;
   const g = c.getContext('2d');
   g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
-  if (flip) { g.translate(c.width, c.height); g.rotate(Math.PI); }
-  g.drawImage(src, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  g.translate(c.width / 2, c.height / 2); g.rotate((turn * Math.PI) / 180); g.translate(-dw / 2, -dh / 2);
+  g.drawImage(src, sx, sy, sw, sh, 0, 0, dw, dh);
   return c.toDataURL('image/jpeg', 0.85);
 }
 function paintDetails() {
@@ -575,7 +579,7 @@ async function cutLogos(files, aiPlates) {
       if (!pages[key]) pages[key] = await pageCanvas(files[fi], pg, 2400);
       const c = pages[key], W = c.width, H = c.height;
       const padX = (b[2] - b[0]) * 0.06 * W, padY = (b[3] - b[1]) * 0.08 * H;
-      const url = toLogo(c, b[0] * W - padX, b[1] * H - padY, (b[2] - b[0]) * W + 2 * padX, (b[3] - b[1]) * H + 2 * padY, !!p.flip, true);
+      const url = toLogo(c, b[0] * W - padX, b[1] * H - padY, (b[2] - b[0]) * W + 2 * padX, (b[3] - b[1]) * H + 2 * padY, !!p.flip, true, +src.rotation || 0);
       if (url) { p.img = url; n++; }
     } catch (e) { console.warn('logo cut', e); }
   }

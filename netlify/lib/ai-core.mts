@@ -42,6 +42,7 @@ grade_number: the number in the board grade (200 in "200 C Kraft", 32 in "32 ECT
 
 const LAYOUT_PROMPT = `You are reading an OLD print layout / specification sheet for a corrugated box plant (often a scan or photo, sometimes with handwritten corrections).
 The goal is to redraw it as a clean new spec sheet, so read every number carefully.
+Scans are often poor: faint, skewed, faxed, or turned sideways / upside down. Read each page in whatever orientation makes the text upright. Never refuse or reply in words: always return the JSON, with null for anything you truly cannot read, and say what was unclear in "unclear".
 You may get several attachments, or one PDF with several pages. At this plant the FIRST attachment (or page 1) is usually the BOX MEASUREMENT drawing (box size, blank size, score / panel dimensions) and the SECOND attachment (or page 2) is usually the PRINT LAYOUT (where the print goes, plate copy, ink, BMC).
 Take box size, blank size, width_panels and length_panels from the measurement drawing. Take printed panels, plates, the BMC and print notes from the print layout. Header fields (customer, ship to, file/spec #, board, routing, dates) can come from either page.
 If the two attachments disagree on a size or score, use the measurement drawing and add a line to "changes" saying what the print layout had.
@@ -57,7 +58,7 @@ Return strict JSON only, no markdown fences, no commentary:
 "style":string|null,"size":string|null,"board":string|null,"blank_width":string|null,"blank_length":string|null,
 "print":string|null,"routing":string|null,"view":"Outside|Inside"|null,
 "width_panels":[string],"length_panels":[string],"printed_panels":[number],
-"plates":[{"panel":number,"length_panel":number|null,"align":"left|center|right","offset_in":number|null,"start_in":number|null,"width_in":number|null,"text":string,"upside_down":boolean,"source":{"file":number,"page":number,"box":[left,top,right,bottom]}|null}],
+"plates":[{"panel":number,"length_panel":number|null,"align":"left|center|right","offset_in":number|null,"start_in":number|null,"width_in":number|null,"text":string,"upside_down":boolean,"source":{"file":number,"page":number,"box":[left,top,right,bottom],"rotation":0|90|180|270}|null}],
 "bmc":{"present":boolean,"test":"ECT|Mullen"|null,"wall":"single|double"|null,"value":number|null,"panel":number|null,"length_panel":number|null,"align":"left|center|right","start_in":number|null,"upside_down":boolean,"written":string|null,"extra_text":string|null},
 "texts":[{"panel":number,"length_panel":number|null,"align":"left|center|right","offset_in":number|null,"start_in":number|null,"text":string,"upside_down":boolean}],
 "notes":[string],"changes":[string],"original_date":string|null,"sales":string|null,"designer":string|null,
@@ -69,7 +70,7 @@ POSITIONS (plates, texts, BMC): print layout drawings are usually hand drawn and
 - start_in only if the sheet writes an exact distance from the left edge of the blank, else null. width_in only if written, else null.
 - Copy that is printed upside down on the drawing has upside_down true. Keep each text block's line breaks with \n.
 - For the BMC: extra_text = words written right beside the BMC (like the box size "54 X 10 X 10"); do not repeat those in texts.
-plate source: where that plate's logo/artwork is drawn on the uploaded pages, so the page can cut it out. file = attachment number (1 if only one), page = page number inside that attachment (1-based), box = a snug box around the logo or copy block (include its border if it has one) as fractions of that page's width/height from the top-left (0 to 1). Use null if the artwork is not shown.
+plate source: where that plate's logo/artwork is drawn on the uploaded pages, so the page can cut it out. file = attachment number (1 if only one), page = page number inside that attachment (1-based), box = a snug box around the logo or copy block (include its border if it has one) as fractions of that page's width/height from the top-left (0 to 1). rotation = degrees to turn the cut-out clockwise so the artwork reads upright (0 if the page is upright; 90 if the page is scanned turned a quarter to the left, so the text runs bottom to top; 270 if it runs top to bottom; 180 if upside down). Use null if the artwork is not shown.
 BMC = Box Maker's (Manufacturer's) Certificate stamp. It is often only a handwritten note like "BMC 32 ECT P2", "cert on flap", "200# cert" or a hand-drawn circle. Set bmc.present true when the sheet asks for one. Take test/value from the note; if the note gives none, use the board grade (200# = Mullen 200, ECT 32 = ECT 32); double wall for BC/DW board. panel/start_in only if the sheet shows where it goes, else null. written = the note word for word.
 texts: other short words the old sheet places ON the blank drawing that are not print plates (e.g. "THIS SIDE UP" marks or handwritten callouts that belong on a panel). Leave empty if none; general instructions go in notes.
 size is the box size as written (L x W x D). print is like "1 color - BLACK ink". notes are short production/print notes in plain words (one idea each). Use null when a value is not on the sheet.`;
@@ -99,11 +100,13 @@ export async function runAi(task: string, files: any[]): Promise<{ status: numbe
   });
   try {
     const client = new Anthropic({ timeout: 10 * 60 * 1000, maxRetries: 1 });
-    const msg = await client.messages.create({
+    // Streamed, so a long read (busy scans take over a minute) is not cut off by the 60 s limit on a single wait.
+    const stream = client.messages.stream({
       model: MODEL,
       max_tokens: task === "layout" ? 8000 : 1200,
       messages: [{ role: "user", content: [...content, { type: "text", text: PROMPTS[task] }] }],
     });
+    const msg: any = await stream.finalMessage();
     const text = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) { console.error("AI no JSON", task, msg.stop_reason, text.slice(0, 300)); return { status: 422, body: { error: "AI could not read that file. Try a clearer photo or enter values by hand." } }; }
