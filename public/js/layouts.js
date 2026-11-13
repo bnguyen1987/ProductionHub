@@ -648,7 +648,7 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
       ${cell('SIZE (L X W X D)', d.size, 'size')}${cell('BOARD / FLUTE', d.board, 'board')}${cell('BLANK SIZE', blank, 'blank')}
       ${cell('PRINT', d.print, 'print')}${cell('ROUTING', d.routing, 'routing')}${cell('VIEW', d.view, 'view')}
     </div>
-    <div class="ls-h">BLANK LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
+    <div class="ls-h">BOX LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
     ${drawing(d, selIdx, opt.H)}
     <div class="ls-boxes"${opt.boxesH ? ` style="min-height:${opt.boxesH}px"` : ''}>
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
