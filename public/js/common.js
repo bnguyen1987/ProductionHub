@@ -77,7 +77,7 @@ export function parseInches(v) {
   if (m) return +m[1] + (+m[3] ? +m[2] / +m[3] : 0);
   m = s.match(/^(\d+)\/(\d+)$/);
   if (m) return +m[2] ? +m[1] / +m[2] : NaN;
-  m = s.match(/^(\d+)\s*[`'-]\s*(\d{1,2})$/); // 33`08 or 33-8 → sixteenths
+  m = s.match(/^(\d+)\s*[`'\-:]\s*(\d{1,2})$/); // 33`08, 33-8 or 33:08 → sixteenths
   if (m && +m[2] < 16) return +m[1] + +m[2] / 16;
   m = s.match(/^\d*\.?\d+$/);
   if (m) return parseFloat(s);
@@ -140,7 +140,7 @@ export function inchConversion(raw, sixteenths = false) {
   if (!s) return '';
   const v = parseInches(s);
   if (!isFinite(v)) return '';
-  const isFraction = /[\/`]/.test(s) || /^\d+\s*-\s*\d{1,2}$/.test(s) || /\d\s+\d/.test(s);
+  const isFraction = /[\/`:]/.test(s) || /^\d+\s*-\s*\d{1,2}$/.test(s) || /\d\s+\d/.test(s);
   if (isFraction) return `= ${(+v.toFixed(4)).toString()}"`;
   if (/\./.test(s)) {
     const exact = Math.abs(v * 16 - Math.round(v * 16)) < 1e-6;

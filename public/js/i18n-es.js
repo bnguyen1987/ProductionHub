@@ -19,6 +19,9 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'The AI took too long. Try again.': 'La IA tardó demasiado. Intente otra vez.',
+  'Could not start the AI. Try again.': 'No se pudo iniciar la IA. Intente otra vez.',
+  'The sheet had more on it than the AI could write back. Try uploading just the print layout page.': 'La hoja tenía más de lo que la IA pudo escribir. Intente subir solo la página del diseño de impresión.',
   'Drop the box measurements and the print layout': 'Suelte las medidas de la caja y el diseño de impresión',
   '(box measurements)': '(medidas de la caja)',
   'Pick both files at once: 1st the box measurements, 2nd the print layout (or one PDF with both pages). Handwritten changes are picked up too.': 'Escoja los dos archivos a la vez: 1ro las medidas de la caja, 2do el diseño de impresión (o un PDF con las dos páginas). También se leen los cambios escritos a mano.',
@@ -548,8 +551,9 @@ export const ES = {
 export const PATTERNS = [
   [/^Size limit (\d+)" · Gross wt (\d+) lbs(?: · Facings (\d+) lbs\/MSF)?$/, (m, a, b, c) => `Límite de tamaño ${a}" · Peso bruto ${b} lbs${c ? ` · Liners ${c} lbs/MSF` : ''}`],
   [/^Found a BMC note and made a stamp \((.+)\)\.(.*)$/, (m, a, b) => `Se encontró una nota de BMC y se hizo un sello (${a}).${b ? ' No decía dónde va, así que está en medio de un panel. Muévalo si hace falta.' : ''}`],
-  [/^Reading (\d+) files… this can take 20–40 seconds\.$/, 'Leyendo $1 archivos… puede tardar de 20 a 40 segundos.'],
+  [/^Reading (\d+) files… this can take up to a minute\.$/, 'Leyendo $1 archivos… puede tardar hasta un minuto.'],
   [/^Reading (.+)… this can take 20–40 seconds\.$/, 'Leyendo $1… puede tardar de 20 a 40 segundos.'],
+  [/^Reading (.+)… this can take up to a minute\.$/, 'Leyendo $1… puede tardar hasta un minuto.'],
   [/^Added (\d+) lines?\.$/, 'Se agregaron $1 línea(s).'],
   [/^Adds up to$/, 'Suma'],
   [/^blank (width|length) is (.+)$/, (m, a, b) => `el ${a === 'width' ? 'ancho' : 'largo'} del blank es ${b}`],

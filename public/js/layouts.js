@@ -284,16 +284,29 @@ function fit() {
 }
 
 // ---- AI read ----
+// Layout reads take 20–90 s, longer than a normal request may run, so they go through a background job and the page checks back.
+async function aiJob(body) {
+  const { id } = await api('/api/aijob', { method: 'POST', body: JSON.stringify(body) });
+  const t0 = Date.now();
+  while (Date.now() - t0 < 4 * 60 * 1000) {
+    await new Promise((z) => setTimeout(z, 3000));
+    let j;
+    try { j = await api('/api/aijob?id=' + encodeURIComponent(id)); } catch (e) { if (/not found|Bad id/i.test(e.message)) throw e; continue; }
+    if (j.status === 'done') return j.result;
+    if (j.status === 'error') throw new Error(j.error || 'AI request failed. Try again, or enter values by hand.');
+  }
+  throw new Error('The AI took too long. Try again.');
+}
 async function readLayout(input) {
   const files = (Array.isArray(input) ? input : [input]).slice(0, 4);
   const msg = $('#lAiMsg');
-  msg.innerHTML = `<div class="alert info"><span class="spinner"></span> Reading ${files.length > 1 ? `${files.length} files` : esc(files[0].name)}… this can take 20–40 seconds.</div>${files.length > 1 ? `<ol class="hint lay-files">${files.map((f, i) => `<li>${esc(f.name)}${i === 0 ? ' <b>(box measurements)</b>' : i === 1 ? ' <b>(print layout)</b>' : ''}</li>`).join('')}</ol>` : ''}`;
+  msg.innerHTML = `<div class="alert info"><span class="spinner"></span> Reading ${files.length > 1 ? `${files.length} files` : esc(files[0].name)}… this can take up to a minute.</div>${files.length > 1 ? `<ol class="hint lay-files">${files.map((f, i) => `<li>${esc(f.name)}${i === 0 ? ' <b>(box measurements)</b>' : i === 1 ? ' <b>(print layout)</b>' : ''}</li>`).join('')}</ol>` : ''}`;
   try {
     const list = [];
     for (const f of files) list.push({ ...(await fileToPayload(f)), name: f.name });
     const size = list.reduce((t, x) => t + x.data.length, 0);
     if (size > 5_200_000) throw new Error('Those files are too large together (max about 4 MB). Upload just the print layout, or use photos/screenshots instead of PDFs.');
-    const { result: r } = await api('/api/ai', { method: 'POST', body: JSON.stringify({ task: 'layout', files: list }) });
+    const r = await aiJob({ task: 'layout', files: list });
     const str = (x) => (x === null || x === undefined ? '' : String(x).trim());
     const arr = (x) => (Array.isArray(x) ? x : []);
     const n = arr(r.width_panels).length;
