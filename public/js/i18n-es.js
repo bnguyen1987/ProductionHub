@@ -19,6 +19,10 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Add image': 'Agregar imagen',
+  'Change image': 'Cambiar imagen',
+  'Remove image': 'Quitar imagen',
+  'Pick a picture (JPG or PNG) of the logo.': 'Escoja una foto (JPG o PNG) del logo.',
   'Distances': 'Distancias',
   'Hide distances': 'Ocultar distancias',
   'Show distances': 'Mostrar distancias',
@@ -563,6 +567,9 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^Copied (\d+) logos? from the layout\. If one looks wrong, use Change image or Remove image on that plate\.$/, 'Se copiaron $1 logo(s) del diseño. Si alguno se ve mal, use Cambiar imagen o Quitar imagen en esa placa.'],
+  [/^Logos were not copied\. Use Add image on a plate to put the real logo in\.$/, 'No se copiaron los logos. Use Agregar imagen en una placa para poner el logo real.'],
+  [/^Cutting the logos out of the layout…$/, 'Recortando los logos del diseño…'],
   [/^Note (\d+)$/, 'Nota $1'],
   [/^Size limit (\d+)" · Gross wt (\d+) lbs(?: · Facings (\d+) lbs\/MSF)?$/, (m, a, b, c) => `Límite de tamaño ${a}" · Peso bruto ${b} lbs${c ? ` · Liners ${c} lbs/MSF` : ''}`],
   [/^Found a BMC note and made a stamp \((.+)\)\.(.*)$/, (m, a, b) => `Se encontró una nota de BMC y se hizo un sello (${a}).${b ? ' No decía dónde va, así que está en medio de un panel. Muévalo si hace falta.' : ''}`],

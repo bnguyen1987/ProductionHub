@@ -125,7 +125,7 @@ export function renderDxf(draw) {
 }
 
 let pdfjsP = null;
-function loadPdfjs() {
+export function loadPdfjs() {
   if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
   if (!pdfjsP) pdfjsP = new Promise((res, rej) => {
     const sc = document.createElement('script'); sc.src = 'vendor/pdf.min.js';
@@ -136,15 +136,15 @@ function loadPdfjs() {
   return pdfjsP;
 }
 
-// First page of a PDF, or a photo, as a canvas (about 1800 px on the long side)
-export async function pageCanvas(file) {
+// A page of a PDF (first by default), or a photo, as a canvas (about `size` px on the long side)
+export async function pageCanvas(file, pageNo = 1, size = 1800) {
   const c = document.createElement('canvas');
   if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '')) {
     const lib = await loadPdfjs();
     const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
-    const page = await doc.getPage(1);
+    const page = await doc.getPage(Math.max(1, Math.min(doc.numPages, pageNo)));
     const v1 = page.getViewport({ scale: 1 });
-    const vp = page.getViewport({ scale: 1800 / Math.max(v1.width, v1.height) });
+    const vp = page.getViewport({ scale: size / Math.max(v1.width, v1.height) });
     c.width = Math.round(vp.width); c.height = Math.round(vp.height);
     const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
     await page.render({ canvasContext: g, viewport: vp }).promise;
@@ -153,7 +153,7 @@ export async function pageCanvas(file) {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Could not open that picture.')); i.src = url; });
-    const k = Math.min(1, 1800 / Math.max(img.naturalWidth, img.naturalHeight));
+    const k = Math.min(1, size / Math.max(img.naturalWidth, img.naturalHeight));
     c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
     return c;

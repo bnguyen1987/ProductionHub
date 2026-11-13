@@ -17,6 +17,7 @@ function clean(b: any) {
   doc.plates = (Array.isArray(b.plates) ? b.plates : []).slice(0, 40).map((p: any) => ({
     panel: Math.max(1, Math.min(20, parseInt(p?.panel, 10) || 1)),
     start: s(p?.start, 20), width: s(p?.width, 20), text: s(p?.text, 200), flip: !!p?.flip, hl: !!p?.hl, nodim: !!p?.nodim,
+    img: typeof p?.img === "string" && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(p.img) && p.img.length < 400_000 ? p.img : "",
     kind: ["plate", "bmc", "text"].includes(p?.kind) ? p.kind : "plate",
     test: p?.test === "Mullen" ? "Mullen" : "ECT", wall: p?.wall === "double" ? "double" : "single", rating: s(p?.rating, 6), size: ["S", "M", "L"].includes(p?.size) ? p.size : "M",
   }));
@@ -48,7 +49,7 @@ export default async (req: Request) => {
     if (req.method === "PUT") {
       if (!okId(id)) return Response.json({ error: "Bad id" }, { status: 400 });
       const raw = await req.text();
-      if (raw.length > 100_000) return Response.json({ error: "Too much text" }, { status: 413 });
+      if (raw.length > 3_000_000) return Response.json({ error: "Too much text" }, { status: 413 });
       const b = JSON.parse(raw);
       const updatedBy = s(b.updatedBy, 80);
       if (!updatedBy) return Response.json({ error: "Your name is required" }, { status: 400 });

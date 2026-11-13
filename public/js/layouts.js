@@ -2,6 +2,7 @@
 // Draft stays in this browser (localStorage). Saved layouts go to /api/layouts so anyone can open and reprint them.
 import { $, $$, esc, api, fileToPayload, parseInches, fmtIn, saveForm, loadForm } from './common.js';
 import { openPrint } from './printkit.js';
+import { pageCanvas } from './dieline.js';
 
 const today = () => { const d = new Date(); return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`; };
 const EMPTY = () => ({
@@ -216,6 +217,7 @@ function fill() {
 
 function onInput(e) {
   const t = e.target;
+  if (t.dataset.img !== undefined) { if (e.type === 'change' && t.files[0]) addImage(+t.dataset.img, t.files[0]); return; }
   if (t.dataset.l) { L[t.dataset.l] = t.value; if (t.dataset.l === 'widthPanels') paintPP(); update(); return; }
   const row = t.closest('[data-plate]');
   if (row) {
@@ -277,7 +279,8 @@ function paintPlates() {
       <div class="field grow"><label>Text</label><input type="text" data-p="text" value="${esc(p.text)}" placeholder="Type anything"></div>`;
     } else {
       mid = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div>
-      <div class="field grow"><label>Copy on the plate</label><input type="text" data-p="text" value="${esc(p.text)}"></div>`;
+      <div class="field grow"><label>Copy on the plate</label><input type="text" data-p="text" value="${esc(p.text)}"></div>
+      <div class="plate-img">${p.img ? `<img src="${p.img}" alt="Logo">` : ''}<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden data-img="${i}"></label>${p.img ? `<button type="button" class="btn small ghost" data-noimg="${i}">Remove image</button>` : ''}</div>`;
     }
     return `
     <div class="plate-row k-${kind}${i === sel ? ' sel' : ''}" data-plate="${i}">
@@ -289,6 +292,7 @@ function paintPlates() {
       <button type="button" class="btn small ghost danger" data-del="${i}" aria-label="Remove">✕</button>
     </div>`; }).join('') : '<p class="hint" style="margin:0">Nothing on the sheet yet.</p>';
   $$('[data-del]', $('#lPlates')).forEach((b) => b.onclick = () => delPlate(+b.dataset.del));
+  $$('[data-noimg]', $('#lPlates')).forEach((b) => b.onclick = () => { const p = L.plates[+b.dataset.noimg]; if (p) { p.img = ''; paintPlates(); update(); } });
 }
 
 function fit() {
@@ -297,6 +301,61 @@ function fit() {
   const k = Math.min(1, wrap.clientWidth / 1000);
   sh.style.transform = `scale(${k})`;
   wrap.style.height = Math.ceil(sh.offsetHeight * k) + 'px';
+}
+
+// ---- logo images on plates ----
+// Shrink a canvas region to a small JPEG data URL (max 520 px wide), trimming white margins; rotate 180° when asked.
+function toLogo(src, sx, sy, sw, sh, flip = false) {
+  sx = Math.max(0, Math.round(sx)); sy = Math.max(0, Math.round(sy));
+  sw = Math.min(src.width - sx, Math.round(sw)); sh = Math.min(src.height - sy, Math.round(sh));
+  if (sw < 4 || sh < 4) return '';
+  // trim near-white margins
+  const d = src.getContext('2d').getImageData(sx, sy, sw, sh).data;
+  let x0 = sw, y0 = sh, x1 = -1, y1 = -1;
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+    const i = (y * sw + x) * 4;
+    if (d[i] + d[i + 1] + d[i + 2] < 600) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 > x0 && y1 > y0) { const m = 3; sx += Math.max(0, x0 - m); sy += Math.max(0, y0 - m); sw = Math.min(x1 - x0 + 2 * m, src.width - sx); sh = Math.min(y1 - y0 + 2 * m, src.height - sy); }
+  const k = Math.min(1, 520 / sw);
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(sw * k)); c.height = Math.max(1, Math.round(sh * k));
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  if (flip) { g.translate(c.width, c.height); g.rotate(Math.PI); }
+  g.drawImage(src, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+async function addImage(i, file) {
+  const p = L.plates[i];
+  if (!p) return;
+  try {
+    if (!file.type.startsWith('image/')) throw new Error('Pick a picture (JPG or PNG) of the logo.');
+    const c = await pageCanvas(file, 1, 1200);
+    p.img = toLogo(c, 0, 0, c.width, c.height, false);
+    paintPlates(); update();
+  } catch (e) { alert(e.message); }
+}
+// After a read: cut each plate's logo out of the uploaded pages, using the box the AI gave.
+async function cutLogos(files, aiPlates) {
+  const pages = {};
+  let n = 0;
+  for (let i = 0; i < aiPlates.length; i++) {
+    const src = aiPlates[i] && aiPlates[i].source, p = L.plates.find((x) => x._ai === i);
+    const b = src && Array.isArray(src.box) && src.box.map(Number);
+    if (!p || !b || b.length !== 4 || b.some((v) => !isFinite(v)) || b[2] <= b[0] || b[3] <= b[1]) continue;
+    const fi = Math.max(1, Math.min(files.length, parseInt(src.file, 10) || 1)) - 1, pg = Math.max(1, parseInt(src.page, 10) || 1);
+    const key = fi + ':' + pg;
+    try {
+      if (!pages[key]) pages[key] = await pageCanvas(files[fi], pg, 2400);
+      const c = pages[key], W = c.width, H = c.height;
+      const padX = (b[2] - b[0]) * 0.06 * W, padY = (b[3] - b[1]) * 0.08 * H;
+      const url = toLogo(c, b[0] * W - padX, b[1] * H - padY, (b[2] - b[0]) * W + 2 * padX, (b[3] - b[1]) * H + 2 * padY, !!p.flip);
+      if (url) { p.img = url; n++; }
+    } catch (e) { console.warn('logo cut', e); }
+  }
+  L.plates.forEach((p) => delete p._ai);
+  return n;
 }
 
 // ---- edit text right on the sheet ----
@@ -412,9 +471,9 @@ async function readLayout(input) {
     const arr = (x) => (Array.isArray(x) ? x : []);
     const n = arr(r.width_panels).length;
     const texts = arr(r.texts).filter((x) => x && str(x.text) && isFinite(+x.start_in)).map((x) => ({ kind: 'text', panel: Math.max(1, parseInt(x.panel, 10) || 1), start: fx(+x.start_in), text: str(x.text), size: 'M', flip: !!x.upside_down }));
-    const plates = arr(r.plates).map((p) => ({
+    const plates = arr(r.plates).map((p, k) => ({
       panel: Math.max(1, parseInt(p.panel, 10) || 1), start: isFinite(+p.start_in) && p.start_in !== null ? fx(+p.start_in) : '',
-      width: isFinite(+p.width_in) && p.width_in ? fx(+p.width_in) : '', text: str(p.text), flip: !!p.upside_down, kind: 'plate',
+      width: isFinite(+p.width_in) && p.width_in ? fx(+p.width_in) : '', text: str(p.text), flip: !!p.upside_down, kind: 'plate', _ai: k,
     }));
     let pp = arr(r.printed_panels).map((x) => parseInt(x, 10)).filter((x) => x >= 1 && (!n || x <= n));
     if (!pp.length) pp = [...new Set(plates.map((p) => p.panel))].sort((a, b) => a - b);
@@ -449,7 +508,11 @@ async function readLayout(input) {
     if (!L.widthPanels) miss.push('panel scores');
     if (!(L.blankW && L.blankL)) miss.push('blank size');
     const low = r.confidence === 'low';
-    msg.innerHTML = `<div class="alert ${miss.length || low ? 'warn' : 'ok'}">Read the layout.${miss.length ? ` Could not find: ${miss.join(', ')}. Fill those in below.` : ' Check every number against the old sheet.'}${bmcMsg}${r.unclear ? ` <br><b>Hard to read:</b> ${esc(r.unclear)}` : ''}</div>`;
+    const done = (logos) => `<div class="alert ${miss.length || low ? 'warn' : 'ok'}">Read the layout.${miss.length ? ` Could not find: ${miss.join(', ')}. Fill those in below.` : ' Check every number against the old sheet.'}${bmcMsg}${logos}${r.unclear ? ` <br><b>Hard to read:</b> ${esc(r.unclear)}` : ''}</div>`;
+    msg.innerHTML = done(plates.some((p, k) => r.plates[k] && r.plates[k].source) ? ' <br><span class="spinner"></span> Cutting the logos out of the layout…' : '');
+    const got = await cutLogos(files, arr(r.plates));
+    if (got) { paintPlates(); update(); }
+    msg.innerHTML = done(got ? ` <br>Copied ${got} logo${got > 1 ? 's' : ''} from the layout. If one looks wrong, use Change image or Remove image on that plate.` : plates.length ? ' <br>Logos were not copied. Use Add image on a plate to put the real logo in.' : '');
   } catch (e) {
     msg.innerHTML = `<div class="alert err">${esc(e.message)}</div>`;
   }
@@ -595,7 +658,9 @@ function drawing(d, selIdx = -1) {
     const maxL = Math.max(1, Math.floor((h - 4) / (fs + 1.5)));
     const lines = wrap(p.text.toUpperCase(), per).slice(0, maxL);
     const y1 = r.m - ((lines.length - 1) * (fs + 1.5)) / 2 + fs * 0.35;
-    const txt = lines.map((ln, k) => t(cx, y1 + k * (fs + 1.5), ln, { size: fs, weight: 600 })).join('');
+    const txt = p.img
+      ? `<image href="${p.img}" x="${(xa + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(xb - xa - 4).toFixed(1)}" height="${(h - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet"/>`
+      : lines.map((ln, k) => t(cx, y1 + k * (fs + 1.5), ln, { size: fs, weight: 600 })).join('');
     o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${r.m.toFixed(1)})"` : ''}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.3"/>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
     p.xa = xa; p.xb = xb; p.e = p.s + w;
