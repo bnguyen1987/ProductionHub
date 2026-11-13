@@ -19,6 +19,8 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Type anything (Enter = new line)': 'Escriba lo que sea (Enter = línea nueva)',
+  'Enter = new line. Save when done.': 'Enter = línea nueva. Guarde al terminar.',
   'only the panels with a plate, BMC or text get shaded; a row picked here with nothing on it is shaded whole': 'solo se sombrean los paneles con placa, BMC o texto; una fila marcada aquí sin nada se sombrea completa',
   'Add image': 'Agregar imagen',
   'Change image': 'Cambiar imagen',

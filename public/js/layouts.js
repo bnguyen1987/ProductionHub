@@ -276,10 +276,10 @@ function paintPlates() {
       <div class="hint bmc-vals">${b.row ? `Size limit ${b.row[1]}" · Gross wt ${b.row[0]} lbs${b.row[2] ? ` · Facings ${b.row[2]} lbs/MSF` : ''}` : 'Not a standard rating. Check the values on the stamp.'}</div>`;
     } else if (kind === 'text') {
       mid = `<div class="field"><label>Size</label><select data-p="size">${opt('S', p.size, 'Small')}${opt('M', p.size || 'M', 'Medium')}${opt('L', p.size, 'Large')}</select></div>
-      <div class="field grow"><label>Text</label><input type="text" data-p="text" value="${esc(p.text)}" placeholder="Type anything"></div>`;
+      <div class="field grow"><label>Text</label><textarea data-p="text" rows="2" placeholder="Type anything (Enter = new line)">${esc(p.text)}</textarea></div>`;
     } else {
       mid = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div>
-      <div class="field grow"><label>Copy on the plate</label><input type="text" data-p="text" value="${esc(p.text)}"></div>
+      <div class="field grow"><label>Copy on the plate</label><textarea data-p="text" rows="2">${esc(p.text)}</textarea></div>
       <div class="plate-img">${p.img ? `<img src="${p.img}" alt="Logo">` : ''}<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden data-img="${i}"></label>${p.img ? `<button type="button" class="btn small ghost" data-noimg="${i}">Remove image</button>` : ''}</div>`;
     }
     return `
@@ -377,7 +377,7 @@ function setValue(key, v) {
     if (i === 'new') { if (v) arr.push(v); } else if (v) arr[+i] = v; else arr.splice(+i, 1);
     L[k] = arr.join('\n'); return;
   }
-  if (k === 'item') { if (L.plates[+i]) L.plates[+i].text = v; return; }
+  if (k === 'item') { if (L.plates[+i]) L.plates[+i].text = v.split('\n').map((x) => x.trim()).filter(Boolean).join('\n'); return; }
   L[key] = key === 'view' ? (/^in/i.test(v) ? 'Inside' : 'Outside') : v;
 }
 function openEditor(key, anchor) {
@@ -385,10 +385,11 @@ function openEditor(key, anchor) {
   const card = $('.lay-preview'), cr = card.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
   const [k, i] = key.split(':');
   const label = k === 'notes' ? (i === 'new' ? 'New note' : 'Note ' + (+i + 1)) : k === 'changes' ? (i === 'new' ? 'New change' : 'Change line') : k === 'item' ? ((L.plates[+i] || {}).kind === 'text' ? 'Text' : 'Copy on the plate') : LABELS[key] || key;
-  const long = k === 'notes' || k === 'changes' || key === 'customer' || key === 'shipTo';
+  const multi = k === 'item'; // text items and plate copy can have several lines
+  const long = multi || k === 'notes' || k === 'changes' || key === 'customer' || key === 'shipTo';
   const box = document.createElement('div');
   box.className = 'sheet-editor';
-  box.innerHTML = `<div class="lbl">${esc(label)}</div>${long ? '<textarea rows="3"></textarea>' : '<input type="text">'}
+  box.innerHTML = `<div class="lbl">${esc(label)}</div>${long ? '<textarea rows="3"></textarea>' : '<input type="text">'}${multi ? '<div class="hint">Enter = new line. Save when done.</div>' : ''}
     <div class="btn-row"><button type="button" class="btn small primary" data-ok>Save</button><button type="button" class="btn small ghost" data-x>Cancel</button>${(k === 'notes' || k === 'changes') && i !== 'new' ? '<button type="button" class="btn small ghost danger" data-rm>Delete line</button>' : ''}</div>`;
   card.appendChild(box);
   const w = Math.min(380, cr.width - 16);
@@ -402,7 +403,10 @@ function openEditor(key, anchor) {
   box.querySelector('[data-ok]').onclick = ok;
   box.querySelector('[data-x]').onclick = closeEditor;
   const rm = box.querySelector('[data-rm]'); if (rm) rm.onclick = () => { setValue(key, ''); closeEditor(); fill(); };
-  f.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ok(); } else if (e.key === 'Escape') closeEditor(); });
+  f.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey || (!multi && !e.shiftKey))) { e.preventDefault(); ok(); }
+    else if (e.key === 'Escape') closeEditor();
+  });
 }
 function closeEditor() { $$('.sheet-editor').forEach((b) => b.remove()); }
 
@@ -598,7 +602,7 @@ function drawing(d, selIdx = -1) {
   const segs = lp.length ? lp.map((v, j) => [scores[j], scores[j + 1]]) : [[0, totL]];
   const items = (d.plates || []).map((p) => {
     const st = pin(p.start); if (!isFinite(st) || p.panel < 1 || p.panel > R.length) return null;
-    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 30 / ((x1 - x0) / totL) : Math.max(0.5, String(p.text || 'TEXT').length * 6.6 / ((x1 - x0) / totL));
+    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 30 / ((x1 - x0) / totL) : Math.max(0.5, Math.max(...String(p.text || 'TEXT').split('\n').map((x) => x.length)) * 6.6 / ((x1 - x0) / totL));
     return { row: p.panel - 1, a: st, b: st + w };
   }).filter(Boolean);
   const shadedRows = new Set();
@@ -654,10 +658,14 @@ function drawing(d, selIdx = -1) {
     const selBox = (x, y, w, h) => { if (p.i === selIdx) o.push(`<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="3" fill="none" stroke="#1a73e8" stroke-width="2.5" stroke-dasharray="5 3" pointer-events="none"/>`); };
     const rot = (cx) => (p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${r.m.toFixed(1)})"` : '');
     if (p.kind === 'text') {
-      const fs = { S: 8, M: 11, L: 15 }[p.size] || 11, txt = String(p.text || '').trim() || 'TEXT';
-      const w = txt.length * fs * 0.6 + 6, xa = X(p.s), y = r.m - fs * 0.75;
-      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(xa + w / 2)}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${(fs * 1.5).toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}"/>${t(xa + 3, r.m + fs * 0.35, txt, { size: fs, weight: 700, anchor: 'start' })}</g></g>`);
-      selBox(xa, y, w, fs * 1.5);
+      const fs = { S: 8, M: 11, L: 15 }[p.size] || 11;
+      let ls = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
+      if (!ls.length) ls = ['TEXT'];
+      const lh = fs * 1.2, hh = ls.length * lh + fs * 0.3;
+      const w = Math.max(...ls.map((x) => x.length)) * fs * 0.6 + 6, xa = X(p.s), y = r.m - hh / 2;
+      const base = r.m - ((ls.length - 1) * lh) / 2 + fs * 0.35;
+      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(xa + w / 2)}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}"/>${ls.map((x, k) => t(xa + 3, base + k * lh, x, { size: fs, weight: 700, anchor: 'start' })).join('')}</g></g>`);
+      selBox(xa, y, w, hh);
       p.skip = true;
       return;
     }
@@ -676,7 +684,7 @@ function drawing(d, selIdx = -1) {
     const fs = h < 26 ? 7 : 8.5;
     const per = Math.max(4, Math.floor((xb - xa - 8) / (fs * 0.64)));
     const maxL = Math.max(1, Math.floor((h - 4) / (fs + 1.5)));
-    const lines = wrap(p.text.toUpperCase(), per).slice(0, maxL);
+    const lines = String(p.text || '').toUpperCase().split('\n').flatMap((x) => wrap(x, per)).slice(0, maxL);
     const y1 = r.m - ((lines.length - 1) * (fs + 1.5)) / 2 + fs * 0.35;
     const txt = p.img
       ? `<image href="${p.img}" x="${(xa + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(xb - xa - 4).toFixed(1)}" height="${(h - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet"/>`
