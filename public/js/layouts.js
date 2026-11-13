@@ -628,7 +628,7 @@ async function readLayout(input) {
 
 // ---- the sheet ----
 function sheetHtml(d, selIdx = -1, opt = {}) {
-  const cell = (t, v, k) => `<div class="ls-cell" data-edit="${k}"><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`;
+  const cell = (t, v, k, span = 1) => `<div class="ls-cell" data-edit="${k}"${span > 1 ? ` style="grid-column:span ${span}"` : ''}><span>${t}</span><b>${esc(v) || '&nbsp;'}</b></div>`;
   const blank = d.blankW || d.blankL ? `${show(d.blankW) || '?'} x ${show(d.blankL) || '?'}` : '';
   const notes = d.notes.split('\n').map((x) => x.trim()).filter(Boolean);
   // close-ups: plate logos (once each) + pictures added for the detail box, at most 3
@@ -643,10 +643,8 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
   return `<div class="lsheet${opt.print ? ' ls-print' : ''}">
     <div class="ls-top"><div class="ls-title">PRINT LAYOUT SHEET</div><div class="ls-co">GoldenWest Packaging Group&nbsp; | &nbsp;Ontario, CA${head2 ? `<br>${head2}` : ''}</div></div>
     <div class="ls-grid">
-      ${cell('CUSTOMER', d.customer, 'customer')}${cell('SHIP TO', d.shipTo, 'shipTo')}${cell('FILE #', d.fileNo, 'fileNo')}
-      ${cell('DESIGN NO.', d.design, 'design')}${cell('IDENT', d.ident, 'ident')}${cell('STYLE', d.style, 'style')}
-      ${cell('SIZE (L X W X D)', d.size, 'size')}${cell('BOARD / FLUTE', d.board, 'board')}${cell('BLANK SIZE', blank, 'blank')}
-      ${cell('PRINT', d.print, 'print')}${cell('ROUTING', d.routing, 'routing')}${cell('VIEW', d.view, 'view')}
+      ${cell('CUSTOMER', d.customer, 'customer', 2)}${cell('SHIP TO', d.shipTo, 'shipTo', 3)}${cell('FILE #', d.fileNo, 'fileNo')}${cell('STYLE', d.style, 'style')}${cell('VIEW', d.view, 'view')}
+      ${cell('DESIGN NO.', d.design, 'design')}${cell('IDENT', d.ident, 'ident')}${cell('SIZE (L X W X D)', d.size, 'size')}${cell('BOARD / FLUTE', d.board, 'board')}${cell('BLANK SIZE', blank, 'blank')}${cell('PRINT', d.print, 'print', 2)}${cell('ROUTING', d.routing, 'routing')}
     </div>
     <div class="ls-h">BOX LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
     ${drawing(d, selIdx, opt.H)}

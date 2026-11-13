@@ -455,3 +455,9 @@ details.fold[open]{padding-bottom:16px}
 .plate-row .pr-opts{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 .plate-row .pr-opts .chk{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;white-space:nowrap;min-height:34px}
 .plate-row .pr-opts [data-del]{margin-left:auto}
+/* compact header boxes: 2 rows of 8 columns */
+.lsheet .ls-grid{grid-template-columns:repeat(8,1fr);gap:0;background:#fff;border:0;border-top:1px solid #9aa5b1;border-left:1px solid #9aa5b1;margin-top:8px}
+.lsheet .ls-grid .ls-cell{background:#fff;border:0;border-right:1px solid #9aa5b1 !important;border-bottom:1px solid #9aa5b1 !important;min-height:0;padding:3px 6px}
+.lsheet .ls-grid .ls-cell span{font-size:8.5px}
+.lsheet .ls-grid .ls-cell b{font-size:11.5px;margin-top:1px;line-height:1.25}
+.lsheet.ls-print .ls-grid .ls-cell{min-height:0;padding:3px 6px}
