@@ -484,3 +484,8 @@ details.fold[open]{padding-bottom:16px}
 .sel-bar [data-ta][aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .sel-bar .fs-val{min-width:34px;text-align:center;font-weight:700;font-size:14px}
 .sel-bar #lFlip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+/* long words must wrap instead of pushing the page sideways */
+.sel-bar>span:first-child{min-width:0;overflow-wrap:anywhere}
+.lay-item>div:first-child{min-width:0;overflow-wrap:anywhere}
+.lay-warn li,#lAiMsg .alert,#lSaveMsg .alert{overflow-wrap:anywhere}
+.lsheet .ls-cell b,.lsheet .ls-box li{overflow-wrap:anywhere}

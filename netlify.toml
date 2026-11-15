@@ -10,3 +10,9 @@
   [headers.values]
     X-Frame-Options = "SAMEORIGIN"
     Referrer-Policy = "same-origin"
+
+# Big third-party libraries (3D, PDF, Excel, QR). They only change when a library is upgraded, so browsers may keep them for 30 days.
+[[headers]]
+  for = "/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000"

@@ -20,21 +20,42 @@ const TRACK = [['style', 'Style'], ['size', 'Size'], ['board', 'Board'], ['blank
 
 let L, view, saved = [], ro = null, sel = -1, undo = null, dragged = false;
 // Undo history: a snapshot after each change (quick changes in a row, like typing, count as one step).
-let hist = [], histLock = false, histT = 0;
+let hist = [], histLock = false, histT = 0, histTyping = false;
+// Pictures are kept once in a pool and the history holds a short tag for each, so 40 undo steps stay small.
+const imgPool = [];
+const slim = (o) => JSON.stringify(o, (k, v) => {
+  if (typeof v !== 'string' || v.length < 500 || !v.startsWith('data:image/')) return v;
+  let i = imgPool.indexOf(v);
+  if (i < 0) i = imgPool.push(v) - 1;
+  return '\u0001img' + i;
+});
+const fat = (j) => JSON.parse(j, (k, v) => (typeof v === 'string' && v.startsWith('\u0001img') ? imgPool[+v.slice(4)] || '' : v));
+// Draft save: right away for a plain sheet; a sheet with pictures (a few hundred KB) is saved once typing pauses.
+let draftT = 0;
+function flushDraft() { if (draftT) { clearTimeout(draftT); draftT = 0; saveForm('layout', L); } }
+function saveDraft() {
+  const heavy = L.plates.some((p) => p.img) || (L.details || []).length;
+  if (!heavy) { if (draftT) { clearTimeout(draftT); draftT = 0; } saveForm('layout', L); return; }
+  clearTimeout(draftT);
+  draftT = setTimeout(() => { draftT = 0; saveForm('layout', L); }, 250);
+}
+const onHide = () => flushDraft();
 function snap() {
   if (histLock) return;
-  const j = JSON.stringify({ ...L, orig: undefined });
+  const j = slim({ ...L, orig: undefined });
   if (hist.length && hist[hist.length - 1] === j) return;
   const now = Date.now();
-  if (hist.length > 1 && now - histT < 700) hist[hist.length - 1] = j; else hist.push(j);
-  histT = now;
+  // typing in a box: keystrokes close together count as one step. Button presses and drags are always their own step.
+  if (histTyping && hist.length > 1 && now - histT < 700) hist[hist.length - 1] = j; else hist.push(j);
+  histT = histTyping ? now : 0;
+  histTyping = false;
   if (hist.length > 40) hist.shift();
   const b = $('#lUndoAll'); if (b) b.disabled = hist.length < 2;
 }
 function undoLast() {
   if (hist.length < 2) return;
   hist.pop();
-  const prev = JSON.parse(hist[hist.length - 1]);
+  const prev = fat(hist[hist.length - 1]);
   histLock = true;
   L = { ...EMPTY(), ...prev, orig: L.orig };
   sel = -1; undo = null;
@@ -176,7 +197,8 @@ export function render(v) {
   $('#lPrint').onclick = printSheet;
   $('#lSave').onclick = save;
   $('#lUndoAll').onclick = undoLast;
-  hist = []; histT = 0;
+  hist = []; histT = 0; imgPool.length = 0;
+  window.addEventListener('pagehide', onHide); document.addEventListener('visibilitychange', onHide);
   $('#lNew').onclick = () => { if (!confirm('Clear this layout and start over?')) return; L = EMPTY(); sel = -1; undo = null; fill(); $('#lAiMsg').innerHTML = ''; $('#lSaveMsg').innerHTML = ''; };
   $('#lFind').oninput = paintList;
   $('#lSheet').addEventListener('click', (e) => {
@@ -204,7 +226,11 @@ export function render(v) {
   loadList();
 }
 
-export function destroy() { if (ro) ro.disconnect(); ro = null; document.removeEventListener('keydown', onKey); sel = -1; undo = null; }
+export function destroy() {
+  flushDraft();
+  window.removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide);
+  if (ro) ro.disconnect(); ro = null; document.removeEventListener('keydown', onKey); sel = -1; undo = null; hist = []; imgPool.length = 0;
+}
 
 // ---- select / highlight / delete a print on the sheet ----
 function onKey(e) {
@@ -254,7 +280,7 @@ function paintSelBar() {
   if (!bar) return;
   const p = L.plates[sel];
   if (p) {
-    const what = p.kind === 'bmc' ? `<b>Selected BMC:</b> P${p.panel} · ${esc(bmcLabel(p))}` : `<b>${p.kind === 'text' ? 'Selected text:' : 'Selected print:'}</b> P${p.panel}${p.text ? ' · ' + esc(p.text) : ''}`;
+    const what = p.kind === 'bmc' ? `<b>Selected BMC:</b> P${p.panel} · ${esc(bmcLabel(p))}` : `<b>${p.kind === 'text' ? 'Selected text:' : 'Selected print:'}</b> P${p.panel}${p.text ? ' · ' + esc(String(p.text).replace(/\s+/g, ' ').slice(0, 70)) + (String(p.text).length > 70 ? '…' : '') : ''}`;
     const nP = Math.max(1, nums(L.widthPanels).length, p.panel);
     bar.innerHTML = `<span>${what}</span>
       <span class="btn-row sel-move"><span class="hint">Move:</span>
@@ -310,6 +336,11 @@ function fill() {
 
 function onInput(e) {
   const t = e.target;
+  const typed = t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !['checkbox', 'file', 'radio'].includes(t.type));
+  // Typed boxes are handled as you type ("input"); dropdowns and checkboxes when picked ("change"). Handling both would
+  // redraw the sheet a second time when a box loses focus, right under the mouse, and swallow the click on the sheet.
+  if (typed ? e.type !== 'input' : e.type !== 'change') return;
+  histTyping = typed;
   if (t.dataset.img !== undefined) { if (e.type === 'change' && t.files[0]) addImage(+t.dataset.img, t.files[0]); return; }
   if (t.dataset.l) { L[t.dataset.l] = t.value; if (t.dataset.l === 'widthPanels') paintPP(); update(); return; }
   const row = t.closest('[data-plate]');
@@ -327,7 +358,7 @@ function onInput(e) {
 }
 
 function update() {
-  saveForm('layout', L);
+  saveDraft();
   snap();
   const wp = nums(L.widthPanels), lp = nums(L.lengthPanels), bw = pin(L.blankW), bl = pin(L.blankL);
   const chk = (a, b, what) => !a.length ? '' : `Adds up to <b>${f(sum(a))}"</b>${isFinite(b) ? (near(sum(a), b) ? ` <span class="pill ok">matches the blank ${what}</span>` : ` <span class="pill warn">blank ${what} is ${f(b)}"</span>`) : ''}`;
@@ -535,7 +566,7 @@ function paintDetails() {
   const tb = $('#lDetTexts');
   if (tb) {
     tb.innerHTML = L.detailTexts.map((x, i) => `<div class="det-text"><textarea rows="3" data-dtx="${i}" placeholder="e.g. Fabri-Cote address, Black ink only">${esc(x)}</textarea><button type="button" class="btn small ghost danger" data-dtrm="${i}" aria-label="Remove text box">✕</button></div>`).join('');
-    $$('[data-dtx]', tb).forEach((ta) => ta.oninput = () => { L.detailTexts[+ta.dataset.dtx] = ta.value; update(); });
+    $$('[data-dtx]', tb).forEach((ta) => ta.oninput = () => { L.detailTexts[+ta.dataset.dtx] = ta.value; histTyping = true; update(); });
     $$('[data-dtrm]', tb).forEach((b) => b.onclick = () => { L.detailTexts.splice(+b.dataset.dtrm, 1); paintDetails(); update(); });
     const add = $('#lDetTextAdd'); if (add) add.disabled = L.detailTexts.length >= 4;
   }
@@ -543,7 +574,7 @@ function paintDetails() {
   if (!box) return;
   box.innerHTML = L.details.map((d, i) => `<div class="det-pic"><img src="${d.img}" alt="Close-up"><input type="text" data-dcap="${i}" value="${esc(d.caption || '')}" placeholder="Caption (optional)"><button type="button" class="btn small ghost danger" data-drm="${i}" aria-label="Remove picture">✕</button></div>`).join('');
   $$('[data-drm]', box).forEach((b) => b.onclick = () => { L.details.splice(+b.dataset.drm, 1); paintDetails(); update(); });
-  $$('[data-dcap]', box).forEach((inp) => inp.oninput = () => { L.details[+inp.dataset.dcap].caption = inp.value; update(); });
+  $$('[data-dcap]', box).forEach((inp) => inp.oninput = () => { L.details[+inp.dataset.dcap].caption = inp.value; histTyping = true; update(); });
 }
 async function addDetail(file) {
   try {
@@ -654,16 +685,18 @@ function startResize(e) {
   const w0 = isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : (box ? +box.getAttribute('width') / pxIn : 10);
   const h0 = box ? +box.getAttribute('height') : rh * 0.6;
   const kind = hd.dataset.handle;
+  let raf = 0;
   hd.setPointerCapture(e.pointerId);
   const move = (ev) => {
     const b = toSvg(ev);
     if (kind === 'w') p.width = f(Math.max(1, Math.round((w0 + (b.x - a.x) / pxIn) * 16) / 16));
     else p.hgt = Math.round(Math.max(0.15, Math.min(0.98, (h0 + 2 * (b.y - a.y)) / rh)) * 100) / 100;
-    $('#lSheet').innerHTML = sheetHtml(L, sel); // quick redraw while dragging
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; $('#lSheet').innerHTML = sheetHtml(L, sel); }); // at most one redraw per screen frame
   };
   const up = () => {
     hd.removeEventListener('pointermove', move); hd.removeEventListener('pointerup', up); hd.removeEventListener('pointercancel', up);
     document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
     dragged = true; setTimeout(() => (dragged = false), 60);
     paintPlates(); update();
   };

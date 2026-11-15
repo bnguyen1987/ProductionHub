@@ -14,4 +14,15 @@ export default async (req: Request) => {
   const r = await runAi(input.task, input.files);
   await blobs.setJSON("job/" + id, r.status === 200 ? { status: "done", result: r.body.result } : { status: "error", error: r.body.error });
   await blobs.delete("in/" + id);
+  // Housekeeping: job ids start with the time they were made (base 36). Remove records and uploads older than a day.
+  try {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    for (const prefix of ["job/", "in/"]) {
+      const { blobs: list } = await blobs.list({ prefix });
+      for (const b of list.slice(0, 200)) {
+        const made = parseInt(b.key.slice(prefix.length, prefix.length + 8), 36);
+        if (isFinite(made) && made < cutoff) await blobs.delete(b.key);
+      }
+    }
+  } catch (e: any) { console.error("ai-jobs cleanup", e?.message); }
 };
