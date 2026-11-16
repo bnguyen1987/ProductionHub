@@ -959,7 +959,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
   const scores = [0]; lp.forEach((v) => scores.push(scores[scores.length - 1] + v));
   const pp = new Set(d.printPanels || []);
   const o = [];
-  const RED = '#c0392b', INK = '#222', DASH = 'stroke-dasharray="6 4"';
+  const RED = '#c0392b', BLUE = '#1565c0', INK = '#222', DASH = 'stroke-dasharray="6 4"';
   const t = (x, y, s, a = {}) => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${a.size || 10}" fill="${a.fill || INK}" text-anchor="${a.anchor || 'middle'}"${a.weight ? ` font-weight="${a.weight}"` : ''}${a.tr ? ` transform="${a.tr}"` : ''}>${esc(s)}</text>`;
   const arrow = (xa, xb, y, c) => `<line x1="${xa.toFixed(1)}" y1="${y.toFixed(1)}" x2="${xb.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="1" marker-start="url(#${uid}la${c === RED ? 'r' : 'k'})" marker-end="url(#${uid}la${c === RED ? 'r' : 'k'})"/>`;
 
@@ -1144,9 +1144,9 @@ function drawing(d, selIdx = -1, drawH = 270) {
       [[r.y, y], [y + h, r.y + r.h]].forEach(([ya, yb2]) => {
         const gIn = (yb2 - ya) / pxPerIn;
         if (gIn < 1 / 32 || yb2 - ya < 6) return;
-        o.push(`<line x1="${xv.toFixed(1)}" y1="${(ya + 0.5).toFixed(1)}" x2="${xv.toFixed(1)}" y2="${(yb2 - 0.5).toFixed(1)}" stroke="${RED}" stroke-width="1" marker-start="url(#${uid}lar)" marker-end="url(#${uid}lar)"/>`);
+        o.push(`<line x1="${xv.toFixed(1)}" y1="${(ya + 0.5).toFixed(1)}" x2="${xv.toFixed(1)}" y2="${(yb2 - 0.5).toFixed(1)}" stroke="${BLUE}" stroke-width="1" marker-start="url(#${uid}lab)" marker-end="url(#${uid}lab)"/>`);
         const lab = q(gIn), lw = lab.length * 5.4 + 8, ly = (ya + yb2) / 2;
-        o.push(`<rect x="${(xv - 4 - lw).toFixed(1)}" y="${(ly - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="12" fill="#fff" fill-opacity=".9"/>` + t(xv - 4 - lw / 2, ly + 3.4, lab, { size: 9.5, fill: RED, weight: 700 }));
+        o.push(`<rect x="${(xv - 4 - lw).toFixed(1)}" y="${(ly - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="12" fill="#fff" fill-opacity=".9"/>` + t(xv - 4 - lw / 2, ly + 3.4, lab, { size: 9.5, fill: BLUE, weight: 700 }));
       });
     }
     if (p.i === selIdx) { // resize handles: right edge = width, bottom edge = height
@@ -1175,7 +1175,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
   }
 
   const mk = (id, c) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" fill="${c}"/></marker>`;
-  return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rowsin="${rows.join(',')}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 36}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk(uid + 'lak', INK)}${mk(uid + 'lar', RED)}</defs>${o.join('')}</svg>`;
+  return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rowsin="${rows.join(',')}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 36}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk(uid + 'lak', INK)}${mk(uid + 'lar', RED)}${mk(uid + 'lab', BLUE)}</defs>${o.join('')}</svg>`;
 }
 
 function gapMark(o, xa, xb, y, label, c, t, arrow, topY = null) {
