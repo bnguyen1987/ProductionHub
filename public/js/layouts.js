@@ -83,6 +83,19 @@ const clampFs = (v) => Math.max(4, Math.min(40, Math.round(+v * 2) / 2));
 // font size of a text item: typed size wins, else the old Small/Medium/Large preset
 const textFs = (p) => (+p.fsz > 0 ? clampFs(p.fsz) : SIZE_PX[p.size] || 11);
 const autoFs = {}; // last auto-fit size of each plate, so A+/A- can start from it
+// Which way the copy runs: 0 upright, 90 sideways reading top to bottom, 180 upside down, 270 sideways reading bottom to top.
+// Older saves only have "flip" (= upside down).
+// AI answer → turn (falls back to the older upside_down flag)
+const turnOf = (x) => ([90, 180, 270].includes(+x?.turn) ? { turn: +x.turn, flip: false } : { turn: 0, flip: !!x?.upside_down });
+const angleOf = (p) => (((+p.turn || 0) + (p.flip ? 180 : 0)) % 360 + 360) % 360;
+function setAngle(p, a) { p.turn = ((+a % 360) + 360) % 360; p.flip = false; }
+const TURNS = [[0, 'Upright'], [90, 'Sideways ↓'], [180, 'Upside down'], [270, 'Sideways ↑']];
+// Size of a text item along the sheet, in drawing px (sideways text takes its line stack along the sheet)
+function textAlongPx(p) {
+  const ls = String(p.text || 'TEXT').split('\n').map((x) => x.trim()).filter(Boolean), fs = textFs(p);
+  const n = Math.max(1, ls.length), longest = Math.max(1, ...ls.map((x) => x.length));
+  return angleOf(p) % 180 === 90 ? n * fs * 1.2 + fs * 0.3 : longest * fs * 0.6 + 6;
+}
 
 // Box Maker's Certificate (BMC) values from the freight rules (NMFC Item 222 / UFC Rule 41).
 // [max gross wt lbs, size limit in (L+W+D), min combined facings lbs/MSF (Mullen only)]. Confirm against the plant's stamp.
@@ -299,7 +312,8 @@ function paintSelBar() {
       ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Font:</span><button type="button" class="btn small" id="lFsDn" aria-label="Smaller text">A−</button><span class="fs-val">${p.kind === 'text' ? textFs(p) : +p.fsz > 0 ? p.fsz : 'Auto'}</span><button type="button" class="btn small" id="lFsUp" aria-label="Bigger text">A+</button>${p.kind === 'plate' && +p.fsz > 0 ? '<button type="button" class="btn small ghost" id="lFsAuto">Auto</button>' : ''}</span>` : ''}
       ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Text:</span>${['left', 'center', 'right'].map((a) => `<button type="button" class="btn small" data-ta="${a}" aria-pressed="${(p.ta || (p.kind === 'text' ? 'left' : 'center')) === a}">${a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right'}</button>`).join('')}</span>` : ''}
       <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
-      <button type="button" class="btn small" id="lFlip" aria-pressed="${!!p.flip}">Upside down</button>
+      <button type="button" class="btn small" id="lTurn" title="Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)">Turn 90° <span class="hint">(${TURNS.find(([a]) => a === angleOf(p))[1]})</span></button>
+      <button type="button" class="btn small" id="lFlip" aria-pressed="${angleOf(p) === 180}">Upside down</button>
       ${p.kind === 'plate' ? `<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden id="lSelImg"></label>` : ''}
       <button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
@@ -319,7 +333,8 @@ function paintSelBar() {
     if ($('#lEditSel')) $('#lEditSel').onclick = () => { const g = $(`#lSheet [data-pi="${sel}"]`); openEditor('item:' + sel, g || $('#lSheet')); };
     $('#lDelSel').onclick = () => delPlate(sel);
     $('#lDup').onclick = () => duplicate(sel);
-    $('#lFlip').onclick = () => { p.flip = !p.flip; paintPlates(); update(); };
+    $('#lFlip').onclick = () => { setAngle(p, angleOf(p) === 180 ? 0 : 180); paintPlates(); update(); };
+    $('#lTurn').onclick = () => { setAngle(p, angleOf(p) + 90); paintPlates(); update(); };
     if ($('#lSelImg')) $('#lSelImg').onchange = (e) => { const f0 = e.target.files[0]; if (f0) addImage(sel, f0); };
     $('#lDone').onclick = () => select(-1);
   } else if (undo) {
@@ -356,6 +371,7 @@ function onInput(e) {
     const k = t.dataset.p;
     if (!p || !k) return;
     if (k === 'dims') { p.nodim = !t.checked; update(); return; }
+    if (k === 'turn') { setAngle(p, +t.value); update(); return; }
     if (k === 'fsz') { p.fsz = t.value === '' ? '' : clampFs(t.value); update(); return; }
     p[k] = k === 'flip' || k === 'hl' ? t.checked : k === 'panel' ? +t.value : t.value;
     if (k === 'test' || k === 'wall') { const r = BMC[p.wall === 'double' ? 'double' : 'single'][p.test === 'Mullen' ? 'Mullen' : 'ECT']; if (!r[p.rating]) p.rating = p.test === 'Mullen' ? (p.wall === 'double' ? '275' : '200') : (p.wall === 'double' ? '48' : '32'); }
@@ -395,7 +411,7 @@ function span(p, g) {
   if (!isFinite(s)) return null;
   let w;
   if (p.kind === 'bmc') w = 1;
-  else if (p.kind === 'text') w = (Math.max(1, ...String(p.text || 'TEXT').split('\n').map((x) => x.trim().length)) * textFs(p) * 0.6 + 6) / g.pxIn;
+  else if (p.kind === 'text') w = textAlongPx(p) / g.pxIn;
   else w = isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : g.totL * 0.1;
   return [s, s + w];
 }
@@ -508,7 +524,7 @@ function paintPlates() {
       <div class="pr-top">${head}${top}</div>
       ${body}
       <div class="pr-opts">
-        <label class="chk"><input type="checkbox" data-p="flip" ${p.flip ? 'checked' : ''}> Upside down</label>
+        <label class="chk">Turn <select data-p="turn">${TURNS.map(([a, n]) => `<option value="${a}" ${angleOf(p) === a ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
         <label class="chk"><input type="checkbox" data-p="hl" ${p.hl ? 'checked' : ''}> Highlight</label>
         ${kind !== 'text' ? `<label class="chk"><input type="checkbox" data-p="dims" ${p.nodim ? '' : 'checked'}> Distances</label>` : ''}
         <button type="button" class="btn small ghost" data-dup="${i}">Duplicate</button>
@@ -809,10 +825,10 @@ async function readLayout(input) {
       const wIn = isFinite(+p.width_in) && +p.width_in > 0 ? +p.width_in : seg ? Math.min(seg * 0.6, 12) : 0;
       return {
         panel: Math.max(1, parseInt(p.panel, 10) || 1), start: startOf(p, wIn || 10),
-        width: wIn ? fx(wIn) : '', plen: isFinite(+p.height_in) && +p.height_in > 0 ? fx(+p.height_in) : '', text: str(p.text), flip: !!p.upside_down, kind: 'plate', _ai: k,
+        width: wIn ? fx(wIn) : '', plen: isFinite(+p.height_in) && +p.height_in > 0 ? fx(+p.height_in) : '', text: str(p.text), ...turnOf(p), kind: 'plate', _ai: k,
       };
     });
-    const texts = arr(r.texts).filter((x) => x && str(x.text)).map((x) => ({ kind: 'text', panel: Math.max(1, parseInt(x.panel, 10) || 1), start: startOf(x, textIn(x.text)), text: str(x.text).split('\n').map((y) => y.trim()).filter(Boolean).join('\n'), size: 'M', flip: !!x.upside_down })).filter((x) => x.start !== '');
+    const texts = arr(r.texts).filter((x) => x && str(x.text)).map((x) => ({ kind: 'text', panel: Math.max(1, parseInt(x.panel, 10) || 1), start: startOf(x, [90, 270].includes(+x.turn) ? (Math.max(1, str(x.text).split('\n').filter((y) => y.trim()).length) * 11 * 1.2 + 3.3) / pxIn : textIn(x.text)), text: str(x.text).split('\n').map((y) => y.trim()).filter(Boolean).join('\n'), size: 'M', ...turnOf(x) })).filter((x) => x.start !== '');
     let pp = arr(r.printed_panels).map((x) => parseInt(x, 10)).filter((x) => x >= 1 && (!n || x <= n));
     if (!pp.length) pp = [...new Set(plates.map((p) => p.panel))].sort((a, b) => a - b);
     L = {
@@ -931,7 +947,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
   const segs = lp.length ? lp.map((v, j) => [scores[j], scores[j + 1]]) : [[0, totL]];
   const items = (d.plates || []).map((p) => {
     const st = pin(p.start); if (!isFinite(st) || p.panel < 1 || p.panel > R.length) return null;
-    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 1 : (Math.max(...String(p.text || 'TEXT').split('\n').map((x) => x.trim().length)) * textFs(p) * 0.6 + 6) / ((x1 - x0) / totL);
+    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 1 : textAlongPx(p) / ((x1 - x0) / totL);
     return { row: p.panel - 1, a: st, b: st + w };
   }).filter(Boolean);
   const shadedRows = new Set();
@@ -1009,16 +1025,17 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const m = r.m + Math.max(-0.45, Math.min(0.45, +p.dy || 0)) * r.h; // up/down inside the panel
     p.cy = m;
     const selBox = (x, y, w, h) => { if (p.i === selIdx) o.push(`<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="3" fill="none" stroke="#1a73e8" stroke-width="2.5" stroke-dasharray="5 3" pointer-events="none"/>`); };
-    const rot = (cx) => (p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : '');
+    const ang = angleOf(p), side = ang % 180 === 90;
+    const rot = (cx) => (ang ? ` transform="rotate(${ang} ${cx.toFixed(1)} ${m.toFixed(1)})"` : '');
     if (p.kind === 'text') {
       const fs = textFs(p);
       let ls = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
       if (!ls.length) ls = ['TEXT'];
       const lh = fs * 1.2, hh = ls.length * lh + fs * 0.3;
-      const w = Math.max(...ls.map((x) => x.length)) * fs * 0.6 + 6, xa = X(p.s), y = m - hh / 2;
+      const w = Math.max(...ls.map((x) => x.length)) * fs * 0.6 + 6, xa = X(p.s) - (side ? (w - hh) / 2 : 0), y = m - hh / 2;
       const base = m - ((ls.length - 1) * lh) / 2 + fs * 0.35;
       o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(xa + w / 2)}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}"/>${ls.map((x, k) => t(p.ta === 'center' ? xa + w / 2 : p.ta === 'right' ? xa + w - 3 : xa + 3, base + k * lh, x, { size: fs, weight: 700, anchor: p.ta === 'center' ? 'middle' : p.ta === 'right' ? 'end' : 'start' })).join('')}</g></g>`);
-      selBox(xa, y, w, hh);
+      if (side) selBox(xa + w / 2 - hh / 2, m - w / 2, hh, w); else selBox(xa, y, w, hh);
       p.skip = true;
       return;
     }
@@ -1038,31 +1055,38 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const plIn = pin(p.plen), rowIn = rows[p.panel - 1];
     const setH = isFinite(plIn) && plIn > 0 && rowIn > 0 ? Math.max(6, Math.min(0.98, plIn / rowIn) * r.h)
       : +p.hgt > 0 ? Math.max(0.15, Math.min(0.98, +p.hgt)) * r.h : 0;
-    const cx = (xa + xb) / 2, hMax = setH || r.h * 0.9, base = setH || Math.min(r.h * 0.8, 52);
+    const cx = (xa + xb) / 2, hMax = setH || r.h * 0.9, base = setH || Math.min(r.h * 0.8, 52), bw = xb - xa;
+    // a sideways plate runs its lines top to bottom: a line gets the box height, the stack of lines the box width
+    const alongMax = side ? hMax : bw, acrossMax = side ? bw : hMax;
     const raw = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
     let fs = 9, lines = [];
     if (+p.fsz > 0) { // size typed by hand: keep it, just wrap
       fs = clampFs(p.fsz);
-      lines = raw.flatMap((x) => wrapHard(x, Math.max(3, Math.floor((xb - xa - 6) / (fs * 0.58)))));
+      lines = raw.flatMap((x) => wrapHard(x, Math.max(3, Math.floor((alongMax - 6) / (fs * 0.58)))));
     } else {
       for (; fs >= 5; fs -= 0.5) {
-        const per = Math.max(3, Math.floor((xb - xa - 6) / (fs * 0.58)));
+        const per = Math.max(3, Math.floor((alongMax - 6) / (fs * 0.58)));
         lines = raw.flatMap((x) => wrapHard(x, per));
         const splitsWord = raw.some((x) => x.split(/\s+/).some((w) => w.length > per));
-        if (lines.length * fs * 1.18 + 6 <= hMax && (!splitsWord || fs <= 6)) break; // shrink a little more rather than break a word
+        if (lines.length * fs * 1.18 + 6 <= acrossMax && (!splitsWord || fs <= 6)) break; // shrink a little more rather than break a word
       }
       fs = Math.max(5, fs);
       autoFs[p.i] = fs;
     }
     const lh = fs * 1.18;
-    const maxL = Math.max(1, Math.floor((hMax - 6) / lh));
+    const maxL = Math.max(1, Math.floor((acrossMax - 6) / lh));
     if (lines.length > maxL) { lines = lines.slice(0, maxL); lines[maxL - 1] += '…'; }
-    const h = p.img || setH ? base : Math.max(base, Math.min(hMax, lines.length * lh + 8)), y = m - h / 2;
+    const h = p.img || setH ? base
+      : side ? Math.max(base, Math.min(hMax, Math.max(1, ...lines.map((l) => l.length)) * fs * 0.58 + 10))
+        : Math.max(base, Math.min(hMax, lines.length * lh + 8));
+    const y = m - h / 2;
+    // the copy / logo is laid out upright in a box the turned way round (vw × vh), centred on the plate, then turned
+    const vw = side ? h : bw, vh = side ? bw : h, vxa = cx - vw / 2, vxb = cx + vw / 2, vya = m - vh / 2;
     const y1 = m - ((lines.length - 1) * lh) / 2 + fs * 0.35;
     const txt = p.img
-      ? `<image href="${p.img}" x="${(xa + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(xb - xa - 4).toFixed(1)}" height="${(h - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="mix-blend-mode:multiply"/>`
-      : lines.map((ln, k) => t(p.ta === 'left' ? xa + 4 : p.ta === 'right' ? xb - 4 : cx, y1 + k * lh, ln, { size: fs, weight: 600, anchor: p.ta === 'left' ? 'start' : p.ta === 'right' ? 'end' : 'middle' })).join('');
-    o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : ''}><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/>${txt}</g></g>`);
+      ? `<image href="${p.img}" x="${(vxa + 2).toFixed(1)}" y="${(vya + 2).toFixed(1)}" width="${Math.max(1, vw - 4).toFixed(1)}" height="${Math.max(1, vh - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="mix-blend-mode:multiply"/>`
+      : lines.map((ln, k) => t(p.ta === 'left' ? vxa + 4 : p.ta === 'right' ? vxb - 4 : cx, y1 + k * lh, ln, { size: fs, weight: 600, anchor: p.ta === 'left' ? 'start' : p.ta === 'right' ? 'end' : 'middle' })).join('');
+    o.push(`<g class="ls-plate" data-pi="${p.i}"><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/><g${rot(cx)}>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
     // plate length (its width along the sheet): arrow across the plate, under it (or over it when there is no room)
     const pw = pin(p.width);
