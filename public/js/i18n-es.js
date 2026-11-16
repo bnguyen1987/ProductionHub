@@ -194,6 +194,7 @@ export const ES = {
   'Copy on the plate': 'Texto en la placa',
   'Upside down': 'Al revés',
   'Take this picture off the sheet': 'Quitar esta imagen de la hoja', 'Remove picture': 'Quitar imagen',
+  'Keep logo shape': 'Mantener forma del logo', 'Off: the logo fills the plate Width × Length. On: the logo keeps its own shape inside the box.': 'Apagado: el logo llena el Ancho × Largo del grabado. Encendido: el logo mantiene su forma dentro del cuadro.',
   Turn: 'Girar', 'Turn 90°': 'Girar 90°', Upright: 'Derecho', 'Sideways ↓': 'De lado ↓', 'Sideways ↑': 'De lado ↑',
   '(Upright)': '(Derecho)', '(Sideways ↓)': '(De lado ↓)', '(Upside down)': '(Al revés)', '(Sideways ↑)': '(De lado ↑)',
   'Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)': 'Girar el texto un cuarto de vuelta (derecho → de lado ↓ → al revés → de lado ↑)',

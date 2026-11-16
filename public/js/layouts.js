@@ -87,6 +87,19 @@ const autoFs = {}; // last auto-fit size of each plate, so A+/A- can start from 
 // Older saves only have "flip" (= upside down).
 // AI answer → turn (falls back to the older upside_down flag)
 const turnOf = (x) => ([90, 180, 270].includes(+x?.turn) ? { turn: +x.turn, flip: false } : { turn: 0, flip: !!x?.upside_down });
+// Height ÷ width of each logo picture (loaded once, then the sheet is redrawn so plates can size to it)
+const imgRatio = new Map();
+function ratioOf(src) {
+  if (!src) return 0;
+  if (imgRatio.has(src)) return imgRatio.get(src);
+  imgRatio.set(src, 0);
+  const im = new Image();
+  im.onload = () => { imgRatio.set(src, im.naturalWidth ? im.naturalHeight / im.naturalWidth : 0); const el = document.getElementById('lSheet'); if (el && el.isConnected) el.innerHTML = sheetHtml(L, sel); };
+  im.src = src;
+  return 0;
+}
+// Width and Length both typed = the real plate size, so the logo fills it (unless "Keep logo shape" is on)
+const fillLogo = (p) => !!p.img && !p.keepShape && pin(p.width) > 0 && pin(p.plen) > 0;
 const angleOf = (p) => (((+p.turn || 0) + (p.flip ? 180 : 0)) % 360 + 360) % 360;
 function setAngle(p, a) { p.turn = ((+a % 360) + 360) % 360; p.flip = false; }
 const TURNS = [[0, 'Upright'], [90, 'Sideways ↓'], [180, 'Upside down'], [270, 'Sideways ↑']];
@@ -323,6 +336,7 @@ function paintSelBar() {
       <button type="button" class="btn small" id="lTurn" title="Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)">Turn 90° <span class="hint">(${TURNS.find(([a]) => a === angleOf(p))[1]})</span></button>
       <button type="button" class="btn small" id="lFlip" aria-pressed="${angleOf(p) === 180}">Upside down</button>
       ${p.kind === 'plate' ? `<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden id="lSelImg"></label>` : ''}
+      ${p.kind === 'plate' && p.img && pin(p.width) > 0 && pin(p.plen) > 0 ? `<button type="button" class="btn small" id="lKeep" aria-pressed="${!!p.keepShape}" title="Off: the logo fills the plate Width × Length. On: the logo keeps its own shape inside the box.">Keep logo shape</button>` : ''}
       <button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
     $('#lMvP').onchange = (e) => { p.panel = +e.target.value; p.dy = 0; paintPlates(); update(); };
@@ -343,6 +357,7 @@ function paintSelBar() {
     $('#lDup').onclick = () => duplicate(sel);
     $('#lFlip').onclick = () => { setAngle(p, angleOf(p) === 180 ? 0 : 180); paintPlates(); update(); };
     $('#lTurn').onclick = () => { setAngle(p, angleOf(p) + 90); paintPlates(); update(); };
+    if ($('#lKeep')) $('#lKeep').onclick = () => { p.keepShape = !p.keepShape; paintPlates(); update(); };
     if ($('#lSelImg')) $('#lSelImg').onchange = (e) => { const f0 = e.target.files[0]; if (f0) addImage(sel, f0); };
     $('#lDone').onclick = () => select(-1);
   } else if (undo) {
@@ -1087,7 +1102,10 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const lh = fs * 1.18;
     const maxL = Math.max(1, Math.floor((acrossMax - 6) / lh));
     if (lines.length > maxL) { lines = lines.slice(0, maxL); lines[maxL - 1] += '…'; }
-    const h = p.img || setH ? base
+    // a logo with no Length typed takes its own shape: the box grows taller as the plate gets wider
+    const ir = p.img ? ratioOf(p.img) : 0;
+    const h = p.img && !setH && ir ? Math.max(12, Math.min(hMax, (side ? bw / ir : bw * ir) + 4))
+      : p.img || setH ? base
       : side ? Math.max(base, Math.min(hMax, Math.max(1, ...lines.map((l) => l.length)) * fs * 0.58 + 10))
         : Math.max(base, Math.min(hMax, lines.length * lh + 8));
     const y = m - h / 2;
@@ -1095,7 +1113,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const vw = side ? h : bw, vh = side ? bw : h, vxa = cx - vw / 2, vxb = cx + vw / 2, vya = m - vh / 2;
     const y1 = m - ((lines.length - 1) * lh) / 2 + fs * 0.35;
     const txt = p.img
-      ? `<image href="${p.img}" x="${(vxa + 2).toFixed(1)}" y="${(vya + 2).toFixed(1)}" width="${Math.max(1, vw - 4).toFixed(1)}" height="${Math.max(1, vh - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="mix-blend-mode:multiply"/>`
+      ? `<image href="${p.img}" x="${(vxa + 2).toFixed(1)}" y="${(vya + 2).toFixed(1)}" width="${Math.max(1, vw - 4).toFixed(1)}" height="${Math.max(1, vh - 4).toFixed(1)}" preserveAspectRatio="${fillLogo(p) ? 'none' : 'xMidYMid meet'}" style="mix-blend-mode:multiply"/>`
       : lines.map((ln, k) => t(p.ta === 'left' ? vxa + 4 : p.ta === 'right' ? vxb - 4 : cx, y1 + k * lh, ln, { size: fs, weight: 600, anchor: p.ta === 'left' ? 'start' : p.ta === 'right' ? 'end' : 'middle' })).join('');
     o.push(`<g class="ls-plate" data-pi="${p.i}"><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/><g${rot(cx)}>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
