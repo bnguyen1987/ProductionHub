@@ -19,6 +19,27 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Ink': 'Tinta',
+  'Ink name': 'Nombre de tinta',
+  'Ink:': 'Tinta:',
+  'e.g. PMS 286': 'p. ej. PMS 286',
+  'Black': 'Negro',
+  'Red': 'Rojo',
+  'Blue': 'Azul',
+  'Green': 'Verde',
+  'Brown': 'Café',
+  'Orange': 'Naranja',
+  'Yellow': 'Amarillo',
+  'Purple': 'Morado',
+  'Gray': 'Gris',
+  'Versions': 'Versiones',
+  'Original scan:': 'Escaneo original:',
+  'Loading versions…': 'Cargando versiones…',
+  'Saved by': 'Guardado por',
+  'No earlier versions yet. Each time this layout is saved, the one before it is kept here.': 'Todavía no hay versiones anteriores. Cada vez que se guarda este diseño, la anterior se guarda aquí.',
+  'Opening one does not change anything until you press Save.': 'Abrir una no cambia nada hasta que presione Guardar.',
+  'Could not open the original': 'No se pudo abrir el original',
+  'The original scan is kept with it.': 'El escaneo original se guarda con él.',
   'Undo the last change (Ctrl+Z)': 'Deshacer el último cambio (Ctrl+Z)',
   '↶ Undo': '↶ Deshacer',
   'Auto': 'Auto',
@@ -618,6 +639,13 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^View (.+\.(?:pdf|jpe?g|png|webp|gif|heic))$/i, 'Ver $1'],
+  [/^Earlier saves of this layout \(newest first, last (\d+)\)\. Opening one does not change anything until you press Save\.$/, 'Versiones anteriores de este diseño (la más reciente primero, últimas $1). Abrir una no cambia nada hasta que presione Guardar.'],
+  [/^Original scan: (.+)\. It is kept with the layout when you press Save\.$/, 'Escaneo original: $1. Se guarda con el diseño al presionar Guardar.'],
+  [/^Saving the original scan \((\d+) of (\d+)\)…$/, 'Guardando el escaneo original ($1 de $2)…'],
+  [/^Showing the version saved (.+) by (.+)\. Press Save to make it the current one, or Undo to go back\.$/, 'Mostrando la versión guardada $1 por $2. Presione Guardar para que sea la actual, o Deshacer para regresar.'],
+  [/^Saved by (.+)$/, 'Guardado por $1'],
+  [/^Too big to keep the original: (.+) \(over 4 MB\)\.$/, 'Muy grande para guardar el original: $1 (más de 4 MB).'],
   [/^(.+) on P(\d+) has no width\. Fill in Width so the distances are right\.$/, '$1 en P$2 no tiene ancho. Llene el Ancho para que las distancias salgan bien.'],
   [/^(.+) on P(\d+) runs off the end of the blank\.$/, '$1 en P$2 se sale del blank.'],
   [/^(.+) on P(\d+) is beside the glue tab, where there is no flap\.$/, '$1 en P$2 está junto a la ceja de pegue, donde no hay solapa.'],
