@@ -493,3 +493,11 @@ details.fold[open]{padding-bottom:16px}
 .lay-orig{margin-top:8px}
 .lay-orig .btn-row{align-items:center}
 .lay-vers{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+
+/* × to take a close-up off the Print Detail box (screen only) */
+.lsheet .ls-pics figure{position:relative}
+.lsheet .ls-picx{position:absolute;top:-4px;right:-4px;width:22px;height:22px;border-radius:50%;border:1px solid #c0392b;background:#fff;color:#c0392b;font:700 15px/18px system-ui,sans-serif;padding:0;cursor:pointer;opacity:.75;z-index:2}
+.lsheet .ls-picx:hover,.lsheet .ls-picx:focus-visible{opacity:1;background:#c0392b;color:#fff}
+.lsheet .ls-picshow{padding:0 8px 4px;text-align:right}
+.lsheet .linklike{background:none;border:0;padding:0;color:#1565c0;text-decoration:underline;cursor:pointer;font:inherit;font-size:11px}
+@media print{.lsheet .ls-picx,.lsheet .ls-picshow{display:none}}

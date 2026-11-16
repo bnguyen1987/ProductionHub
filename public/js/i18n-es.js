@@ -193,6 +193,7 @@ export const ES = {
   'Start (in)': 'Inicio (pulg)',
   'Copy on the plate': 'Texto en la placa',
   'Upside down': 'Al revés',
+  'Take this picture off the sheet': 'Quitar esta imagen de la hoja', 'Remove picture': 'Quitar imagen',
   Turn: 'Girar', 'Turn 90°': 'Girar 90°', Upright: 'Derecho', 'Sideways ↓': 'De lado ↓', 'Sideways ↑': 'De lado ↑',
   '(Upright)': '(Derecho)', '(Sideways ↓)': '(De lado ↓)', '(Upside down)': '(Al revés)', '(Sideways ↑)': '(De lado ↑)',
   'Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)': 'Girar el texto un cuarto de vuelta (derecho → de lado ↓ → al revés → de lado ↑)',
@@ -643,6 +644,7 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^Show (\d+) hidden logos?$/, 'Mostrar $1 logo(s) oculto(s)'],
   [/^View (.+\.(?:pdf|jpe?g|png|webp|gif|heic))$/i, 'Ver $1'],
   [/^Earlier saves of this layout \(newest first, last (\d+)\)\. Opening one does not change anything until you press Save\.$/, 'Versiones anteriores de este diseño (la más reciente primero, últimas $1). Abrir una no cambia nada hasta que presione Guardar.'],
   [/^Original scan: (.+)\. It is kept with the layout when you press Save\.$/, 'Escaneo original: $1. Se guarda con el diseño al presionar Guardar.'],

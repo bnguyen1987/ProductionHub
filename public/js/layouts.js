@@ -221,6 +221,14 @@ export function render(v) {
   $('#lFind').oninput = paintList;
   $('#lSheet').addEventListener('click', (e) => {
     if (dragged) { dragged = false; return; }
+    const px = e.target.closest('[data-picx]');
+    if (px) {
+      const k = px.dataset.picx, n = +k.slice(1);
+      if (k[0] === 'l' && L.plates[n]) { const img = L.plates[n].img; L.plates.forEach((p) => { if (p.img === img) p.nodetail = true; }); }
+      else if (k[0] === 'd') { L.details.splice(n, 1); paintDetails(); }
+      update(); return;
+    }
+    if (e.target.closest('[data-picshow]')) { L.plates.forEach((p) => { delete p.nodetail; }); update(); return; }
     const ed = e.target.closest('[data-edit]');
     if (ed) { openEditor(ed.dataset.edit, ed); return; }
     const g = e.target.closest('[data-pi]');
@@ -887,8 +895,10 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
   const notes = d.notes.split('\n').map((x) => x.trim()).filter(Boolean);
   // close-ups: plate logos (once each) + pictures added for the detail box, at most 3
   const seen = new Set(), pics = [];
-  if (d.detailLogos !== false) (d.plates || []).forEach((p) => { if (p.kind === 'plate' && p.img && !seen.has(p.img)) { seen.add(p.img); pics.push({ img: p.img, caption: '' }); /* no automatic caption: the logo speaks for itself */ } });
-  (d.details || []).forEach((x) => x && x.img && pics.push({ img: x.img, caption: x.caption || '' }));
+  // logos hidden with the × on the sheet: the plate keeps its logo, it just isn't zoomed in
+  const hiddenLogos = new Set((d.plates || []).filter((p) => p.kind === 'plate' && p.img && p.nodetail).map((p) => p.img));
+  if (d.detailLogos !== false) (d.plates || []).forEach((p, i) => { if (p.kind === 'plate' && p.img && !seen.has(p.img) && !hiddenLogos.has(p.img)) { seen.add(p.img); pics.push({ img: p.img, caption: '', x: 'l' + i }); /* no automatic caption: the logo speaks for itself */ } });
+  (d.details || []).forEach((x, k) => x && x.img && pics.push({ img: x.img, caption: x.caption || '', x: 'd' + k }));
   pics.splice(3);
   const allT = Array.isArray(d.detailTexts) ? d.detailTexts : d.detailText ? [d.detailText] : [];
   const dtexts = allT.map((x, k) => ({ x: String(x || ''), k })).filter((o) => o.x.trim()).slice(0, 4);
@@ -905,7 +915,8 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
     <div class="ls-boxes"${opt.boxesH ? ` style="min-height:${opt.boxesH}px"` : ''}>
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
       <div class="ls-box ls-detail"><div class="ls-bh">PRINT DETAIL (ZOOMED IN)</div>
-        ${pics.length ? `<div class="ls-pics">${pics.map((x) => `<figure><img src="${x.img}" alt="">${x.caption ? `<figcaption>${esc(x.caption)}</figcaption>` : ''}</figure>`).join('')}</div>` : '<div class="ls-empty ls-nopic">No close-up yet. Add one under "Print detail box", or add a logo to a plate.</div>'}
+        ${pics.length ? `<div class="ls-pics">${pics.map((x) => `<figure>${opt.print ? '' : `<button type="button" class="ls-picx" data-picx="${x.x}" title="Take this picture off the sheet" aria-label="Remove picture">×</button>`}<img src="${x.img}" alt="">${x.caption ? `<figcaption>${esc(x.caption)}</figcaption>` : ''}</figure>`).join('')}</div>` : '<div class="ls-empty ls-nopic">No close-up yet. Add one under "Print detail box", or add a logo to a plate.</div>'}
+        ${!opt.print && d.detailLogos !== false && hiddenLogos.size ? `<div class="ls-picshow"><button type="button" class="linklike" data-picshow="1">Show ${hiddenLogos.size} hidden logo${hiddenLogos.size > 1 ? 's' : ''}</button></div>` : ''}
         <div class="ls-dtexts">${dtexts.map((o) => `<div class="ls-dtext" data-edit="dtext:${o.k}">${esc(o.x).replace(/\n/g, '<br>')}</div>`).join('')}${allT.length < 4 ? '<div class="ls-dtext ls-dnew" data-edit="dtext:new"><span class="ls-add">+ add text box</span></div>' : ''}</div></div>
     </div>
   </div>`;
