@@ -1058,6 +1058,17 @@ function drawing(d, selIdx = -1, drawH = 270) {
       : lines.map((ln, k) => t(p.ta === 'left' ? xa + 4 : p.ta === 'right' ? xb - 4 : cx, y1 + k * lh, ln, { size: fs, weight: 600, anchor: p.ta === 'left' ? 'start' : p.ta === 'right' ? 'end' : 'middle' })).join('');
     o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : ''}><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
+    // plate length (its width along the sheet): arrow across the plate, under it (or over it when there is no room)
+    const pw = pin(p.width);
+    if (!p.nodim && isFinite(pw) && pw > 0 && xb - xa >= 14) {
+      const below = y + h + 13 <= r.y + r.h - 2, yd = below ? y + h + 7 : y - 7;
+      const lab = q(pw), lw = lab.length * 5.4 + 8, ccx = (xa + xb) / 2;
+      o.push(`<line x1="${xa.toFixed(1)}" y1="${(below ? y + h + 2 : y - 2).toFixed(1)}" x2="${xa.toFixed(1)}" y2="${(yd + (below ? 3 : -3)).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
+      o.push(`<line x1="${xb.toFixed(1)}" y1="${(below ? y + h + 2 : y - 2).toFixed(1)}" x2="${xb.toFixed(1)}" y2="${(yd + (below ? 3 : -3)).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
+      o.push(arrow(xa + 0.5, xb - 0.5, yd, INK));
+      if (xb - xa >= lw + 10) o.push(`<rect x="${(ccx - lw / 2).toFixed(1)}" y="${(yd - 5.5).toFixed(1)}" width="${lw.toFixed(1)}" height="11" fill="#fff"/>` + t(ccx, yd + 3.2, lab, { size: 9, weight: 700 }));
+      else o.push(t(xb + 3, yd + 3.2, lab, { size: 9, weight: 700, anchor: 'start' })); // narrow plate: number beside the arrow
+    }
     if (p.i === selIdx) { // resize handles: right edge = width, bottom edge = height
       o.push(`<rect class="ls-handle" data-handle="w" data-hpi="${p.i}" x="${(xb + 1).toFixed(1)}" y="${(m - 7).toFixed(1)}" width="9" height="14" rx="2" fill="#1a73e8" stroke="#fff" stroke-width="1.5"/>`);
       o.push(`<rect class="ls-handle" data-handle="h" data-hpi="${p.i}" x="${(cx - 7).toFixed(1)}" y="${(y + h + 1).toFixed(1)}" width="14" height="9" rx="2" fill="#1a73e8" stroke="#fff" stroke-width="1.5"/>`);
