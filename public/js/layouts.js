@@ -260,10 +260,11 @@ function nudge(dIn) {
 function movePanel(d) {
   const p = L.plates[sel]; if (!p) return;
   const n = Math.max(1, nums(L.widthPanels).length);
-  let dy = (+p.dy || 0) + d * 0.15;
+  const rowIn = nums(L.widthPanels)[p.panel - 1];
+  let dy = (+p.dy || 0) + d * (rowIn > 0 ? 0.25 / rowIn : 0.15); // 1/4" a step when the panel size is known
   if (dy < -0.451 && p.panel > 1) { p.panel--; dy = 0.45; }
   else if (dy > 0.451 && p.panel < n) { p.panel++; dy = -0.45; }
-  p.dy = Math.round(Math.max(-0.45, Math.min(0.45, dy)) * 100) / 100;
+  p.dy = Math.round(Math.max(-0.45, Math.min(0.45, dy)) * 10000) / 10000;
   paintPlates(); update();
 }
 function select(i, repaintRows = true) {
@@ -1082,6 +1083,15 @@ function drawing(d, selIdx = -1, drawH = 270) {
       const lab = q(plIn);
       o.push(`<rect x="${(xd - 6).toFixed(1)}" y="${(m - lab.length * 2.7 - 4).toFixed(1)}" width="12" height="${(lab.length * 5.4 + 8).toFixed(1)}" fill="#fff"/>` + t(xd + 3.2, m, lab, { size: 9, weight: 700, tr: `rotate(-90 ${(xd + 3.2).toFixed(1)} ${m.toFixed(1)})` }));
       p.dimR = 14;
+      // red distances from the plate up to the panel's top score and down to its bottom score (left of the plate, clear of the other arrows)
+      const pxPerIn = r.h / rowIn, xv = xa - 8;
+      [[r.y, y], [y + h, r.y + r.h]].forEach(([ya, yb2]) => {
+        const gIn = (yb2 - ya) / pxPerIn;
+        if (gIn < 1 / 32 || yb2 - ya < 6) return;
+        o.push(`<line x1="${xv.toFixed(1)}" y1="${(ya + 0.5).toFixed(1)}" x2="${xv.toFixed(1)}" y2="${(yb2 - 0.5).toFixed(1)}" stroke="${RED}" stroke-width="1" marker-start="url(#${uid}lar)" marker-end="url(#${uid}lar)"/>`);
+        const lab = q(gIn), lw = lab.length * 5.4 + 8, ly = (ya + yb2) / 2;
+        o.push(`<rect x="${(xv - 4 - lw).toFixed(1)}" y="${(ly - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="12" fill="#fff" fill-opacity=".9"/>` + t(xv - 4 - lw / 2, ly + 3.4, lab, { size: 9.5, fill: RED, weight: 700 }));
+      });
     }
     if (p.i === selIdx) { // resize handles: right edge = width, bottom edge = height
       o.push(`<rect class="ls-handle" data-handle="w" data-hpi="${p.i}" x="${(xb + 1).toFixed(1)}" y="${(m - 7).toFixed(1)}" width="9" height="14" rx="2" fill="#1a73e8" stroke="#fff" stroke-width="1.5"/>`);
