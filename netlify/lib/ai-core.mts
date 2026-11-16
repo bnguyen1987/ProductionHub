@@ -55,7 +55,7 @@ printed_panels: 1-based numbers of the width panels that receive print.
 plates: each print plate / copy block. panel = the 1-based width panel it sits on. start_in = inches from the LEFT edge of the blank to the left side of the plate (if the sheet says "start print 18 in from the score" and that score is at 4 3/4, start_in is 22.75). width_in = plate length along the sheet; if not given, work it out from the stated gaps ("60 in between plates") or estimate. text = the copy on the plate in a few words. upside_down = true if the copy is printed upside down on the drawing.
 Return strict JSON only, no markdown fences, no commentary:
 {"customer":string|null,"ship_to":string|null,"file_no":string|null,"spec_no":string|null,"design_no":string|null,"ident":string|null,
-"style":string|null,"size":string|null,"board":string|null,"blank_width":string|null,"blank_length":string|null,
+"style":string|null,"joint":"glue|stitch|tape"|null,"size":string|null,"board":string|null,"blank_width":string|null,"blank_length":string|null,
 "print":string|null,"routing":string|null,"view":"Outside|Inside"|null,
 "width_panels":[string],"length_panels":[string],"printed_panels":[number],
 "plates":[{"panel":number,"length_panel":number|null,"align":"left|center|right","offset_in":number|null,"start_in":number|null,"width_in":number|null,"height_in":number|null,"text":string,"upside_down":boolean,"turn":0|90|180|270,"source":{"file":number,"page":number,"box":[left,top,right,bottom],"rotation":0|90|180|270}|null}],

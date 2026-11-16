@@ -7,7 +7,7 @@ import { pageCanvas } from './dieline.js';
 const today = () => { const d = new Date(); return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`; };
 const EMPTY = () => ({
   id: '', customer: '', shipTo: '', fileNo: '', specNo: '', design: '', ident: '', style: '', size: '', board: '',
-  blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
+  joint: '', blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
   printPanels: [], plates: [], notes: '', changes: '', detailTexts: [], details: [], detailLogos: true, origDate: '', revDate: today(), sales: '', designer: '', approved: '', orig: null,
 });
 const INFO = [
@@ -100,6 +100,8 @@ function ratioOf(src) {
 }
 // Width and Length both typed = the real plate size, so the logo fills it (unless "Keep logo shape" is on)
 const fillLogo = (p) => !!p.img && !p.keepShape && pin(p.width) > 0 && pin(p.plen) > 0;
+// How the manufacturer's joint is closed: glue (default), stitch or tape
+const jointName = (d) => (d.joint === 'stitch' ? 'STITCH' : d.joint === 'tape' ? 'TAPE' : 'GLUE');
 const angleOf = (p) => (((+p.turn || 0) + (p.flip ? 180 : 0)) % 360 + 360) % 360;
 function setAngle(p, a) { p.turn = ((+a % 360) + 360) % 360; p.flip = false; }
 const TURNS = [[0, 'Upright'], [90, 'Sideways ↓'], [180, 'Upside down'], [270, 'Sideways ↑']];
@@ -199,6 +201,7 @@ export function render(v) {
           <div id="lLChk" class="hint" style="margin:4px 0 10px"></div>
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Measurements on the sheet</label><select data-l="units"><option value="">10:05 (inches:sixteenths)</option><option value="frac">10 5/16 (fractions)</option></select></div>
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Glue tab and slots</label><select data-l="glueTab"><option value="">Auto (RSC-type: small 1st length panel)</option><option value="on">Show</option><option value="off">Don't show</option></select></div>
+          <div class="field" style="max-width:200px;margin-bottom:10px"><label>Joint</label><select data-l="joint"><option value="">Glue</option><option value="stitch">Stitch</option><option value="tape">Tape</option></select></div>
           <div class="lbl" style="margin:4px 0 6px">Printed panels <span class="hint" style="font-weight:500">only the panels with a plate, BMC or text get shaded; a row picked here with nothing on it is shaded whole</span></div>
           <div class="seg" id="lPP"></div>
           <div class="lbl" style="margin:14px 0 6px">Print, BMC and text on the sheet <span class="hint" style="font-weight:500">start = inches from the left edge of the blank</span></div>
@@ -449,8 +452,8 @@ function placementWarnings() {
     const [a, b] = sp, who = `${itemName(p)} on P${p.panel}`;
     if (p.kind === 'plate' && !(isFinite(pin(p.width)) && pin(p.width) > 0)) out.push({ i, msg: `${who} has no width. Fill in Width so the distances are right.` });
     if (a < -tol || b > g.totL + tol) out.push({ i, msg: `${who} runs off the end of the blank.` });
-    if (g.tab && g.flap.has(p.panel - 1) && a < g.lp[0] - tol) out.push({ i, msg: `${who} is beside the glue tab, where there is no flap.` });
-    else if (g.tab && a < g.lp[0] - tol && p.kind !== 'text') out.push({ i, msg: `${who} sits on the glue tab.` });
+    if (g.tab && g.flap.has(p.panel - 1) && a < g.lp[0] - tol) out.push({ i, msg: `${who} is beside the ${jointName(L).toLowerCase()} tab, where there is no flap.` });
+    else if (g.tab && a < g.lp[0] - tol && p.kind !== 'text') out.push({ i, msg: `${who} sits on the ${jointName(L).toLowerCase()} tab.` });
     const sc = g.scores.slice(1, -1).find((x) => x > a + tol && x < b - tol);
     if (sc !== undefined && !(g.tab && sc === g.lp[0] && a < g.lp[0] - tol)) out.push({ i, msg: `${who} crosses the ${g.flap.has(p.panel - 1) ? 'slot' : 'score'} at ${f(sc)}".` });
   });
@@ -858,7 +861,7 @@ async function readLayout(input) {
       ...EMPTY(),
       customer: str(r.customer), shipTo: str(r.ship_to), fileNo: str(r.file_no), specNo: str(r.spec_no), design: str(r.design_no),
       ident: str(r.ident), style: str(r.style), size: str(r.size), board: str(r.board),
-      blankW: show(r.blank_width), blankL: show(r.blank_length), print: str(r.print), routing: str(r.routing),
+      joint: ['stitch', 'tape'].includes(String(r.joint || '').toLowerCase()) ? String(r.joint).toLowerCase() : '', blankW: show(r.blank_width), blankL: show(r.blank_length), print: str(r.print), routing: str(r.routing),
       view: r.view === 'Inside' ? 'Inside' : 'Outside',
       widthPanels: arr(r.width_panels).map(show).join(', '), lengthPanels: arr(r.length_panels).map(show).join(', '),
       printPanels: pp, plates: [...plates, ...texts], notes: arr(r.notes).map(str).filter(Boolean).join('\n'), changes: arr(r.changes).map(str).filter(Boolean).join('\n'),
@@ -989,7 +992,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
   });
   if (tab) {
     o.push(`<path d="M${xg.toFixed(1)} ${y0}H${x1}V${yE}H${xg.toFixed(1)}V${bB.toFixed(1)}L${x0} ${(bB - tp).toFixed(1)}V${(bT + tp).toFixed(1)}L${xg.toFixed(1)} ${bT.toFixed(1)}Z" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`);
-    if (xg - x0 >= 9 && bB - bT > 40) o.push(t((x0 + xg) / 2 + 2.5, (bT + bB) / 2, 'GLUE TAB', { size: 6.5, weight: 700, fill: '#555', tr: `rotate(-90 ${((x0 + xg) / 2 + 2.5).toFixed(1)} ${((bT + bB) / 2).toFixed(1)})` }));
+    if (xg - x0 >= 9 && bB - bT > 40) o.push(t((x0 + xg) / 2 + 2.5, (bT + bB) / 2, jointName(d) + ' TAB', { size: 6.5, weight: 700, fill: '#555', tr: `rotate(-90 ${((x0 + xg) / 2 + 2.5).toFixed(1)} ${((bT + bB) / 2).toFixed(1)})` }));
   } else o.push(`<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${H}" fill="none" stroke="${INK}" stroke-width="1.6"/>`);
   R.slice(1).forEach((r) => o.push(`<line x1="${xg.toFixed(1)}" y1="${r.y.toFixed(1)}" x2="${x1}" y2="${r.y.toFixed(1)}" stroke="${INK}" ${DASH}/>`));
   scores.slice(1, -1).forEach((sc) => {
