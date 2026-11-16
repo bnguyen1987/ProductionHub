@@ -94,7 +94,7 @@ export default async (req: Request) => {
         const bytes = Uint8Array.from(Buffer.from(String(b.data || ""), "base64"));
         if (!bytes.length) return Response.json({ error: "Empty file" }, { status: 400 });
         const name = s(b.name, 120) || "original";
-        await blobs.set("o/" + id + "/" + on, bytes, { metadata: { name, mediaType } });
+        await blobs.set("o/" + id + "/" + on, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), { metadata: { name, mediaType } });
         const cur: any = await blobs.get("l/" + id, { type: "json" });
         if (cur) {
           const originals = Array.isArray(cur.originals) ? cur.originals.slice(0, 4) : [];
