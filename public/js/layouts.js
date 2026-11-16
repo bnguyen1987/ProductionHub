@@ -866,7 +866,7 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
   const notes = d.notes.split('\n').map((x) => x.trim()).filter(Boolean);
   // close-ups: plate logos (once each) + pictures added for the detail box, at most 3
   const seen = new Set(), pics = [];
-  if (d.detailLogos !== false) (d.plates || []).forEach((p) => { if (p.kind === 'plate' && p.img && !seen.has(p.img)) { seen.add(p.img); pics.push({ img: p.img, caption: `P${p.panel}${p.text ? ' · ' + String(p.text).split('\n')[0] : ''}` }); } });
+  if (d.detailLogos !== false) (d.plates || []).forEach((p) => { if (p.kind === 'plate' && p.img && !seen.has(p.img)) { seen.add(p.img); pics.push({ img: p.img, caption: String(p.text || '').split('\n')[0] }); } });
   (d.details || []).forEach((x) => x && x.img && pics.push({ img: x.img, caption: x.caption || '' }));
   pics.splice(3);
   const allT = Array.isArray(d.detailTexts) ? d.detailTexts : d.detailText ? [d.detailText] : [];
@@ -957,11 +957,9 @@ function drawing(d, selIdx = -1, drawH = 270) {
   // left = each width panel, right = running total down the side, top = each length panel, bottom = running total at each score.
   let cumW = 0;
   R.forEach((r, i) => {
-    const pr = shadedRows.has(i);
     cumW += rows[i];
-    o.push(t(x0 - 14, wp.length ? r.m - 3 : r.m + 3.5, `P${i + 1}${pr ? ' *' : ''}`, { anchor: 'end', fill: pr ? RED : '#888', size: 9.5 }));
     if (wp.length) {
-      o.push(t(x0 - 14, r.m + 10, f(rows[i]), { anchor: 'end', size: 10, weight: 700 }));
+      o.push(t(x0 - 14, r.m + 3.5, f(rows[i]), { anchor: 'end', size: 10, weight: 700 }));
       o.push(`<line x1="${x0 - 7}" y1="${(r.y + 1.5).toFixed(1)}" x2="${x0 - 7}" y2="${(r.y + r.h - 1.5).toFixed(1)}" stroke="${INK}" stroke-width=".8" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
       o.push(`<line x1="${x0 - 11}" y1="${r.y.toFixed(1)}" x2="${x0 - 3}" y2="${r.y.toFixed(1)}" stroke="${INK}" stroke-width=".8"/>`);
     }
