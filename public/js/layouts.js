@@ -871,7 +871,7 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
   const notes = d.notes.split('\n').map((x) => x.trim()).filter(Boolean);
   // close-ups: plate logos (once each) + pictures added for the detail box, at most 3
   const seen = new Set(), pics = [];
-  if (d.detailLogos !== false) (d.plates || []).forEach((p) => { if (p.kind === 'plate' && p.img && !seen.has(p.img)) { seen.add(p.img); pics.push({ img: p.img, caption: String(p.text || '').split('\n')[0] }); } });
+  if (d.detailLogos !== false) (d.plates || []).forEach((p) => { if (p.kind === 'plate' && p.img && !seen.has(p.img)) { seen.add(p.img); pics.push({ img: p.img, caption: '' }); /* no automatic caption: the logo speaks for itself */ } });
   (d.details || []).forEach((x) => x && x.img && pics.push({ img: x.img, caption: x.caption || '' }));
   pics.splice(3);
   const allT = Array.isArray(d.detailTexts) ? d.detailTexts : d.detailText ? [d.detailText] : [];
@@ -889,7 +889,7 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
     <div class="ls-boxes"${opt.boxesH ? ` style="min-height:${opt.boxesH}px"` : ''}>
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
       <div class="ls-box ls-detail"><div class="ls-bh">PRINT DETAIL (ZOOMED IN)</div>
-        ${pics.length ? `<div class="ls-pics">${pics.map((x) => `<figure><img src="${x.img}" alt=""><figcaption>${esc(x.caption)}</figcaption></figure>`).join('')}</div>` : '<div class="ls-empty ls-nopic">No close-up yet. Add one under "Print detail box", or add a logo to a plate.</div>'}
+        ${pics.length ? `<div class="ls-pics">${pics.map((x) => `<figure><img src="${x.img}" alt="">${x.caption ? `<figcaption>${esc(x.caption)}</figcaption>` : ''}</figure>`).join('')}</div>` : '<div class="ls-empty ls-nopic">No close-up yet. Add one under "Print detail box", or add a logo to a plate.</div>'}
         <div class="ls-dtexts">${dtexts.map((o) => `<div class="ls-dtext" data-edit="dtext:${o.k}">${esc(o.x).replace(/\n/g, '<br>')}</div>`).join('')}${allT.length < 4 ? '<div class="ls-dtext ls-dnew" data-edit="dtext:new"><span class="ls-add">+ add text box</span></div>' : ''}</div></div>
     </div>
   </div>`;
