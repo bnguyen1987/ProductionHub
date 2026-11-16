@@ -1198,9 +1198,9 @@ function printSheet() {
   let o = { H: 270 }, k = 0.998;
   const m0 = measure(o);
   if (m0.h < AVAIL) {
-    // spare height: first make the notes / detail boxes at least ~190 px (about 2"), then grow the drawing, then the boxes again
+    // spare height: first make the notes / detail boxes at least ~250 px (room for a readable print detail), then grow the drawing, then the boxes again
     let extra = AVAIL - m0.h;
-    const box = Math.min(extra, Math.max(0, 190 - m0.boxes));
+    const box = Math.min(extra, Math.max(0, 250 - m0.boxes));
     extra -= box;
     const add = Math.min(extra, 260);
     extra -= add;

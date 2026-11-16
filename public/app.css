@@ -385,7 +385,7 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .ls-h{font-size:12px;font-weight:700;color:#1f3a5f;margin:12px 0 2px}
 .lsheet .ls-h i{font-weight:400;color:#555;font-size:10.5px;margin-left:6px}
 .lsheet .ls-svg{display:block;width:100%;height:auto}
-.lsheet .ls-boxes{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;margin-top:6px}
+.lsheet .ls-boxes{display:grid;grid-template-columns:1fr 1.5fr;gap:14px;margin-top:6px}
 .lsheet .ls-box{border:1px solid #9aa5b1}
 .lsheet .ls-bh{background:#1f3a5f;color:#fff;font-weight:700;font-size:11px;padding:4px 8px;letter-spacing:.03em}
 .lsheet .ls-box ol,.lsheet .ls-box ul{margin:6px 0;padding-left:26px;font-size:11px}
@@ -427,7 +427,7 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .ls-detail{display:flex;flex-direction:column}
 .lsheet .ls-pics{display:flex;gap:10px;padding:8px;justify-content:center;align-items:flex-end}
 .lsheet .ls-pics figure{margin:0;flex:1;min-width:0;text-align:center}
-.lsheet .ls-pics img{display:block;width:100%;max-height:120px;object-fit:contain;margin:0 auto;border:1px solid #ccd3db;background:#fff}
+.lsheet .ls-pics img{display:block;width:100%;max-height:200px;object-fit:contain;margin:0 auto;border:1px solid #ccd3db;background:#fff}
 .lsheet .ls-pics figcaption{font-size:9.5px;color:#333;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lsheet .ls-nopic{padding:10px;font-size:10.5px}
 #printSheet .ls-nopic{display:none}
@@ -443,7 +443,7 @@ details.fold[open]{padding-bottom:16px}
 #printSheet .ls-dnew{display:none}
 .lsheet.ls-print{width:1000px;padding:0}
 .lsheet.ls-print .ls-add,.lsheet.ls-print .ls-nopic,.lsheet.ls-print .ls-dnew{display:none}
-#printSheet .lsheet.ls-print .ls-pics img,.lsheet.ls-print .ls-pics img{height:88px;max-height:none;width:100%;object-fit:contain}
+#printSheet .lsheet.ls-print .ls-pics img,.lsheet.ls-print .ls-pics img{height:150px;max-height:none;width:100%;object-fit:contain}
 .lsheet.ls-print .ls-pics{padding:6px 8px}
 .lsheet.ls-print .ls-cell{min-height:32px;padding:3px 8px}
 .lsheet.ls-print .ls-h{margin:8px 0 0}
