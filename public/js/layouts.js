@@ -1146,7 +1146,8 @@ function drawing(d, selIdx = -1, drawH = 270) {
         if (gIn < 1 / 32 || yb2 - ya < 6) return;
         o.push(`<line x1="${xv.toFixed(1)}" y1="${(ya + 0.5).toFixed(1)}" x2="${xv.toFixed(1)}" y2="${(yb2 - 0.5).toFixed(1)}" stroke="${BLUE}" stroke-width="1" marker-start="url(#${uid}lab)" marker-end="url(#${uid}lab)"/>`);
         const lab = q(gIn), lw = lab.length * 5.4 + 8, ly = (ya + yb2) / 2;
-        o.push(`<rect x="${(xv - 4 - lw).toFixed(1)}" y="${(ly - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="12" fill="#fff" fill-opacity=".9"/>` + t(xv - 4 - lw / 2, ly + 3.4, lab, { size: 9.5, fill: BLUE, weight: 700 }));
+        // number to the right of the arrow (over the plate's open space), away from the red distances on the left
+        o.push(`<rect x="${(xv + 3).toFixed(1)}" y="${(ly - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="12" fill="#fff" fill-opacity=".9"/>` + t(xv + 3 + lw / 2, ly + 3.4, lab, { size: 9.5, fill: BLUE, weight: 700 }));
       });
     }
     if (p.i === selIdx) { // resize handles: right edge = width, bottom edge = height
