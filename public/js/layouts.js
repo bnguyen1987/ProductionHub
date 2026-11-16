@@ -1159,18 +1159,19 @@ function drawing(d, selIdx = -1, drawH = 270) {
   for (let i = 1; i <= R.length; i++) {
     const row = plates.filter((p) => p.panel === i && !p.skip && !p.nodim).sort((a, b) => a.s - b.s);
     if (!row.length) continue;
-    let prevEnd = null, prevKind = '', prevDim = 0;
+    let prevEnd = null;
     row.forEach((p, k) => {
       const sc = scores.filter((s) => s <= p.s + 1e-6).pop() ?? 0;
       const fromPlate = prevEnd !== null && prevEnd >= sc - 1e-6;
       const a = fromPlate ? prevEnd : sc;
       const gap = p.s - a;
       const y = p.cy, topY = R[i - 1].y + 10;
-      if (gap > 0.01) gapMark(o, X(a) + (fromPlate ? prevDim : 0), p.xa, y, fromPlate && prevKind !== 'bmc' && p.kind !== 'bmc' ? `${q(gap)} between plates` : q(gap), RED, t, arrow, topY);
-      prevEnd = Math.max(prevEnd ?? -Infinity, p.e); prevKind = p.kind; prevDim = p.dimR || 0;
+      // only distances from a score: the space between two items is not measured
+      if (gap > 0.01 && !fromPlate) gapMark(o, X(a), p.xa, y, q(gap), RED, t, arrow, topY);
+      prevEnd = Math.max(prevEnd ?? -Infinity, p.e);
       // gap to the next score, when that score comes before the next plate
       const next = row[k + 1], scR = scores.find((s) => s >= p.e - 1e-6) ?? totL;
-      if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01) { gapMark(o, p.xb, X(scR), y, q(scR - p.e), RED, t, arrow, topY); prevEnd = scR; prevDim = 0; }
+      if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01) { gapMark(o, p.xb, X(scR), y, q(scR - p.e), RED, t, arrow, topY); prevEnd = scR; }
     });
   }
 
