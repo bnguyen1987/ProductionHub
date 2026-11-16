@@ -79,19 +79,6 @@ const nums = (s) => list(s).map(pin).filter((v) => isFinite(v) && v > 0);
 const sum = (a) => a.reduce((t, v) => t + v, 0);
 const near = (a, b) => Math.abs(a - b) < 1 / 32;
 const SIZE_PX = { XS: 6, S: 8, M: 11, L: 15 };
-// Ink colors a plate / text / BMC can be tagged with. The color is how it shows on the sheet; the name (e.g. "PMS 286") prints beside it.
-const INKS = { black: ['Black', '#111111'], red: ['Red', '#c62828'], blue: ['Blue', '#1f5fbf'], green: ['Green', '#2e7d32'], brown: ['Brown', '#6d4c41'],
-  orange: ['Orange', '#e65100'], yellow: ['Yellow', '#b38f00'], purple: ['Purple', '#6a1b9a'], gray: ['Gray', '#616161'] };
-const inkColor = (p) => (INKS[p.ink] ? INKS[p.ink][1] : '#222');
-const inkLabel = (p) => (p.inkName || (INKS[p.ink] ? INKS[p.ink][0] : ''));
-// AI ink words → preset ("PMS 286 Blue" → blue, "Reflex blue" → blue, "Black" → black)
-function inkKey(word) {
-  const w = String(word || '').toLowerCase();
-  if (!w) return '';
-  for (const [k, re] of [['black', /black|blk/], ['red', /red|rubine|warm red|185|032|186/], ['blue', /blue|reflex|286|300|072|293/], ['green', /green|348|354/],
-    ['brown', /brown|kraft|469|4625/], ['orange', /orange|021|151/], ['yellow', /yellow|116|109/], ['purple', /purple|violet|2685/], ['gray', /gr[ae]y|cool gray|877|silver/]]) if (re.test(w)) return k;
-  return '';
-}
 const clampFs = (v) => Math.max(4, Math.min(40, Math.round(+v * 2) / 2));
 // font size of a text item: typed size wins, else the old Small/Medium/Large preset
 const textFs = (p) => (+p.fsz > 0 ? clampFs(p.fsz) : SIZE_PX[p.size] || 11);
@@ -311,7 +298,6 @@ function paintSelBar() {
       ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Font:</span><button type="button" class="btn small" id="lFsDn" aria-label="Smaller text">A−</button><span class="fs-val">${p.kind === 'text' ? textFs(p) : +p.fsz > 0 ? p.fsz : 'Auto'}</span><button type="button" class="btn small" id="lFsUp" aria-label="Bigger text">A+</button>${p.kind === 'plate' && +p.fsz > 0 ? '<button type="button" class="btn small ghost" id="lFsAuto">Auto</button>' : ''}</span>` : ''}
       ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Text:</span>${['left', 'center', 'right'].map((a) => `<button type="button" class="btn small" data-ta="${a}" aria-pressed="${(p.ta || (p.kind === 'text' ? 'left' : 'center')) === a}">${a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right'}</button>`).join('')}</span>` : ''}
       <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
-      <label class="sel-ink"><span class="hint">Ink:</span><select id="lInk"><option value="">—</option>${Object.entries(INKS).map(([k, [n]]) => `<option value="${k}" ${p.ink === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
       <button type="button" class="btn small" id="lFlip" aria-pressed="${!!p.flip}">Upside down</button>
       ${p.kind === 'plate' ? `<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden id="lSelImg"></label>` : ''}
       <button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
@@ -333,7 +319,6 @@ function paintSelBar() {
     $('#lDelSel').onclick = () => delPlate(sel);
     $('#lDup').onclick = () => duplicate(sel);
     $('#lFlip').onclick = () => { p.flip = !p.flip; paintPlates(); update(); };
-    $('#lInk').onchange = (e) => { setInk(p, e.target.value); paintPlates(); update(); };
     if ($('#lSelImg')) $('#lSelImg').onchange = (e) => { const f0 = e.target.files[0]; if (f0) addImage(sel, f0); };
     $('#lDone').onclick = () => select(-1);
   } else if (undo) {
@@ -370,7 +355,6 @@ function onInput(e) {
     const k = t.dataset.p;
     if (!p || !k) return;
     if (k === 'dims') { p.nodim = !t.checked; update(); return; }
-    if (k === 'ink') { setInk(p, t.value); paintPlates(); update(); return; }
     if (k === 'fsz') { p.fsz = t.value === '' ? '' : clampFs(t.value); update(); return; }
     p[k] = k === 'flip' || k === 'hl' ? t.checked : k === 'panel' ? +t.value : t.value;
     if (k === 'test' || k === 'wall') { const r = BMC[p.wall === 'double' ? 'double' : 'single'][p.test === 'Mullen' ? 'Mullen' : 'ECT']; if (!r[p.rating]) p.rating = p.test === 'Mullen' ? (p.wall === 'double' ? '275' : '200') : (p.wall === 'double' ? '48' : '32'); }
@@ -391,18 +375,6 @@ function update() {
   paintWarn();
   paintSelBar();
   fit();
-}
-
-// Picking a different ink drops a name that belongs to another color (e.g. "Black" when switching to Red); keeps a custom one like "PMS 185" only if it fits.
-function setInk(p, key) {
-  p.ink = key;
-  if (p.inkName && (!key || inkKey(p.inkName) !== key)) p.inkName = '';
-}
-// "Inks: ● Black ● PMS 286" for the heading (each ink once)
-function inkLegend(d) {
-  const seen = new Map();
-  (d.plates || []).forEach((p) => { const l = inkLabel(p); if (l && !seen.has(l.toLowerCase())) seen.set(l.toLowerCase(), [l, inkColor(p)]); });
-  return seen.size ? `<span class="ls-inks">Inks: ${[...seen.values()].map(([l, c]) => `<b style="color:${c}">● ${esc(l)}</b>`).join(' ')}</span> ` : '';
 }
 
 // ---- sheet geometry in inches (same rules as the drawing) ----
@@ -532,9 +504,7 @@ function paintPlates() {
     }
     return `
     <div class="plate-row k-${kind}${i === sel ? ' sel' : ''}" data-plate="${i}">
-      <div class="pr-top">${head}${top}
-        <div class="field"><label>Ink</label><select data-p="ink"><option value="">—</option>${Object.entries(INKS).map(([k, [n]]) => opt(k, p.ink || '', n)).join('')}</select></div>
-        <div class="field"><label>Ink name</label><input type="text" data-p="inkName" value="${esc(p.inkName || '')}" placeholder="${esc(INKS[p.ink] ? INKS[p.ink][0] : 'e.g. PMS 286')}"></div></div>
+      <div class="pr-top">${head}${top}</div>
       ${body}
       <div class="pr-opts">
         <label class="chk"><input type="checkbox" data-p="flip" ${p.flip ? 'checked' : ''}> Upside down</label>
@@ -834,7 +804,7 @@ async function readLayout(input) {
       const wIn = isFinite(+p.width_in) && +p.width_in > 0 ? +p.width_in : seg ? Math.min(seg * 0.6, 12) : 0;
       return {
         panel: Math.max(1, parseInt(p.panel, 10) || 1), start: startOf(p, wIn || 10),
-        width: wIn ? fx(wIn) : '', text: str(p.text), flip: !!p.upside_down, kind: 'plate', _ai: k, ink: inkKey(p.ink), inkName: str(p.ink).slice(0, 40),
+        width: wIn ? fx(wIn) : '', text: str(p.text), flip: !!p.upside_down, kind: 'plate', _ai: k,
       };
     });
     const texts = arr(r.texts).filter((x) => x && str(x.text)).map((x) => ({ kind: 'text', panel: Math.max(1, parseInt(x.panel, 10) || 1), start: startOf(x, textIn(x.text)), text: str(x.text).split('\n').map((y) => y.trim()).filter(Boolean).join('\n'), size: 'M', flip: !!x.upside_down })).filter((x) => x.start !== '');
@@ -909,7 +879,7 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
       ${cell('CUSTOMER', d.customer, 'customer', 2)}${cell('SHIP TO', d.shipTo, 'shipTo', 3)}${cell('FILE #', d.fileNo, 'fileNo')}${cell('STYLE', d.style, 'style')}${cell('VIEW', d.view, 'view')}
       ${cell('SIZE (L X W X D)', d.size, 'size', 2)}${cell('BOARD / FLUTE', d.board, 'board')}${cell('BLANK SIZE', blank, 'blank', 2)}${cell('PRINT', d.print, 'print', 2)}${cell('ROUTING', d.routing, 'routing')}
     </div>
-    <div class="ls-h">BOX LAYOUT &amp; PRINT PLACEMENT ${inkLegend(d)}<i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
+    <div class="ls-h">BOX LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
     ${drawing(d, selIdx, opt.H)}
     <div class="ls-boxes"${opt.boxesH ? ` style="min-height:${opt.boxesH}px"` : ''}>
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
@@ -1044,7 +1014,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
       const lh = fs * 1.2, hh = ls.length * lh + fs * 0.3;
       const w = Math.max(...ls.map((x) => x.length)) * fs * 0.6 + 6, xa = X(p.s), y = m - hh / 2;
       const base = m - ((ls.length - 1) * lh) / 2 + fs * 0.35;
-      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(xa + w / 2)}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}"/>${ls.map((x, k) => t(p.ta === 'center' ? xa + w / 2 : p.ta === 'right' ? xa + w - 3 : xa + 3, base + k * lh, x, { size: fs, weight: 700, fill: inkColor(p), anchor: p.ta === 'center' ? 'middle' : p.ta === 'right' ? 'end' : 'start' })).join('')}</g></g>`);
+      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(xa + w / 2)}><rect x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}"/>${ls.map((x, k) => t(p.ta === 'center' ? xa + w / 2 : p.ta === 'right' ? xa + w - 3 : xa + 3, base + k * lh, x, { size: fs, weight: 700, anchor: p.ta === 'center' ? 'middle' : p.ta === 'right' ? 'end' : 'start' })).join('')}</g></g>`);
       selBox(xa, y, w, hh);
       p.skip = true;
       return;
@@ -1053,7 +1023,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
       // A BMC is 1" round. Drawn to scale when that is big enough to read, never smaller than 22 px; measured as 1".
       const D = 1, rr = Math.min(r.h * 0.45, Math.max(11, (D * pxIn) / 2)), cx = X(p.s + D / 2), xa = cx - rr;
       const b = bmcOf(p), big = rr >= 15;
-      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(cx)}><circle cx="${cx.toFixed(1)}" cy="${m.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${inkColor(p)}" stroke-width="1.2"/><circle cx="${cx.toFixed(1)}" cy="${m.toFixed(1)}" r="${(rr - 2).toFixed(1)}" fill="none" stroke="${inkColor(p)}" stroke-width=".5"/>${big ? t(cx, m - 1, 'BMC', { size: 7.5, weight: 700, fill: inkColor(p) }) + t(cx, m + 7, `${b.v} ${b.tst === 'ECT' ? 'ECT' : 'LB'}`, { size: 6, fill: inkColor(p) }) : t(cx, m + 2.2, 'BMC', { size: 6, weight: 700, fill: inkColor(p) })}</g></g>`);
+      o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(cx)}><circle cx="${cx.toFixed(1)}" cy="${m.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.2"/><circle cx="${cx.toFixed(1)}" cy="${m.toFixed(1)}" r="${(rr - 2).toFixed(1)}" fill="none" stroke="${INK}" stroke-width=".5"/>${big ? t(cx, m - 1, 'BMC', { size: 7.5, weight: 700 }) + t(cx, m + 7, `${b.v} ${b.tst === 'ECT' ? 'ECT' : 'LB'}`, { size: 6 }) : t(cx, m + 2.2, 'BMC', { size: 6, weight: 700 })}</g></g>`);
       selBox(xa, m - rr, rr * 2, rr * 2);
       p.xa = Math.min(xa, X(p.s)); p.xb = Math.max(cx + rr, X(p.s + D)); p.e = p.s + D;
       return;
@@ -1085,11 +1055,9 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const y1 = m - ((lines.length - 1) * lh) / 2 + fs * 0.35;
     const txt = p.img
       ? `<image href="${p.img}" x="${(xa + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(xb - xa - 4).toFixed(1)}" height="${(h - 4).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="mix-blend-mode:multiply"/>`
-      : lines.map((ln, k) => t(p.ta === 'left' ? xa + 4 : p.ta === 'right' ? xb - 4 : cx, y1 + k * lh, ln, { size: fs, weight: 600, fill: inkColor(p), anchor: p.ta === 'left' ? 'start' : p.ta === 'right' ? 'end' : 'middle' })).join('');
+      : lines.map((ln, k) => t(p.ta === 'left' ? xa + 4 : p.ta === 'right' ? xb - 4 : cx, y1 + k * lh, ln, { size: fs, weight: 600, anchor: p.ta === 'left' ? 'start' : p.ta === 'right' ? 'end' : 'middle' })).join('');
     o.push(`<g class="ls-plate" data-pi="${p.i}"><g${p.flip ? ` transform="rotate(180 ${cx.toFixed(1)} ${m.toFixed(1)})"` : ''}><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${(xb - xa).toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
-    // ink name under the plate (only when the plate is tagged)
-    if (inkLabel(p) && y + h + 9 < r.y + r.h) o.push(t(cx, y + h + 8, '● ' + inkLabel(p), { size: 7, weight: 700, fill: inkColor(p) }));
     if (p.i === selIdx) { // resize handles: right edge = width, bottom edge = height
       o.push(`<rect class="ls-handle" data-handle="w" data-hpi="${p.i}" x="${(xb + 1).toFixed(1)}" y="${(m - 7).toFixed(1)}" width="9" height="14" rx="2" fill="#1a73e8" stroke="#fff" stroke-width="1.5"/>`);
       o.push(`<rect class="ls-handle" data-handle="h" data-hpi="${p.i}" x="${(cx - 7).toFixed(1)}" y="${(y + h + 1).toFixed(1)}" width="14" height="9" rx="2" fill="#1a73e8" stroke="#fff" stroke-width="1.5"/>`);

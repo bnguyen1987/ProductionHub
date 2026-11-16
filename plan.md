@@ -223,6 +223,6 @@ The drawing is scaled into the 3D world. One unit is about 0.7 m, and the buildi
 
 ## 18. Versions, inks, PDF name, original scan (Nov 15, 2026)
 - Saved versions: every save first copies the previous doc to `v/<id>/<time>`; the last 10 are kept. "Versions" button (shown once a layout is saved/opened) lists them (who, when); opening one loads it into the editor without saving (Save makes it current, Undo goes back). Delete removes versions and originals too.
-- Ink per item: `ink` (preset black/red/blue/green/brown/orange/yellow/purple/gray) + optional `inkName` (e.g. PMS 286). Copy / BMC drawn in the ink color, plates get "● name" under them, heading shows an "Inks:" legend. The AI returns each plate's ink and it is mapped to a preset (`inkKey`). Picking another ink drops a name that belongs to a different color.
+- Ink per item was added and then removed (Nov 16) at Brian's request: no ink dropdowns, colored copy or legend. Old saves that still carry `ink`/`inkName` are ignored.
 - Print / save PDF sets the page title to "<File #> <Customer>" while printing, so the PDF is named after the job.
 - Original scan: the uploaded PDF/photo(s) are kept in memory after a read and stored as is with the layout on Save (`o/<id>/<n>`, max ~4 MB each, one request per file). "View <name>" opens it. A new scan replaces the old one (`newOriginals`).
