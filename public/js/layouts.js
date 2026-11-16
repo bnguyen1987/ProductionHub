@@ -498,7 +498,7 @@ function paintPlates() {
       top = `<div class="field"><label>Font size</label><input type="number" min="4" max="40" step="0.5" data-p="fsz" value="${textFs(p)}"></div><div class="field"><label>Text align</label><select data-p="ta">${opt('left', p.ta || 'left', 'Left')}${opt('center', p.ta || 'left', 'Center')}${opt('right', p.ta || 'left', 'Right')}</select></div>`;
       body = `<div class="field"><label>Text</label><textarea data-p="text" rows="2" placeholder="Type anything (Enter = new line)">${esc(p.text)}</textarea></div>`;
     } else {
-      top = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div><div class="field"><label>Font size</label><input type="number" min="4" max="40" step="0.5" data-p="fsz" value="${+p.fsz > 0 ? p.fsz : ''}" placeholder="Auto"></div><div class="field"><label>Text align</label><select data-p="ta">${opt('left', p.ta || 'center', 'Left')}${opt('center', p.ta || 'center', 'Center')}${opt('right', p.ta || 'center', 'Right')}</select></div>`;
+      top = `<div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div><div class="field"><label>Length (in)</label><input type="text" inputmode="decimal" data-p="plen" value="${esc(p.plen || '')}" placeholder="Auto" title="Plate size top to bottom (across the panel). Blank = fit the copy."></div><div class="field"><label>Font size</label><input type="number" min="4" max="40" step="0.5" data-p="fsz" value="${+p.fsz > 0 ? p.fsz : ''}" placeholder="Auto"></div><div class="field"><label>Text align</label><select data-p="ta">${opt('left', p.ta || 'center', 'Left')}${opt('center', p.ta || 'center', 'Center')}${opt('right', p.ta || 'center', 'Right')}</select></div>`;
       body = `<div class="field"><label>Copy on the plate</label><textarea data-p="text" rows="2">${esc(p.text)}</textarea></div>
         <div class="plate-img">${p.img ? `<img src="${p.img}" alt="Logo">` : ''}<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden data-img="${i}"></label>${p.img ? `<button type="button" class="btn small ghost" data-noimg="${i}">Remove image</button>` : ''}</div>`;
     }
@@ -687,6 +687,7 @@ function startResize(e) {
   const toSvg = (ev) => { const cur = $('#lSheet svg') || svg, pt = cur.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY; return pt.matrixTransform(cur.getScreenCTM().inverse()); };
   const a = toSvg(e), pxIn = (+svg.dataset.x1 - +svg.dataset.x0) / +svg.dataset.totl;
   const rows = svg.dataset.rows.split(';').map((r) => r.split(',').map(Number)), rh = (rows[p.panel - 1] || rows[0])[1];
+  const rowIn = (svg.dataset.rowsin || '').split(',').map(Number)[p.panel - 1]; // panel size in inches, to turn the dragged height into inches
   const box = svg.querySelector(`[data-pi="${hd.dataset.hpi}"] .ls-pbox`);
   const w0 = isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : (box ? +box.getAttribute('width') / pxIn : 10);
   const h0 = box ? +box.getAttribute('height') : rh * 0.6;
@@ -696,7 +697,10 @@ function startResize(e) {
   const move = (ev) => {
     const b = toSvg(ev);
     if (kind === 'w') p.width = f(Math.max(1, Math.round((w0 + (b.x - a.x) / pxIn) * 16) / 16));
-    else p.hgt = Math.round(Math.max(0.15, Math.min(0.98, (h0 + 2 * (b.y - a.y)) / rh)) * 100) / 100;
+    else {
+      const share = Math.max(0.1, Math.min(0.98, (h0 + 2 * (b.y - a.y)) / rh));
+      if (rowIn > 0) { p.plen = f(Math.max(0.5, Math.round(share * rowIn * 16) / 16)); p.hgt = 0; } else p.hgt = Math.round(share * 100) / 100;
+    }
     if (!raf) raf = requestAnimationFrame(() => { raf = 0; $('#lSheet').innerHTML = sheetHtml(L, sel); }); // at most one redraw per screen frame
   };
   const up = () => {
@@ -804,7 +808,7 @@ async function readLayout(input) {
       const wIn = isFinite(+p.width_in) && +p.width_in > 0 ? +p.width_in : seg ? Math.min(seg * 0.6, 12) : 0;
       return {
         panel: Math.max(1, parseInt(p.panel, 10) || 1), start: startOf(p, wIn || 10),
-        width: wIn ? fx(wIn) : '', text: str(p.text), flip: !!p.upside_down, kind: 'plate', _ai: k,
+        width: wIn ? fx(wIn) : '', plen: isFinite(+p.height_in) && +p.height_in > 0 ? fx(+p.height_in) : '', text: str(p.text), flip: !!p.upside_down, kind: 'plate', _ai: k,
       };
     });
     const texts = arr(r.texts).filter((x) => x && str(x.text)).map((x) => ({ kind: 'text', panel: Math.max(1, parseInt(x.panel, 10) || 1), start: startOf(x, textIn(x.text)), text: str(x.text).split('\n').map((y) => y.trim()).filter(Boolean).join('\n'), size: 'M', flip: !!x.upside_down })).filter((x) => x.start !== '');
@@ -1029,7 +1033,10 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const w = isFinite(p.w) && p.w > 0 ? p.w : totL * 0.1;
     const xa = X(p.s), xb = Math.max(X(p.s + w), xa + 24);
     // Fit all of the copy: shrink the type (9 → 5 px) and let the box grow up to ~90% of the panel height.
-    const setH = +p.hgt > 0 ? Math.max(0.15, Math.min(0.98, +p.hgt)) * r.h : 0; // height set by hand (share of the panel)
+    // plate size top to bottom: Length in inches (drawn at the panel's scale), else an older dragged share of the panel
+    const plIn = pin(p.plen), rowIn = rows[p.panel - 1];
+    const setH = isFinite(plIn) && plIn > 0 && rowIn > 0 ? Math.max(6, Math.min(0.98, plIn / rowIn) * r.h)
+      : +p.hgt > 0 ? Math.max(0.15, Math.min(0.98, +p.hgt)) * r.h : 0;
     const cx = (xa + xb) / 2, hMax = setH || r.h * 0.9, base = setH || Math.min(r.h * 0.8, 52);
     const raw = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
     let fs = 9, lines = [];
@@ -1067,33 +1074,42 @@ function drawing(d, selIdx = -1, drawH = 270) {
       if (xb - xa >= lw + 10) o.push(`<rect x="${(ccx - lw / 2).toFixed(1)}" y="${(yd - 5.5).toFixed(1)}" width="${lw.toFixed(1)}" height="11" fill="#fff"/>` + t(ccx, yd + 3.2, lab, { size: 9, weight: 700 }));
       else o.push(t(xb + 3, yd + 3.2, lab, { size: 9, weight: 700, anchor: 'start' })); // narrow plate: number beside the arrow
     }
+    // plate length top to bottom: arrow on the right side of the plate (gap arrows on that side start past it)
+    if (!p.nodim && isFinite(plIn) && plIn > 0 && h >= 12) {
+      const xd = xb + 6;
+      o.push(`<line x1="${(xb + 1).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(xd + 3).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${INK}" stroke-width=".6"/><line x1="${(xb + 1).toFixed(1)}" y1="${(y + h).toFixed(1)}" x2="${(xd + 3).toFixed(1)}" y2="${(y + h).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
+      o.push(`<line x1="${xd.toFixed(1)}" y1="${(y + 0.5).toFixed(1)}" x2="${xd.toFixed(1)}" y2="${(y + h - 0.5).toFixed(1)}" stroke="${INK}" stroke-width="1" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
+      const lab = q(plIn);
+      o.push(`<rect x="${(xd - 6).toFixed(1)}" y="${(m - lab.length * 2.7 - 4).toFixed(1)}" width="12" height="${(lab.length * 5.4 + 8).toFixed(1)}" fill="#fff"/>` + t(xd + 3.2, m, lab, { size: 9, weight: 700, tr: `rotate(-90 ${(xd + 3.2).toFixed(1)} ${m.toFixed(1)})` }));
+      p.dimR = 14;
+    }
     if (p.i === selIdx) { // resize handles: right edge = width, bottom edge = height
       o.push(`<rect class="ls-handle" data-handle="w" data-hpi="${p.i}" x="${(xb + 1).toFixed(1)}" y="${(m - 7).toFixed(1)}" width="9" height="14" rx="2" fill="#1a73e8" stroke="#fff" stroke-width="1.5"/>`);
       o.push(`<rect class="ls-handle" data-handle="h" data-hpi="${p.i}" x="${(cx - 7).toFixed(1)}" y="${(y + h + 1).toFixed(1)}" width="14" height="9" rx="2" fill="#1a73e8" stroke="#fff" stroke-width="1.5"/>`);
     }
-    p.xa = xa; p.xb = xb; p.e = p.s + w;
+    p.xa = xa; p.xb = xb + (p.dimR || 0); p.e = p.s + w;
   });
   // gaps: from the nearest score (or plate) on the left of each plate, and from the last plate to the next score
   for (let i = 1; i <= R.length; i++) {
     const row = plates.filter((p) => p.panel === i && !p.skip && !p.nodim).sort((a, b) => a.s - b.s);
     if (!row.length) continue;
-    let prevEnd = null, prevKind = '';
+    let prevEnd = null, prevKind = '', prevDim = 0;
     row.forEach((p, k) => {
       const sc = scores.filter((s) => s <= p.s + 1e-6).pop() ?? 0;
       const fromPlate = prevEnd !== null && prevEnd >= sc - 1e-6;
       const a = fromPlate ? prevEnd : sc;
       const gap = p.s - a;
       const y = p.cy, topY = R[i - 1].y + 10;
-      if (gap > 0.01) gapMark(o, X(a), p.xa, y, fromPlate && prevKind !== 'bmc' && p.kind !== 'bmc' ? `${q(gap)} between plates` : q(gap), RED, t, arrow, topY);
-      prevEnd = Math.max(prevEnd ?? -Infinity, p.e); prevKind = p.kind;
+      if (gap > 0.01) gapMark(o, X(a) + (fromPlate ? prevDim : 0), p.xa, y, fromPlate && prevKind !== 'bmc' && p.kind !== 'bmc' ? `${q(gap)} between plates` : q(gap), RED, t, arrow, topY);
+      prevEnd = Math.max(prevEnd ?? -Infinity, p.e); prevKind = p.kind; prevDim = p.dimR || 0;
       // gap to the next score, when that score comes before the next plate
       const next = row[k + 1], scR = scores.find((s) => s >= p.e - 1e-6) ?? totL;
-      if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01) { gapMark(o, p.xb, X(scR), y, q(scR - p.e), RED, t, arrow, topY); prevEnd = scR; }
+      if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01) { gapMark(o, p.xb, X(scR), y, q(scR - p.e), RED, t, arrow, topY); prevEnd = scR; prevDim = 0; }
     });
   }
 
   const mk = (id, c) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L10 5L0 9z" fill="${c}"/></marker>`;
-  return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 36}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk(uid + 'lak', INK)}${mk(uid + 'lar', RED)}</defs>${o.join('')}</svg>`;
+  return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rowsin="${rows.join(',')}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 36}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk(uid + 'lak', INK)}${mk(uid + 'lar', RED)}</defs>${o.join('')}</svg>`;
 }
 
 function gapMark(o, xa, xb, y, label, c, t, arrow, topY = null) {

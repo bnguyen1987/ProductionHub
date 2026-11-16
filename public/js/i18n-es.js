@@ -19,6 +19,7 @@ const NEED = {
 const needList = (s) => s.split(', ').map((x) => NEED[x] || x).join(', ');
 
 export const ES = {
+  'Plate size top to bottom (across the panel). Blank = fit the copy.': 'Tamaño de la placa de arriba a abajo (a lo ancho del panel). En blanco = ajusta al texto.',
   'Ink': 'Tinta',
   'Ink name': 'Nombre de tinta',
   'Ink:': 'Tinta:',
