@@ -1303,7 +1303,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
       prevEnd = Math.max(prevEnd ?? -Infinity, p.e); prevDim = p.dimR || 0;
       // gap to the next score, when that score comes before the next plate
       const next = row[k + 1], scR = scores.find((s) => s >= p.e - 1e-6) ?? totL;
-      if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01) { gapMark(o, X(scR) - p.xb >= 8 ? p.xb : p.xb - (p.dimR || 0), X(scR), y, q(scR - p.e), p.kind === 'hole' ? GREEN : RED, t, arrow, topY, null, placed, botY); prevEnd = scR; prevDim = 0; }
+      if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01 && p.kind !== 'hole') { /* a hand hole is measured from the left only */ gapMark(o, X(scR) - p.xb >= 8 ? p.xb : p.xb - (p.dimR || 0), X(scR), y, q(scR - p.e), p.kind === 'hole' ? GREEN : RED, t, arrow, topY, null, placed, botY); prevEnd = scR; prevDim = 0; }
     });
   }
 
