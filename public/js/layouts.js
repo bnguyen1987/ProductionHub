@@ -132,6 +132,9 @@ function setSpace(p, side, v) {
 }
 
 
+// plates and hand holes both have a typed Width and Length
+const hasW = (p) => p.kind === 'plate' || p.kind === 'hole';
+const isHinge = (p) => p.kind === 'hole' && p.hole === 'hinge';
 const angleOf = (p) => (((+p.turn || 0) + (p.flip ? 180 : 0)) % 360 + 360) % 360;
 function setAngle(p, a) { p.turn = ((+a % 360) + 360) % 360; p.flip = false; }
 const TURNS = [[0, 'Upright'], [90, 'Sideways ↓'], [180, 'Upside down'], [270, 'Sideways ↑']];
@@ -237,7 +240,7 @@ export function render(v) {
           <div class="seg" id="lPP"></div>
           <div class="lbl" style="margin:14px 0 6px">Print, BMC and text on the sheet <span class="hint" style="font-weight:500">start = inches from the left edge of the blank</span></div>
           <div id="lPlates"></div>
-          <div class="btn-row" style="margin-top:8px"><button type="button" class="btn small" id="lAddPlate">+ Add plate</button><button type="button" class="btn small" id="lAddBmc">+ Add BMC</button><button type="button" class="btn small" id="lAddText">+ Add text</button></div>
+          <div class="btn-row" style="margin-top:8px"><button type="button" class="btn small" id="lAddPlate">+ Add plate</button><button type="button" class="btn small" id="lAddBmc">+ Add BMC</button><button type="button" class="btn small" id="lAddText">+ Add text</button><button type="button" class="btn small" id="lAddHole">+ Add hand hole</button></div>
         </section>
         </div>
       </div>
@@ -255,6 +258,12 @@ export function render(v) {
   $('#lAddPlate').onclick = () => addItem({ kind: 'plate', panel: L.printPanels[0] || 1, start: '', width: '', text: '', flip: false });
   $('#lAddBmc').onclick = () => addItem({ kind: 'bmc', panel: L.printPanels[0] || 1, start: mid(), ...bmcFromBoard(L.board), flip: false });
   $('#lAddText').onclick = () => addItem({ kind: 'text', panel: 1, start: mid(), text: '', size: 'M', flip: false });
+  // Hand hole: starts 3 3/4" × 1 1/4" (a common size, change it), centred in the 2nd length panel of the middle row, toward the top
+  $('#lAddHole').onclick = () => {
+    const g = geom(), nR = g.rows.length || 1, row = nR >= 3 ? Math.ceil(nR / 2) : 1;
+    const k = g.lp.length >= 3 ? 1 : 0, a = g.scores[k] || 0, b = g.scores[k + 1] || g.totL || 12;
+    addItem({ kind: 'hole', hole: 'cut', panel: row, width: '3 3/4', plen: '1 1/4', start: fx(Math.max(0, Math.round((a + (b - a - 3.75) / 2) * 16) / 16)), dy: -0.2, text: '', flip: false });
+  };
   $('#lDetTextAdd').onclick = () => { if (L.detailTexts.length >= 4) return alert('The detail box holds up to 4 text boxes.'); L.detailTexts.push(''); paintDetails(); update(); const t = $$('#lDetTexts textarea').pop(); if (t) t.focus(); };
   $('#lDetLogos').onchange = (e) => { L.detailLogos = e.target.checked; update(); };
   $('#lDetAdd').onchange = (e) => { const f0 = e.target.files[0]; e.target.value = ''; if (f0) addDetail(f0); };
@@ -287,14 +296,14 @@ export function render(v) {
     if (ed) { openEditor(ed.dataset.edit, ed); return; }
     const g = e.target.closest('[data-pi]');
     const pi = g ? +g.dataset.pi : -1;
-    if (pi >= 0 && pi === sel && L.plates[pi] && L.plates[pi].kind !== 'bmc') { openEditor('item:' + pi, g); return; } // tap a selected item again to change its words
+    if (pi >= 0 && pi === sel && L.plates[pi] && !['bmc', 'hole'].includes(L.plates[pi].kind)) { openEditor('item:' + pi, g); return; } // tap a selected item again to change its words
     closeEditor();
     select(pi);
   });
   $('#lSheet').addEventListener('dblclick', (e) => {
     const g = e.target.closest('[data-pi]');
     const p = g && L.plates[+g.dataset.pi];
-    if (p && p.kind !== 'bmc') openEditor('item:' + g.dataset.pi, g);
+    if (p && !['bmc', 'hole'].includes(p.kind)) openEditor('item:' + g.dataset.pi, g);
   });
   $('#lSheet').addEventListener('pointerdown', startDrag);
   $('#lPlates').addEventListener('focusin', (e) => { const r = e.target.closest('[data-plate]'); if (r && +r.dataset.plate !== sel) select(+r.dataset.plate, false); });
@@ -325,7 +334,7 @@ function onKey(e) {
 function nudge(dIn) {
   const p = L.plates[sel]; if (!p) return;
   const lp = nums(L.lengthPanels), tl = lp.length ? sum(lp) : pin(L.blankL);
-  const w = p.kind === 'plate' && isFinite(pin(p.width)) ? pin(p.width) : p.kind === 'bmc' ? 1 : 0;
+  const w = hasW(p) && isFinite(pin(p.width)) ? pin(p.width) : p.kind === 'bmc' ? 1 : 0;
   let st = (isFinite(pin(p.start)) ? pin(p.start) : 0) + dIn;
   st = Math.max(0, isFinite(tl) ? Math.min(tl - w, st) : st);
   p.start = f(Math.round(st * 16) / 16);
@@ -361,11 +370,11 @@ function paintSelBar() {
   if (!bar) return;
   const p = L.plates[sel];
   if (p) {
-    const what = p.kind === 'bmc' ? `<b>Selected BMC:</b> P${p.panel} · ${esc(bmcLabel(p))}` : `<b>${p.kind === 'text' ? 'Selected text:' : 'Selected print:'}</b> P${p.panel}${p.text ? ' · ' + esc(String(p.text).replace(/\s+/g, ' ').slice(0, 70)) + (String(p.text).length > 70 ? '…' : '') : ''}`;
+    const what = p.kind === 'hole' ? `<b>Selected ${isHinge(p) ? 'hinged hand hole' : 'hand hole'}:</b> P${p.panel} · ${esc(show(p.width) || '?')} × ${esc(show(p.plen) || '?')}` : p.kind === 'bmc' ? `<b>Selected BMC:</b> P${p.panel} · ${esc(bmcLabel(p))}` : `<b>${p.kind === 'text' ? 'Selected text:' : 'Selected print:'}</b> P${p.panel}${p.text ? ' · ' + esc(String(p.text).replace(/\s+/g, ' ').slice(0, 70)) + (String(p.text).length > 70 ? '…' : '') : ''}`;
     const nP = Math.max(1, nums(L.widthPanels).length, p.panel);
     // Same rows and the same buttons for every item: a button that does not apply is greyed out, never removed,
     // so nothing jumps around when you click from a plate to a BMC or text.
-    const isB = p.kind === 'bmc', isT = p.kind === 'text', isP = p.kind === 'plate';
+    const isB = p.kind === 'bmc' || p.kind === 'hole', isT = p.kind === 'text', isP = p.kind === 'plate', isH = p.kind === 'hole';
     const dis = (off) => (off ? ' disabled' : '');
     const ta = p.ta || (isT ? 'left' : 'center');
     const keepOk = isP && p.img && pin(p.width) > 0 && pin(p.plen) > 0;
@@ -383,11 +392,11 @@ function paintSelBar() {
         <span class="sb-gap"></span>${['left', 'center', 'right'].map((a) => `<button type="button" class="btn small" data-ta="${a}" aria-pressed="${!isB && ta === a}"${dis(isB)}>${a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right'}</button>`).join('')}
         <span class="sb-gap"></span><button type="button" class="btn small" id="lEditSel"${dis(isB)}>Edit text</button></div>
       <div class="sb-row"><span class="sb-lab">Turn</span>
-        <button type="button" class="btn small sb-turn" id="lTurn" title="Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)">Turn 90° <span class="hint">(${TURNS.find(([a]) => a === angleOf(p))[1]})</span></button>
-        <button type="button" class="btn small" id="lFlip" aria-pressed="${angleOf(p) === 180}">Upside down</button></div>
+        <button type="button" class="btn small sb-turn" id="lTurn"${dis(isH)} title="Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)">Turn 90° <span class="hint">(${TURNS.find(([a]) => a === angleOf(p))[1]})</span></button>
+        <button type="button" class="btn small" id="lFlip" aria-pressed="${angleOf(p) === 180}"${dis(isH && !isHinge(p))}>${isH ? 'Hinge on bottom' : 'Upside down'}</button></div>
       <div class="sb-row"><span class="sb-lab">Plate</span>
         <button type="button" class="btn small sb-w1" id="lDims"${dis(isT)}>${p.nodim ? 'Show distances' : 'Hide distances'}</button>
-        <button type="button" class="btn small sb-w1" id="lSize"${dis(!isP)}>${p.nosize ? 'Show size' : 'Hide size'}</button>
+        <button type="button" class="btn small sb-w1" id="lSize"${dis(!hasW(p))}>${p.nosize ? 'Show size' : 'Hide size'}</button>
         <button type="button" class="btn small sb-w1" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
         <label class="btn small sb-w2${isP ? '' : ' is-off'}">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden id="lSelImg"${dis(!isP)}></label>
         <button type="button" class="btn small" id="lKeep" aria-pressed="${!!p.keepShape}"${dis(!keepOk)} title="Off: the logo fills the plate Width × Length. On: the logo keeps its own shape inside the box.">Keep logo shape</button></div>
@@ -458,6 +467,8 @@ function onInput(e) {
     if (k === 'dims') { p.nodim = !t.checked; update(); return; }
     if (k === 'size') { p.nosize = !t.checked; update(); return; }
     if (k === 'turn') { setAngle(p, +t.value); update(); return; }
+    if (k === 'hingeSide') { setAngle(p, t.value === 'bottom' ? 180 : 0); update(); return; }
+    if (k === 'hole') { p.hole = t.value === 'hinge' ? 'hinge' : 'cut'; paintPlates(); update(); return; }
     if (k === 'fsz') { p.fsz = t.value === '' ? '' : clampFs(t.value); update(); return; }
     p[k] = k === 'flip' || k === 'hl' ? t.checked : k === 'panel' ? +t.value : t.value;
     if (k === 'test' || k === 'wall') { const r = BMC[p.wall === 'double' ? 'double' : 'single'][p.test === 'Mullen' ? 'Mullen' : 'ECT']; if (!r[p.rating]) p.rating = p.test === 'Mullen' ? (p.wall === 'double' ? '275' : '200') : (p.wall === 'double' ? '48' : '32'); }
@@ -501,7 +512,7 @@ function span(p, g) {
   else w = isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : g.totL * 0.1;
   return [s, s + w];
 }
-const itemName = (p) => (p.kind === 'bmc' ? 'BMC' : p.kind === 'text' ? `Text "${String(p.text || '').split('\n')[0].slice(0, 22)}"` : `Plate${p.text ? ` "${String(p.text).split('\n')[0].slice(0, 22)}"` : ''}`);
+const itemName = (p) => (p.kind === 'bmc' ? 'BMC' : p.kind === 'hole' ? (isHinge(p) ? 'Hinged hand hole' : 'Hand hole') : p.kind === 'text' ? `Text "${String(p.text || '').split('\n')[0].slice(0, 22)}"` : `Plate${p.text ? ` "${String(p.text).split('\n')[0].slice(0, 22)}"` : ''}`);
 
 // ---- placement warnings: crossing a score, off the blank, on the glue tab, overlapping, no width ----
 function placementWarnings() {
@@ -510,7 +521,7 @@ function placementWarnings() {
   items.forEach(({ p, i, sp }) => {
     if (!sp) return;
     const [a, b] = sp, who = `${itemName(p)} on P${p.panel}`;
-    if (p.kind === 'plate' && !(isFinite(pin(p.width)) && pin(p.width) > 0)) out.push({ i, msg: `${who} has no width. Fill in Width so the distances are right.` });
+    if (hasW(p) && !(isFinite(pin(p.width)) && pin(p.width) > 0)) out.push({ i, msg: `${who} has no width. Fill in Width so the distances are right.` });
     if (a < -tol || b > g.totL + tol) out.push({ i, msg: `${who} runs off the end of the blank.` });
     if (g.tab && g.flap.has(p.panel - 1) && a < g.lp[0] - tol) out.push({ i, msg: `${who} is beside the ${jointName(L).toLowerCase()} tab, where there is no flap.` });
     else if (g.tab && a < g.lp[0] - tol && p.kind !== 'text') out.push({ i, msg: `${who} sits on the ${jointName(L).toLowerCase()} tab.` });
@@ -586,7 +597,7 @@ function paintPlates() {
   const opt = (v, cur, label = v) => `<option value="${esc(v)}" ${String(cur) === String(v) ? 'selected' : ''}>${esc(label)}</option>`;
   $('#lPlates').innerHTML = L.plates.length ? L.plates.map((p, i) => {
     const kind = p.kind || 'plate';
-    const head = `<div class="field"><label>${kind === 'bmc' ? 'BMC on' : kind === 'text' ? 'Text on' : 'Panel'}</label><select data-p="panel">${Array.from({ length: Math.max(n, p.panel) }, (_, k) => opt(k + 1, p.panel, 'P' + (k + 1))).join('')}</select></div>
+    const head = `<div class="field"><label>${kind === 'bmc' ? 'BMC on' : kind === 'text' ? 'Text on' : kind === 'hole' ? 'Hand hole on' : 'Panel'}</label><select data-p="panel">${Array.from({ length: Math.max(n, p.panel) }, (_, k) => opt(k + 1, p.panel, 'P' + (k + 1))).join('')}</select></div>
       <div class="field"><label>Start (in)</label><input type="text" inputmode="decimal" data-p="start" value="${esc(p.start)}"></div>`;
     // Each row: fields across the top, then the copy box, picture buttons and the options line.
     let top = '', body = '';
@@ -597,6 +608,10 @@ function paintPlates() {
         <div class="field"><label>Wall</label><select data-p="wall">${opt('single', b.w, 'Single')}${opt('double', b.w, 'Double')}</select></div>
         <div class="field"><label>Rating</label><select data-p="rating">${ratings.map((r) => opt(r, b.v, b.tst === 'ECT' ? r + ' ECT' : r + ' lb')).join('')}</select></div>`;
       body = `<div class="hint bmc-vals">${b.row ? `Size limit ${b.row[1]}" · Gross wt ${b.row[0]} lbs${b.row[2] ? ` · Facings ${b.row[2]} lbs/MSF` : ''}` : 'Not a standard rating. Check the values on the stamp.'}</div>`;
+    } else if (kind === 'hole') {
+      top = `<div class="field"><label>Type</label><select data-p="hole">${opt('cut', p.hole || 'cut', 'Cut-out')}${opt('hinge', p.hole || 'cut', 'Hinged')}</select></div>
+        <div class="field"><label>Width (in)</label><input type="text" inputmode="decimal" data-p="width" value="${esc(p.width)}"></div><div class="field"><label>Length (in)</label><input type="text" inputmode="decimal" data-p="plen" value="${esc(p.plen || '')}" title="Top to bottom"></div>`;
+      body = isHinge(p) ? `<div class="field" style="max-width:220px"><label>Hinge (fold line) on</label><select data-p="hingeSide">${opt('top', angleOf(p) === 180 ? 'bottom' : 'top', 'Top edge')}${opt('bottom', angleOf(p) === 180 ? 'bottom' : 'top', 'Bottom edge')}</select></div>` : '';
     } else if (kind === 'text') {
       top = `<div class="field"><label>Font size</label><input type="number" min="4" max="40" step="0.5" data-p="fsz" value="${textFs(p)}"></div><div class="field"><label>Text align</label><select data-p="ta">${opt('left', p.ta || 'left', 'Left')}${opt('center', p.ta || 'left', 'Center')}${opt('right', p.ta || 'left', 'Right')}</select></div>`;
       body = `<div class="field"><label>Text</label><textarea data-p="text" rows="2" placeholder="Type anything (Enter = new line)">${esc(p.text)}</textarea></div>`;
@@ -610,10 +625,10 @@ function paintPlates() {
       <div class="pr-top">${head}${top}</div>
       ${body}
       <div class="pr-opts">
-        <label class="chk">Turn <select data-p="turn">${TURNS.map(([a, n]) => `<option value="${a}" ${angleOf(p) === a ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        ${kind === 'hole' ? '' : `<label class="chk">Turn <select data-p="turn">${TURNS.map(([a, n]) => `<option value="${a}" ${angleOf(p) === a ? 'selected' : ''}>${n}</option>`).join('')}</select></label>`}
         <label class="chk"><input type="checkbox" data-p="hl" ${p.hl ? 'checked' : ''}> Highlight</label>
         ${kind !== 'text' ? `<label class="chk"><input type="checkbox" data-p="dims" ${p.nodim ? '' : 'checked'}> Distances</label>` : ''}
-        ${kind === 'plate' ? `<label class="chk"><input type="checkbox" data-p="size" ${p.nosize ? '' : 'checked'}> Show size</label>` : ''}
+        ${hasW(p) ? `<label class="chk"><input type="checkbox" data-p="size" ${p.nosize ? '' : 'checked'}> Show size</label>` : ''}
         <button type="button" class="btn small ghost" data-dup="${i}">Duplicate</button>
         <button type="button" class="btn small ghost danger" data-del="${i}" aria-label="Remove">✕</button>
       </div>
@@ -848,7 +863,7 @@ function startDrag(e) {
     if (k < 0) k = y < rows[0][0] ? 0 : rows.length - 1;
     const rk = rows[k];
     p.dy = Math.round(Math.max(-0.45, Math.min(0.45, (y - (rk[0] + rk[1] / 2)) / rk[1])) * 100) / 100;
-    const w = p.kind === 'plate' && isFinite(pin(p.width)) ? pin(p.width) : 0;
+    const w = hasW(p) && isFinite(pin(p.width)) ? pin(p.width) : 0;
     let s = (isFinite(pin(p.start)) ? pin(p.start) : 0) + dx / pxIn;
     s = Math.max(0, Math.min(totL - w, Math.round(s * 16) / 16));
     p.start = f(s); p.panel = k + 1;
@@ -916,6 +931,13 @@ async function readLayout(input) {
       };
     });
     const texts = arr(r.texts).filter((x) => x && str(x.text)).map((x) => ({ kind: 'text', panel: Math.max(1, parseInt(x.panel, 10) || 1), start: startOf(x, [90, 270].includes(+x.turn) ? (Math.max(1, str(x.text).split('\n').filter((y) => y.trim()).length) * 11 * 1.2 + 3.3) / pxIn : textIn(x.text)), text: str(x.text).split('\n').map((y) => y.trim()).filter(Boolean).join('\n'), size: 'M', ...turnOf(x) })).filter((x) => x.start !== '');
+    // hand holes: 3 3/4 × 1 1/4 when the sheet gives no size; up/down from top_in when given, else a little above the middle
+    const rowsIn = arr(r.width_panels).map((v) => pin(show(v)));
+    const holes = arr(r.hand_holes).slice(0, 6).filter((x) => x && typeof x === 'object').map((x) => {
+      const wIn = +x.width_in > 0 ? +x.width_in : 3.75, hIn = +x.height_in > 0 ? +x.height_in : 1.25, panel = Math.max(1, parseInt(x.panel, 10) || 1), rowIn = rowsIn[panel - 1];
+      const dy = +x.top_in >= 0 && x.top_in !== null && rowIn > 0 ? Math.max(-0.45, Math.min(0.45, (+x.top_in + hIn / 2) / rowIn - 0.5)) : -0.2;
+      return { kind: 'hole', hole: x.type === 'hinge' ? 'hinge' : 'cut', panel, start: startOf(x, wIn), width: fx(wIn), plen: fx(hIn), dy: Math.round(dy * 10000) / 10000, text: '', turn: x.type === 'hinge' && x.hinge === 'bottom' ? 180 : 0, flip: false };
+    });
     let pp = arr(r.printed_panels).map((x) => parseInt(x, 10)).filter((x) => x >= 1 && (!n || x <= n));
     if (!pp.length) pp = [...new Set(plates.map((p) => p.panel))].sort((a, b) => a - b);
     L = {
@@ -925,7 +947,7 @@ async function readLayout(input) {
       joint: ['stitch', 'tape'].includes(String(r.joint || '').toLowerCase()) ? String(r.joint).toLowerCase() : '', blankW: show(r.blank_width), blankL: show(r.blank_length), print: str(r.print), routing: str(r.routing),
       view: r.view === 'Inside' ? 'Inside' : 'Outside',
       widthPanels: arr(r.width_panels).map(show).join(', '), lengthPanels: arr(r.length_panels).map(show).join(', '),
-      printPanels: pp, plates: [...plates, ...texts], notes: arr(r.notes).map(str).filter(Boolean).join('\n'), changes: arr(r.changes).map(str).filter(Boolean).join('\n'),
+      printPanels: pp, plates: [...plates, ...texts, ...holes], notes: arr(r.notes).map(str).filter(Boolean).join('\n'), changes: arr(r.changes).map(str).filter(Boolean).join('\n'),
       origDate: str(r.original_date), sales: str(r.sales), designer: str(r.designer),
     };
     let bmcMsg = '';
@@ -1065,8 +1087,8 @@ function drawing(d, selIdx = -1, drawH = 270) {
   // A row marked printed with nothing placed on it yet is shaded whole.
   const segs = lp.length ? lp.map((v, j) => [scores[j], scores[j + 1]]) : [[0, totL]];
   const items = (d.plates || []).map((p) => {
-    const st = pin(p.start); if (!isFinite(st) || p.panel < 1 || p.panel > R.length) return null;
-    const w = p.kind === 'plate' && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 1 : textAlongPx(p) / ((x1 - x0) / totL);
+    const st = pin(p.start); if (p.kind === 'hole' || !isFinite(st) || p.panel < 1 || p.panel > R.length) return null; // a hand hole is not print
+    const w = hasW(p) && isFinite(pin(p.width)) && pin(p.width) > 0 ? pin(p.width) : p.kind === 'bmc' ? 1 : textAlongPx(p) / ((x1 - x0) / totL);
     return { row: p.panel - 1, a: st, b: st + w };
   }).filter(Boolean);
   const shadedRows = new Set();
@@ -1139,6 +1161,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
   // plates
   const plates = (d.plates || []).map((p, i) => ({ ...p, i, s: pin(p.start), w: pin(p.width) })).filter((p) => isFinite(p.s) && p.panel >= 1 && p.panel <= R.length);
   const pxIn = (x1 - x0) / totL;
+  const blueLabs = {}; // blue up/down numbers per panel row
   plates.forEach((p) => {
     const r = R[p.panel - 1];
     const m = r.m + Math.max(-0.45, Math.min(0.45, +p.dy || 0)) * r.h; // up/down inside the panel
@@ -1177,7 +1200,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const cx = (xa + xb) / 2, hMax = setH || r.h * 0.9, base = setH || Math.min(r.h * 0.8, 52), bw = xb - xa;
     // a sideways plate runs its lines top to bottom: a line gets the box height, the stack of lines the box width
     const alongMax = side ? hMax : bw, acrossMax = side ? bw : hMax;
-    const raw = String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
+    const raw = p.kind === 'hole' ? [] : String(p.text || '').split('\n').map((x) => x.trim()).filter(Boolean);
     let fs = 9, lines = [];
     if (+p.fsz > 0) { // size typed by hand: keep it, just wrap
       fs = clampFs(p.fsz);
@@ -1208,12 +1231,20 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const txt = p.img
       ? `<image href="${p.img}" x="${(vxa + 2).toFixed(1)}" y="${(vya + 2).toFixed(1)}" width="${Math.max(1, vw - 4).toFixed(1)}" height="${Math.max(1, vh - 4).toFixed(1)}" preserveAspectRatio="${fillLogo(p) ? 'none' : 'xMidYMid meet'}" style="mix-blend-mode:multiply"/>`
       : lines.map((ln, k) => t(p.ta === 'left' ? vxa + 4 : p.ta === 'right' ? vxb - 4 : cx, y1 + k * lh, ln, { size: fs, weight: 600, anchor: p.ta === 'left' ? 'start' : p.ta === 'right' ? 'end' : 'middle' })).join('');
+    if (p.kind === 'hole') o.push(`<g class="ls-plate" data-pi="${p.i}">${holeSvg(p, xa, y, bw, h)}</g>`); else
     o.push(`<g class="ls-plate" data-pi="${p.i}"><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/><g${rot(cx)}>${txt}</g></g>`);
     selBox(xa, y, xb - xa, h);
     // plate length (its width along the sheet): arrow across the plate, under it (or over it when there is no room)
     const pw = pin(p.width);
     let wLab = 0; // width of the plate-size number in the middle, so the blue arrows can sit just beside it
-    if (!p.nodim && !p.nosize && d.plateSizes === 'show' && isFinite(pw) && pw > 0 && xb - xa >= 14) {
+    // hand hole: its size as one label (Width × Length) just under it, or over it when there is no room
+    if (p.kind === 'hole' && !p.nodim && !p.nosize && (pw > 0 || plIn > 0)) {
+      const lab = [pw > 0 ? q(pw) : '?', plIn > 0 ? q(plIn) : '?'].join(' × '), lw = lab.length * 5.2 + 8, ccx = (xa + xb) / 2;
+      const below = y + h + 14 <= r.y + r.h - 2, yl = below ? y + h + 9 : y - 6;
+      o.push(`<rect x="${(ccx - lw / 2).toFixed(1)}" y="${(yl - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="11" fill="#fff" fill-opacity=".9"/>` + t(ccx, yl + 3, lab, { size: 9, weight: 700 }));
+      wLab = lw;
+    }
+    if (!p.nodim && !p.nosize && p.kind !== 'hole' && d.plateSizes === 'show' && isFinite(pw) && pw > 0 && xb - xa >= 14) {
       const below = y + h + 13 <= r.y + r.h - 2, yd = below ? y + h + 7 : y - 7;
       const lab = q(pw), lw = lab.length * 5.4 + 8, ccx = (xa + xb) / 2;
       o.push(`<line x1="${xa.toFixed(1)}" y1="${(below ? y + h + 2 : y - 2).toFixed(1)}" x2="${xa.toFixed(1)}" y2="${(yd + (below ? 3 : -3)).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
@@ -1224,7 +1255,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
       else o.push(t(xb + 3, yd + 3.2, lab, { size: 9, weight: 700, anchor: 'start' })); // narrow plate: number beside the arrow
     }
     // plate length top to bottom: arrow on the right side of the plate (gap arrows on that side start past it)
-    if (!p.nodim && !p.nosize && d.plateSizes === 'show' && isFinite(plIn) && plIn > 0 && h >= 12) {
+    if (!p.nodim && !p.nosize && p.kind !== 'hole' && d.plateSizes === 'show' && isFinite(plIn) && plIn > 0 && h >= 12) {
       const xd = xb + 6;
       o.push(`<line x1="${(xb + 1).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(xd + 3).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${INK}" stroke-width=".6"/><line x1="${(xb + 1).toFixed(1)}" y1="${(y + h).toFixed(1)}" x2="${(xd + 3).toFixed(1)}" y2="${(y + h).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
       o.push(`<line x1="${xd.toFixed(1)}" y1="${(y + 0.5).toFixed(1)}" x2="${xd.toFixed(1)}" y2="${(y + h - 0.5).toFixed(1)}" stroke="${INK}" stroke-width="1" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
@@ -1242,7 +1273,8 @@ function drawing(d, selIdx = -1, drawH = 270) {
         if (gIn < 1 / 32 || yb2 - ya < 6) return;
         o.push(`<line x1="${xv.toFixed(1)}" y1="${(ya + 0.5).toFixed(1)}" x2="${xv.toFixed(1)}" y2="${(yb2 - 0.5).toFixed(1)}" stroke="${BLUE}" stroke-width="1" marker-start="url(#${uid}lab)" marker-end="url(#${uid}lab)"/>`);
         const lab = q(gIn), lw = lab.length * 5.4 + 8, ly = (ya + yb2) / 2;
-        // number to the right of the arrow
+        // number to the right of the arrow (remembered so the red numbers keep clear of it)
+        (blueLabs[p.panel] = blueLabs[p.panel] || []).push({ x1: xv + 3, x2: xv + 3 + lw, y: ly + 3.4 });
         o.push(`<rect x="${(xv + 3).toFixed(1)}" y="${(ly - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="12" fill="#fff" fill-opacity=".9"/>` + t(xv + 3 + lw / 2, ly + 3.4, lab, { size: 9.5, fill: BLUE, weight: 700 }));
       });
     }
@@ -1257,7 +1289,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const row = plates.filter((p) => p.panel === i && !p.skip && !p.nodim).sort((a, b) => a.s - b.s);
     if (!row.length) continue;
     let prevEnd = null, prevDim = 0;
-    const placed = [], botY = R[i - 1].y + R[i - 1].h - 3;
+    const placed = (blueLabs[i] || []).slice(), botY = R[i - 1].y + R[i - 1].h - 3;
     row.forEach((p, k) => {
       const sc = scores.filter((s) => s <= p.s + 1e-6).pop() ?? 0;
       const fromPlate = prevEnd !== null && prevEnd >= sc - 1e-6;
@@ -1280,12 +1312,28 @@ function drawing(d, selIdx = -1, drawH = 270) {
 
 // maxRight: the label must end left of this x (keeps it off the blue top/bottom number beside the plate)
 // placed: labels already put at the top / bottom of this panel row, so a new one never lands on another (it moves to the bottom)
+// Hand hole: a rounded slot. Cut-out = solid cut line, shaded (the board is removed).
+// Hinged = cut on three sides, the straight fold line (dashed) left on, top or bottom.
+function holeSvg(p, x, y, w, h) {
+  const hl = p.hl ? '#ffeb3b' : null, f1 = (v) => v.toFixed(1);
+  if (!isHinge(p)) {
+    const rr = Math.min(h, w) / 2;
+    return `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" rx="${f1(rr)}" fill="${hl || '#d5d9de'}" stroke="#111" stroke-width="1.3"/>`
+      + (w >= 46 && h >= 9 ? `<text x="${f1(x + w / 2)}" y="${f1(y + h / 2 + 2.6)}" text-anchor="middle" font-size="7" font-weight="700" fill="#333" font-family="Arial,sans-serif">HAND HOLE</text>` : '');
+  }
+  const bottom = angleOf(p) === 180, rr = Math.min(h * 0.9, w / 2), yH = bottom ? y + h : y, yF = bottom ? y : y + h, sg = bottom ? -1 : 1;
+  // three cut sides with rounded corners away from the fold
+  const cut = `M${f1(x)} ${f1(yH)} V${f1(yF - sg * rr)} A${f1(rr)} ${f1(rr)} 0 0 ${bottom ? 1 : 0} ${f1(x + rr)} ${f1(yF)} H${f1(x + w - rr)} A${f1(rr)} ${f1(rr)} 0 0 ${bottom ? 1 : 0} ${f1(x + w)} ${f1(yF - sg * rr)} V${f1(yH)}`;
+  return `<path d="${cut} Z" fill="${hl || '#eef1f4'}" stroke="none"/><path d="${cut}" fill="none" stroke="#111" stroke-width="1.3"/>`
+    + `<line x1="${f1(x)}" y1="${f1(yH)}" x2="${f1(x + w)}" y2="${f1(yH)}" stroke="#111" stroke-width="1" stroke-dasharray="4 3"/>`
+    + (w >= 46 && h >= 9 ? `<text x="${f1(x + w / 2)}" y="${f1(y + h / 2 + 2.6)}" text-anchor="middle" font-size="7" font-weight="700" fill="#333" font-family="Arial,sans-serif">HINGED H.H.</text>` : '');
+}
 function gapMark(o, xa, xb, y, label, c, t, arrow, topY = null, maxRight = null, placed = null, botY = null) {
   if (xb - xa < 1.5) return;
   const w = label.length * 5.4 + 8, cx = (xa + xb) / 2;
   if (xb - xa >= 8) o.push(arrow(xa + 1, xb - 1, y, c));
   else o.push(`<line x1="${xa.toFixed(1)}" y1="${y.toFixed(1)}" x2="${xb.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="2"/>`); // too tight for arrowheads
-  if (xb - xa < w + 24) { // short gap: label goes at the top of the panel (clear of the plate) so the arrow stays visible
+  if (xb - xa < w + 14) { // short gap: label goes at the top of the panel (clear of the plate) so the arrow stays visible
     let ly = topY !== null ? Math.min(topY, y - 8) : y - 8;
     const lx = maxRight != null && cx + w / 2 > maxRight ? maxRight - w / 2 : cx;
     const hits = (yy) => placed && placed.some((b) => Math.abs(b.y - yy) < 11 && lx - w / 2 < b.x2 + 2 && lx + w / 2 > b.x1 - 2);

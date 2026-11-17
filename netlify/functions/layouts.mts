@@ -24,7 +24,7 @@ function clean(b: any) {
     panel: Math.max(1, Math.min(20, parseInt(p?.panel, 10) || 1)),
     start: s(p?.start, 20), width: s(p?.width, 20), plen: s(p?.plen, 20), text: s(p?.text, 200), flip: !!p?.flip, nodetail: !!p?.nodetail, keepShape: !!p?.keepShape, nosize: !!p?.nosize, turn: [0, 90, 180, 270].includes(Number(p?.turn)) ? Number(p.turn) : 0, hl: !!p?.hl, nodim: !!p?.nodim, dy: Math.max(-0.45, Math.min(0.45, Number(p?.dy) || 0)), hgt: Math.max(0, Math.min(0.98, Number(p?.hgt) || 0)), ta: ["left", "center", "right"].includes(p?.ta) ? p.ta : "", fsz: Number(p?.fsz) > 0 ? Math.max(4, Math.min(40, Number(p.fsz))) : "",
     img: typeof p?.img === "string" && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(p.img) && p.img.length < 400_000 ? p.img : "",
-    kind: ["plate", "bmc", "text"].includes(p?.kind) ? p.kind : "plate",
+    kind: ["plate", "bmc", "text", "hole"].includes(p?.kind) ? p.kind : "plate", hole: p?.hole === "hinge" ? "hinge" : "cut",
     test: p?.test === "Mullen" ? "Mullen" : "ECT", wall: p?.wall === "double" ? "double" : "single", rating: s(p?.rating, 6), size: ["XS", "S", "M", "L"].includes(p?.size) ? p.size : "M",
   }));
   doc.notes = s(b.notes, 4000);
