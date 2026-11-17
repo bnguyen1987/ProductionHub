@@ -232,7 +232,7 @@ export function render(v) {
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Measurements on the sheet</label><select data-l="units"><option value="">10:05 (inches:sixteenths)</option><option value="frac">10 5/16 (fractions)</option></select></div>
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Glue tab and slots</label><select data-l="glueTab"><option value="">Auto (RSC-type: small 1st length panel)</option><option value="on">Show</option><option value="off">Don't show</option></select></div>
           <div class="field" style="max-width:200px;margin-bottom:10px"><label>Joint</label><select data-l="joint"><option value="">Glue</option><option value="stitch">Stitch</option><option value="tape">Tape</option></select></div>
-          <div class="field" style="max-width:200px;margin-bottom:10px"><label>Plate size measurements</label><select data-l="plateSizes"><option value="">Show</option><option value="off">Hide on all plates</option></select></div>
+          <div class="field" style="max-width:200px;margin-bottom:10px"><label>Plate sizes</label><select data-l="plateSizes"><option value="">In Print Detail</option><option value="show">Print Detail + drawing</option></select></div>
           <div class="lbl" style="margin:4px 0 6px">Printed panels <span class="hint" style="font-weight:500">only the panels with a plate, BMC or text get shaded; a row picked here with nothing on it is shaded whole</span></div>
           <div class="seg" id="lPP"></div>
           <div class="lbl" style="margin:14px 0 6px">Print, BMC and text on the sheet <span class="hint" style="font-weight:500">start = inches from the left edge of the blank</span></div>
@@ -275,6 +275,13 @@ export function render(v) {
       else if (k[0] === 'd') { L.details.splice(n, 1); paintDetails(); }
       update(); return;
     }
+    const szx = e.target.closest('[data-szx]');
+    if (szx) {
+      const ids = szx.dataset.szx.split(',').map(Number), img = (L.plates[ids[0]] || {}).img;
+      L.plates.forEach((p, k) => { if (ids.includes(k) || (img && p.img === img)) p.nosize = true; });
+      paintPlates(); update(); return;
+    }
+    if (e.target.closest('[data-szshow]')) { L.plates.forEach((p) => { delete p.nosize; }); paintPlates(); update(); return; }
     if (e.target.closest('[data-picshow]')) { L.plates.forEach((p) => { delete p.nodetail; }); update(); return; }
     const ed = e.target.closest('[data-edit]');
     if (ed) { openEditor(ed.dataset.edit, ed); return; }
@@ -380,7 +387,7 @@ function paintSelBar() {
         <button type="button" class="btn small" id="lFlip" aria-pressed="${angleOf(p) === 180}">Upside down</button></div>
       <div class="sb-row"><span class="sb-lab">Plate</span>
         <button type="button" class="btn small sb-w1" id="lDims"${dis(isT)}>${p.nodim ? 'Show distances' : 'Hide distances'}</button>
-        <button type="button" class="btn small sb-w1" id="lSize"${dis(!isP)}>${p.nosize ? 'Show plate size' : 'Hide plate size'}</button>
+        <button type="button" class="btn small sb-w1" id="lSize"${dis(!isP)}>${p.nosize ? 'Show size' : 'Hide size'}</button>
         <button type="button" class="btn small sb-w1" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
         <label class="btn small sb-w2${isP ? '' : ' is-off'}">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden id="lSelImg"${dis(!isP)}></label>
         <button type="button" class="btn small" id="lKeep" aria-pressed="${!!p.keepShape}"${dis(!keepOk)} title="Off: the logo fills the plate Width × Length. On: the logo keeps its own shape inside the box.">Keep logo shape</button></div>
@@ -606,7 +613,7 @@ function paintPlates() {
         <label class="chk">Turn <select data-p="turn">${TURNS.map(([a, n]) => `<option value="${a}" ${angleOf(p) === a ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
         <label class="chk"><input type="checkbox" data-p="hl" ${p.hl ? 'checked' : ''}> Highlight</label>
         ${kind !== 'text' ? `<label class="chk"><input type="checkbox" data-p="dims" ${p.nodim ? '' : 'checked'}> Distances</label>` : ''}
-        ${kind === 'plate' ? `<label class="chk"><input type="checkbox" data-p="size" ${p.nosize ? '' : 'checked'}> Plate size</label>` : ''}
+        ${kind === 'plate' ? `<label class="chk"><input type="checkbox" data-p="size" ${p.nosize ? '' : 'checked'}> Show size</label>` : ''}
         <button type="button" class="btn small ghost" data-dup="${i}">Duplicate</button>
         <button type="button" class="btn small ghost danger" data-del="${i}" aria-label="Remove">✕</button>
       </div>
@@ -972,6 +979,33 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
   if (d.detailLogos !== false) (d.plates || []).forEach((p, i) => { if (p.kind === 'plate' && p.img && !seen.has(p.img) && !hiddenLogos.has(p.img)) { seen.add(p.img); pics.push({ img: p.img, caption: '', x: 'l' + i }); /* no automatic caption: the logo speaks for itself */ } });
   (d.details || []).forEach((x, k) => x && x.img && pics.push({ img: x.img, caption: x.caption || '', x: 'd' + k }));
   pics.splice(3);
+  // plate sizes in the Print Detail box: on each logo close-up, and a list for plates with no logo. × hides one (p.nosize).
+  const q = fmtFor(d).q, PL = d.plates || [];
+  const sizeOf = (p) => { const w = pin(p.width), l = pin(p.plen); return { w: isFinite(w) && w > 0 ? w : 0, l: isFinite(l) && l > 0 ? l : 0 }; };
+  const sizeList = [], seenSz = new Map();
+  PL.forEach((p, i) => {
+    if (p.kind !== 'plate' || p.img || p.nosize) return;
+    const { w, l } = sizeOf(p); if (!w && !l) return;
+    const name = String(p.text || 'Plate').split('\n').map((x) => x.trim()).filter(Boolean).join(' ').slice(0, 40) || 'Plate';
+    const key = name + '|' + w + '|' + l;
+    if (seenSz.has(key)) { seenSz.get(key).n++; seenSz.get(key).idx.push(i); return; }
+    const row = { name, sz: w && l ? `${q(w)} × ${q(l)}` : w ? `${q(w)} wide` : `${q(l)} long`, n: 1, idx: [i] };
+    seenSz.set(key, row); sizeList.push(row);
+  });
+  const hiddenSz = PL.filter((p) => p.kind === 'plate' && p.nosize && (sizeOf(p).w || sizeOf(p).l)).length;
+  const picDims = (x) => {
+    if (x.x[0] !== 'l') return null;
+    const p = PL[+x.x.slice(1)]; if (!p || p.nosize) return null;
+    const { w, l } = sizeOf(p), side = angleOf(p) % 180 === 90; // the close-up is upright: a sideways plate's width runs up and down
+    const h = side ? l : w, v = side ? w : l;
+    return h || v ? { h, v, i: +x.x.slice(1) } : null;
+  };
+  const dimFig = (x) => {
+    const dm = picDims(x);
+    const img = `<img src="${x.img}" alt="">`;
+    if (!dm) return img;
+    return `<div class="pd">${img}${dm.v ? `<span class="pd-v"><i></i><b>${q(dm.v)}</b><i></i></span>` : '<span></span>'}${dm.h ? `<span class="pd-h"><i></i><b>${q(dm.h)}</b><i></i></span>` : ''}${opt.print ? '' : `<button type="button" class="ls-szx" data-szx="${dm.i}" title="Hide this size" aria-label="Hide size">×</button>`}</div>`;
+  };
   const allT = Array.isArray(d.detailTexts) ? d.detailTexts : d.detailText ? [d.detailText] : [];
   const dtexts = allT.map((x, k) => ({ x: String(x || ''), k })).filter((o) => o.x.trim()).slice(0, 4);
   const changes = d.changes.split('\n').map((x) => x.trim().replace(/^[-•]\s*/, '')).filter(Boolean);
@@ -987,7 +1021,9 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
     <div class="ls-boxes"${opt.boxesH ? ` style="min-height:${opt.boxesH}px"` : ''}>
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
       <div class="ls-box ls-detail"><div class="ls-bh">PRINT DETAIL (ZOOMED IN)</div>
-        ${pics.length ? `<div class="ls-pics">${pics.map((x) => `<figure>${opt.print ? '' : `<button type="button" class="ls-picx" data-picx="${x.x}" title="Take this picture off the sheet" aria-label="Remove picture">×</button>`}<img src="${x.img}" alt="">${x.caption ? `<figcaption>${esc(x.caption)}</figcaption>` : ''}</figure>`).join('')}</div>` : '<div class="ls-empty ls-nopic">No close-up yet. Add one under "Print detail box", or add a logo to a plate.</div>'}
+        ${pics.length ? `<div class="ls-pics">${pics.map((x) => `<figure>${opt.print ? '' : `<button type="button" class="ls-picx" data-picx="${x.x}" title="Take this picture off the sheet" aria-label="Remove picture">×</button>`}${dimFig(x)}${x.caption ? `<figcaption>${esc(x.caption)}</figcaption>` : ''}</figure>`).join('')}</div>` : '<div class="ls-empty ls-nopic">No close-up yet. Add one under "Print detail box", or add a logo to a plate.</div>'}
+        ${sizeList.length ? `<div class="ls-sizes"><b>Plate sizes (W × L):</b>${sizeList.map((r) => `<span class="ls-sz">${esc(r.name)}${r.n > 1 ? ` (×${r.n})` : ''} — <b>${r.sz}</b>${opt.print ? '' : `<button type="button" class="ls-szx in" data-szx="${r.idx.join(',')}" title="Hide this size" aria-label="Hide size">×</button>`}</span>`).join('')}</div>` : ''}
+        ${!opt.print && hiddenSz ? `<div class="ls-picshow"><button type="button" class="linklike" data-szshow="1">Show ${hiddenSz} hidden size${hiddenSz > 1 ? 's' : ''}</button></div>` : ''}
         ${!opt.print && d.detailLogos !== false && hiddenLogos.size ? `<div class="ls-picshow"><button type="button" class="linklike" data-picshow="1">Show ${hiddenLogos.size} hidden logo${hiddenLogos.size > 1 ? 's' : ''}</button></div>` : ''}
         <div class="ls-dtexts">${dtexts.map((o) => `<div class="ls-dtext" data-edit="dtext:${o.k}">${esc(o.x).replace(/\n/g, '<br>')}</div>`).join('')}${allT.length < 4 ? '<div class="ls-dtext ls-dnew" data-edit="dtext:new"><span class="ls-add">+ add text box</span></div>' : ''}</div></div>
     </div>
@@ -1177,7 +1213,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
     // plate length (its width along the sheet): arrow across the plate, under it (or over it when there is no room)
     const pw = pin(p.width);
     let wLab = 0; // width of the plate-size number in the middle, so the blue arrows can sit just beside it
-    if (!p.nodim && !p.nosize && d.plateSizes !== 'off' && isFinite(pw) && pw > 0 && xb - xa >= 14) {
+    if (!p.nodim && !p.nosize && d.plateSizes === 'show' && isFinite(pw) && pw > 0 && xb - xa >= 14) {
       const below = y + h + 13 <= r.y + r.h - 2, yd = below ? y + h + 7 : y - 7;
       const lab = q(pw), lw = lab.length * 5.4 + 8, ccx = (xa + xb) / 2;
       o.push(`<line x1="${xa.toFixed(1)}" y1="${(below ? y + h + 2 : y - 2).toFixed(1)}" x2="${xa.toFixed(1)}" y2="${(yd + (below ? 3 : -3)).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
@@ -1188,7 +1224,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
       else o.push(t(xb + 3, yd + 3.2, lab, { size: 9, weight: 700, anchor: 'start' })); // narrow plate: number beside the arrow
     }
     // plate length top to bottom: arrow on the right side of the plate (gap arrows on that side start past it)
-    if (!p.nodim && !p.nosize && d.plateSizes !== 'off' && isFinite(plIn) && plIn > 0 && h >= 12) {
+    if (!p.nodim && !p.nosize && d.plateSizes === 'show' && isFinite(plIn) && plIn > 0 && h >= 12) {
       const xd = xb + 6;
       o.push(`<line x1="${(xb + 1).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(xd + 3).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${INK}" stroke-width=".6"/><line x1="${(xb + 1).toFixed(1)}" y1="${(y + h).toFixed(1)}" x2="${(xd + 3).toFixed(1)}" y2="${(y + h).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
       o.push(`<line x1="${xd.toFixed(1)}" y1="${(y + 0.5).toFixed(1)}" x2="${xd.toFixed(1)}" y2="${(y + h - 0.5).toFixed(1)}" stroke="${INK}" stroke-width="1" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);

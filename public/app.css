@@ -523,3 +523,24 @@ details.fold[open]{padding-bottom:16px}
 @media (max-width:600px){.sel-bar .sb-lab{flex-basis:100%}.sel-bar .sb-w1,.sel-bar .sb-w2,.sel-bar .sb-turn{min-width:0}}
 .sel-bar .sb-row.sel-move select{width:auto;flex:0 0 auto}
 .sel-bar .sb-row.sel-move input{width:90px;flex:0 0 auto}
+
+/* Plate sizes in Print Detail: width arrow under the close-up, length arrow beside it */
+.lsheet .ls-pics .pd{position:relative;display:inline-grid;grid-template-columns:minmax(0,auto) 18px;grid-template-rows:auto 16px;max-width:100%;margin:0 auto;vertical-align:bottom}
+.lsheet .ls-pics .pd img,#printSheet .lsheet.ls-print .ls-pics .pd img,.lsheet.ls-print .ls-pics .pd img{width:auto;height:auto;max-width:100%;max-height:180px;object-fit:fill;border:0}
+.lsheet.ls-print .ls-pics .pd img,#printSheet .lsheet.ls-print .ls-pics .pd img{max-height:132px}
+.lsheet .pd-h,.lsheet .pd-v{position:relative;display:flex;align-items:center;justify-content:center}
+.lsheet .pd-h::before{content:'';position:absolute;left:0;right:0;top:50%;border-top:1px solid #222}
+.lsheet .pd-v::before{content:'';position:absolute;top:0;bottom:0;left:50%;border-left:1px solid #222}
+.lsheet .pd-h i,.lsheet .pd-v i{position:absolute;width:0;height:0}
+.lsheet .pd-h i:first-child{left:0;top:calc(50% - 3.5px);border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;border-right:7px solid #222}
+.lsheet .pd-h i:last-child{right:0;top:calc(50% - 3.5px);border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;border-left:7px solid #222}
+.lsheet .pd-v i:first-child{top:0;left:calc(50% - 3.5px);border-left:3.5px solid transparent;border-right:3.5px solid transparent;border-bottom:7px solid #222}
+.lsheet .pd-v i:last-child{bottom:0;left:calc(50% - 3.5px);border-left:3.5px solid transparent;border-right:3.5px solid transparent;border-top:7px solid #222}
+.lsheet .pd-h b,.lsheet .pd-v b{position:relative;background:#fff;color:#111;font:700 10.5px/1 system-ui,Arial,sans-serif;padding:1px 3px}
+.lsheet .pd-v b{writing-mode:vertical-rl;transform:rotate(180deg);padding:3px 1px}
+.lsheet .ls-sizes{display:flex;flex-wrap:wrap;gap:4px 14px;padding:2px 10px 6px;font-size:11px;color:#111}
+.lsheet .ls-sz{display:inline-flex;align-items:center;gap:4px}
+.lsheet .ls-szx{position:absolute;right:-6px;bottom:-6px;width:18px;height:18px;border-radius:50%;border:1px solid #c0392b;background:#fff;color:#c0392b;font:700 12px/15px system-ui,sans-serif;padding:0;cursor:pointer;opacity:.75;z-index:2}
+.lsheet .ls-szx.in{position:static;width:16px;height:16px;font-size:11px;line-height:13px}
+.lsheet .ls-szx:hover,.lsheet .ls-szx:focus-visible{opacity:1;background:#c0392b;color:#fff}
+@media print{.lsheet .ls-szx{display:none}}
