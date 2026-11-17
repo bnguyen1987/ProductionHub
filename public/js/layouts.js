@@ -18,6 +18,7 @@ const INFO = [
 // Fields compared by "Add my edits"
 const TRACK = [['style', 'Style'], ['size', 'Size'], ['board', 'Board'], ['blankW', 'Blank width'], ['blankL', 'Blank length'], ['print', 'Print'], ['routing', 'Routing'], ['widthPanels', 'Panel scores'], ['lengthPanels', 'Length scores']];
 
+let listAll = false; // Saved layouts: false = only the last 3
 let L, view, saved = [], ro = null, sel = -1, undo = null, dragged = false;
 let origFiles = []; // the scan(s) just read, kept in memory until the layout is saved (then stored with it)
 // Undo history: a snapshot after each change (quick changes in a row, like typing, count as one step).
@@ -1518,12 +1519,16 @@ function paintList() {
   const rows = saved.filter((x) => !q || [x.customer, x.fileNo, x.specNo, x.design, x.style].join(' ').toLowerCase().includes(q));
   if (!saved.length) { box.innerHTML = '<p class="hint" style="margin:0">No saved layouts yet.</p>'; return; }
   if (!rows.length) { box.innerHTML = '<p class="hint" style="margin:0">No match.</p>'; return; }
-  box.innerHTML = rows.slice(0, 100).map((x) => `
+  // only the 3 most recent show; a search looks through all of them
+  const SHOW = 3, cut = !q && !listAll && rows.length > SHOW;
+  box.innerHTML = rows.slice(0, cut ? SHOW : 100).map((x) => `
     <div class="lay-item">
       <div><b>${x.specNo ? 'Spec # ' + esc(x.specNo) + ' · ' : ''}${esc(x.customer || 'No customer')}</b><div class="hint">${[!x.specNo && x.fileNo && 'File # ' + x.fileNo, x.design, x.style].filter(Boolean).map(esc).join(' · ')}</div>
         <div class="hint">${esc(x.updatedBy || '')}${x.updatedAt ? ' · ' + new Date(x.updatedAt).toLocaleDateString() : ''}</div></div>
       <div class="btn-row"><button type="button" class="btn small" data-open="${esc(x.id)}">Open</button><button type="button" class="btn small ghost danger" data-rm="${esc(x.id)}" aria-label="Delete">✕</button></div>
-    </div>`).join('');
+    </div>`).join('') + (cut ? `<button type="button" class="btn small ghost" id="lListAll" style="margin-top:6px">Show all ${rows.length} saved layouts</button>`
+      : !q && listAll && rows.length > SHOW ? `<button type="button" class="btn small ghost" id="lListAll" style="margin-top:6px">Show only the last ${SHOW}</button>` : '');
+  if ($('#lListAll')) $('#lListAll').onclick = () => { listAll = !listAll; paintList(); };
   $$('[data-open]', box).forEach((b) => b.onclick = async () => {
     try {
       const { layout } = await api('/api/layouts?id=' + encodeURIComponent(b.dataset.open));

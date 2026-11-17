@@ -653,6 +653,8 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^Show all (\d+) saved layouts$/, 'Mostrar los $1 diseños guardados'],
+  [/^Show only the last (\d+)$/, 'Mostrar solo los últimos $1'],
   [/^Saved as Spec # (.+?)( \(replaced the saved sheet with that Spec #; the old one is under Versions\))?\. Anyone can open it from Saved layouts\.$/, (m, n, r) => `Guardado como Spec # ${n}${r ? ' (reemplazó la hoja guardada con ese Spec #; la anterior está en Versiones)' : ''}. Cualquiera lo puede abrir en Diseños guardados.`],
   [/^Show (\d+) hidden logos?$/, 'Mostrar $1 logo(s) oculto(s)'],
   [/^View (.+\.(?:pdf|jpe?g|png|webp|gif|heic))$/i, 'Ver $1'],
