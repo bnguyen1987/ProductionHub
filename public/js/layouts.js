@@ -1176,12 +1176,14 @@ function drawing(d, selIdx = -1, drawH = 270) {
     selBox(xa, y, xb - xa, h);
     // plate length (its width along the sheet): arrow across the plate, under it (or over it when there is no room)
     const pw = pin(p.width);
+    let wLab = 0; // width of the plate-size number in the middle, so the blue arrows can sit just beside it
     if (!p.nodim && !p.nosize && d.plateSizes !== 'off' && isFinite(pw) && pw > 0 && xb - xa >= 14) {
       const below = y + h + 13 <= r.y + r.h - 2, yd = below ? y + h + 7 : y - 7;
       const lab = q(pw), lw = lab.length * 5.4 + 8, ccx = (xa + xb) / 2;
       o.push(`<line x1="${xa.toFixed(1)}" y1="${(below ? y + h + 2 : y - 2).toFixed(1)}" x2="${xa.toFixed(1)}" y2="${(yd + (below ? 3 : -3)).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
       o.push(`<line x1="${xb.toFixed(1)}" y1="${(below ? y + h + 2 : y - 2).toFixed(1)}" x2="${xb.toFixed(1)}" y2="${(yd + (below ? 3 : -3)).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
       o.push(arrow(xa + 0.5, xb - 0.5, yd, INK));
+      if (xb - xa >= lw + 10) wLab = lw;
       if (xb - xa >= lw + 10) o.push(`<rect x="${(ccx - lw / 2).toFixed(1)}" y="${(yd - 5.5).toFixed(1)}" width="${lw.toFixed(1)}" height="11" fill="#fff"/>` + t(ccx, yd + 3.2, lab, { size: 9, weight: 700 }));
       else o.push(t(xb + 3, yd + 3.2, lab, { size: 9, weight: 700, anchor: 'start' })); // narrow plate: number beside the arrow
     }
@@ -1197,14 +1199,14 @@ function drawing(d, selIdx = -1, drawH = 270) {
     // blue distances from the plate up to the panel's top score and down to its bottom score (left of the plate, clear of the other arrows).
     // They belong to "distances", not to the plate size, so hiding the plate size keeps them.
     if (!p.nodim && isFinite(plIn) && plIn > 0 && h >= 12) {
-      const pxPerIn = r.h / rowIn, xv = xa - 8;
-      p.vdim = true;
+      // in the middle of the plate (just right of the plate-size number when it is shown)
+      const pxPerIn = r.h / rowIn, xv = (xa + xb) / 2 + (wLab ? wLab / 2 + 6 : 0);
       [[r.y, y], [y + h, r.y + r.h]].forEach(([ya, yb2]) => {
         const gIn = (yb2 - ya) / pxPerIn;
         if (gIn < 1 / 32 || yb2 - ya < 6) return;
         o.push(`<line x1="${xv.toFixed(1)}" y1="${(ya + 0.5).toFixed(1)}" x2="${xv.toFixed(1)}" y2="${(yb2 - 0.5).toFixed(1)}" stroke="${BLUE}" stroke-width="1" marker-start="url(#${uid}lab)" marker-end="url(#${uid}lab)"/>`);
         const lab = q(gIn), lw = lab.length * 5.4 + 8, ly = (ya + yb2) / 2;
-        // number to the right of the arrow (over the plate's open space), away from the red distances on the left
+        // number to the right of the arrow
         o.push(`<rect x="${(xv + 3).toFixed(1)}" y="${(ly - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="12" fill="#fff" fill-opacity=".9"/>` + t(xv + 3 + lw / 2, ly + 3.4, lab, { size: 9.5, fill: BLUE, weight: 700 }));
       });
     }
