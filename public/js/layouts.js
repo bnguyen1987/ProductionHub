@@ -1193,7 +1193,10 @@ function drawing(d, selIdx = -1, drawH = 270) {
       const lab = q(plIn);
       o.push(`<rect x="${(xd - 6).toFixed(1)}" y="${(m - lab.length * 2.7 - 4).toFixed(1)}" width="12" height="${(lab.length * 5.4 + 8).toFixed(1)}" fill="#fff"/>` + t(xd + 3.2, m, lab, { size: 9, weight: 700, tr: `rotate(-90 ${(xd + 3.2).toFixed(1)} ${m.toFixed(1)})` }));
       p.dimR = 14;
-      // red distances from the plate up to the panel's top score and down to its bottom score (left of the plate, clear of the other arrows)
+    }
+    // blue distances from the plate up to the panel's top score and down to its bottom score (left of the plate, clear of the other arrows).
+    // They belong to "distances", not to the plate size, so hiding the plate size keeps them.
+    if (!p.nodim && isFinite(plIn) && plIn > 0 && h >= 12) {
       const pxPerIn = r.h / rowIn, xv = xa - 8;
       p.vdim = true;
       [[r.y, y], [y + h, r.y + r.h]].forEach(([ya, yb2]) => {
