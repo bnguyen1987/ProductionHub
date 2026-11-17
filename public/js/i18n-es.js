@@ -201,6 +201,7 @@ export const ES = {
   'Plate size': 'Tamaño del grabado', 'Hide plate size': 'Ocultar tamaño', 'Show plate size': 'Mostrar tamaño', 'Plate size measurements': 'Medidas del grabado', Show: 'Mostrar', 'Hide on all plates': 'Ocultar en todos',
   'Plate sizes': 'Tamaños de grabado', 'In Print Detail': 'En detalle de impresión', 'Print Detail + drawing': 'Detalle + dibujo', 'Hide size': 'Ocultar tamaño', 'Show size': 'Mostrar tamaño', 'Hide this size': 'Ocultar este tamaño',
   'Plate #': 'Grabado #', 'PLATE #': 'GRABADO #',
+  'Add a Spec # or customer first.': 'Primero agregue Spec # o cliente.', 'Search Spec #, customer': 'Buscar Spec #, cliente',
   Turn: 'Girar', 'Turn 90°': 'Girar 90°', Upright: 'Derecho', 'Sideways ↓': 'De lado ↓', 'Sideways ↑': 'De lado ↑',
   '(Upright)': '(Derecho)', '(Sideways ↓)': '(De lado ↓)', '(Upside down)': '(Al revés)', '(Sideways ↑)': '(De lado ↑)',
   'Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)': 'Girar el texto un cuarto de vuelta (derecho → de lado ↓ → al revés → de lado ↑)',
@@ -651,6 +652,7 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^Saved as Spec # (.+?)( \(replaced the saved sheet with that Spec #; the old one is under Versions\))?\. Anyone can open it from Saved layouts\.$/, (m, n, r) => `Guardado como Spec # ${n}${r ? ' (reemplazó la hoja guardada con ese Spec #; la anterior está en Versiones)' : ''}. Cualquiera lo puede abrir en Diseños guardados.`],
   [/^Show (\d+) hidden logos?$/, 'Mostrar $1 logo(s) oculto(s)'],
   [/^View (.+\.(?:pdf|jpe?g|png|webp|gif|heic))$/i, 'Ver $1'],
   [/^Earlier saves of this layout \(newest first, last (\d+)\)\. Opening one does not change anything until you press Save\.$/, 'Versiones anteriores de este diseño (la más reciente primero, últimas $1). Abrir una no cambia nada hasta que presione Guardar.'],

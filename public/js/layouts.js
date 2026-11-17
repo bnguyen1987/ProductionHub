@@ -179,7 +179,7 @@ export function render(v) {
         </section>
         <section class="card">
           <h2>Saved layouts</h2>
-          <input type="search" id="lFind" placeholder="Search customer, file #, design" aria-label="Search saved layouts">
+          <input type="search" id="lFind" placeholder="Search Spec #, customer" aria-label="Search saved layouts">
           <div id="lList" style="margin-top:10px"><div class="hint"><span class="spinner"></span> Loading…</div></div>
         </section>
       </div>
@@ -1354,7 +1354,7 @@ function printSheet() {
   }
   // the browser uses the page title as the PDF file name: "668565 Fabri-Cote"
   const oldTitle = document.title;
-  const fname = [L.fileNo && String(L.fileNo).trim(), String(L.customer || '').split(/[,\n]/)[0].trim()].filter(Boolean).join(' ').replace(/[\\/:*?"<>|#%]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const fname = [(L.specNo || L.fileNo) && String(L.specNo || L.fileNo).trim(), String(L.customer || '').split(/[,\n]/)[0].trim()].filter(Boolean).join(' ').replace(/[\\/:*?"<>|#%]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
   if (fname) {
     document.title = fname;
     const back = () => { document.title = oldTitle; window.removeEventListener('afterprint', back); };
@@ -1424,8 +1424,11 @@ async function save() {
   const name = $('#lName').value.trim();
   const msg = $('#lSaveMsg');
   if (!name) { msg.innerHTML = '<div class="alert warn">Type your name to save.</div>'; $('#lName').focus(); return; }
-  if (!L.customer && !L.fileNo && !L.design) { msg.innerHTML = '<div class="alert warn">Add a customer, file # or design no. first.</div>'; return; }
+  if (!L.customer && !L.specNo && !L.fileNo && !L.design) { msg.innerHTML = '<div class="alert warn">Add a Spec # or customer first.</div>'; return; }
   saveForm('layout_name', name);
+  // the Spec # is the key: a new sheet with the Spec # of a saved one is saved over it (the old one stays under Versions)
+  const sameSpec = !L.id && L.specNo && saved.find((x) => String(x.specNo || '').trim().toLowerCase() === String(L.specNo).trim().toLowerCase());
+  if (sameSpec) L.id = sameSpec.id;
   if (!L.id) L.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const btn = $('#lSave'); btn.disabled = true;
   try {
@@ -1447,7 +1450,7 @@ async function save() {
     origFiles = [];
     saveForm('layout', L);
     paintOrig();
-    msg.innerHTML = `<div class="alert ok">Saved. Anyone can open it from Saved layouts.${kept ? ` The original scan is kept with it.` : ''}${skipped.length ? ` <br>Too big to keep the original: ${skipped.map(esc).join(', ')} (over 4 MB).` : ''}</div>`;
+    msg.innerHTML = `<div class="alert ok">Saved${L.specNo ? ` as Spec # ${esc(L.specNo)}` : ''}${sameSpec ? ' (replaced the saved sheet with that Spec #; the old one is under Versions)' : ''}. Anyone can open it from Saved layouts.${kept ? ` The original scan is kept with it.` : ''}${skipped.length ? ` <br>Too big to keep the original: ${skipped.map(esc).join(', ')} (over 4 MB).` : ''}</div>`;
     $('#lVers').innerHTML = '';
     loadList();
   } catch (e) { msg.innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
@@ -1468,7 +1471,7 @@ function paintList() {
   if (!rows.length) { box.innerHTML = '<p class="hint" style="margin:0">No match.</p>'; return; }
   box.innerHTML = rows.slice(0, 100).map((x) => `
     <div class="lay-item">
-      <div><b>${esc(x.customer || 'No customer')}</b><div class="hint">${[x.fileNo && 'File # ' + x.fileNo, x.design, x.style].filter(Boolean).map(esc).join(' · ')}</div>
+      <div><b>${x.specNo ? 'Spec # ' + esc(x.specNo) + ' · ' : ''}${esc(x.customer || 'No customer')}</b><div class="hint">${[!x.specNo && x.fileNo && 'File # ' + x.fileNo, x.design, x.style].filter(Boolean).map(esc).join(' · ')}</div>
         <div class="hint">${esc(x.updatedBy || '')}${x.updatedAt ? ' · ' + new Date(x.updatedAt).toLocaleDateString() : ''}</div></div>
       <div class="btn-row"><button type="button" class="btn small" data-open="${esc(x.id)}">Open</button><button type="button" class="btn small ghost danger" data-rm="${esc(x.id)}" aria-label="Delete">✕</button></div>
     </div>`).join('');
