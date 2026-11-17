@@ -353,23 +353,34 @@ function paintSelBar() {
   if (p) {
     const what = p.kind === 'bmc' ? `<b>Selected BMC:</b> P${p.panel} · ${esc(bmcLabel(p))}` : `<b>${p.kind === 'text' ? 'Selected text:' : 'Selected print:'}</b> P${p.panel}${p.text ? ' · ' + esc(String(p.text).replace(/\s+/g, ' ').slice(0, 70)) + (String(p.text).length > 70 ? '…' : '') : ''}`;
     const nP = Math.max(1, nums(L.widthPanels).length, p.panel);
-    bar.innerHTML = `<span>${what}</span>
-      <span class="btn-row sel-move"><span class="hint">Move:</span>
+    // Same rows and the same buttons for every item: a button that does not apply is greyed out, never removed,
+    // so nothing jumps around when you click from a plate to a BMC or text.
+    const isB = p.kind === 'bmc', isT = p.kind === 'text', isP = p.kind === 'plate';
+    const dis = (off) => (off ? ' disabled' : '');
+    const ta = p.ta || (isT ? 'left' : 'center');
+    const keepOk = isP && p.img && pin(p.width) > 0 && pin(p.plen) > 0;
+    bar.innerHTML = `<div class="sb-title">${what}</div>
+      <div class="sb-row sel-move"><span class="sb-lab">Move</span>
         <select id="lMvP" aria-label="Panel">${Array.from({ length: nP }, (_, k) => `<option value="${k + 1}" ${p.panel === k + 1 ? 'selected' : ''}>P${k + 1}</option>`).join('')}</select>
         <button type="button" class="btn small" id="lMvL" aria-label="Move left">◀</button>
         <input type="text" id="lMvS" value="${esc(show(p.start))}" aria-label="Start in inches from the left edge" title="Inches from the left edge of the blank">
         <button type="button" class="btn small" id="lMvR" aria-label="Move right">▶</button>
         <button type="button" class="btn small" id="lMvU" aria-label="Move up">▲</button><button type="button" class="btn small" id="lMvD" aria-label="Move down">▼</button>
-        <button type="button" class="btn small" id="lCtrH" title="Center left-right in its panel">Center ↔</button><button type="button" class="btn small" id="lCtrV" title="Center top-to-bottom in its panel">Center ↕</button></span>
-      <span class="btn-row sel-move sel-space"><span class="hint">Space (in):</span>${[['left', 'Left', '#c0392b'], ['right', 'Right', '#c0392b'], ['top', 'Top', '#1565c0'], ['bottom', 'Bottom', '#1565c0']].map(([k, n, c]) => `<label style="color:${c}">${n} <input type="text" data-space="${k}" aria-label="${n} space in inches" title="Type the inches (3:05, 3 5/16 or 3.31) and press Enter"></label>`).join('')}</span>
-      ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Font:</span><button type="button" class="btn small" id="lFsDn" aria-label="Smaller text">A−</button><span class="fs-val">${p.kind === 'text' ? textFs(p) : +p.fsz > 0 ? p.fsz : 'Auto'}</span><button type="button" class="btn small" id="lFsUp" aria-label="Bigger text">A+</button>${p.kind === 'plate' && +p.fsz > 0 ? '<button type="button" class="btn small ghost" id="lFsAuto">Auto</button>' : ''}</span>` : ''}
-      ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Text:</span>${['left', 'center', 'right'].map((a) => `<button type="button" class="btn small" data-ta="${a}" aria-pressed="${(p.ta || (p.kind === 'text' ? 'left' : 'center')) === a}">${a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right'}</button>`).join('')}</span>` : ''}
-      <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
-      <button type="button" class="btn small" id="lTurn" title="Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)">Turn 90° <span class="hint">(${TURNS.find(([a]) => a === angleOf(p))[1]})</span></button>
-      <button type="button" class="btn small" id="lFlip" aria-pressed="${angleOf(p) === 180}">Upside down</button>
-      ${p.kind === 'plate' ? `<label class="btn small">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden id="lSelImg"></label>` : ''}
-      ${p.kind === 'plate' && p.img && pin(p.width) > 0 && pin(p.plen) > 0 ? `<button type="button" class="btn small" id="lKeep" aria-pressed="${!!p.keepShape}" title="Off: the logo fills the plate Width × Length. On: the logo keeps its own shape inside the box.">Keep logo shape</button>` : ''}
-      <button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></span>`;
+        <button type="button" class="btn small" id="lCtrH" title="Center left-right in its panel">Center ↔</button><button type="button" class="btn small" id="lCtrV" title="Center top-to-bottom in its panel">Center ↕</button></div>
+      <div class="sb-row sel-space"><span class="sb-lab">Space (in)</span>${[['left', 'Left', '#c0392b'], ['right', 'Right', '#c0392b'], ['top', 'Top', '#1565c0'], ['bottom', 'Bottom', '#1565c0']].map(([k, n, c]) => `<label style="color:${c}">${n} <input type="text" data-space="${k}" aria-label="${n} space in inches" title="Type the inches (3:05, 3 5/16 or 3.31) and press Enter"></label>`).join('')}</div>
+      <div class="sb-row"><span class="sb-lab">Text</span>
+        <button type="button" class="btn small" id="lFsDn" aria-label="Smaller text"${dis(isB)}>A−</button><span class="fs-val">${isB ? '–' : isT ? textFs(p) : +p.fsz > 0 ? p.fsz : 'Auto'}</span><button type="button" class="btn small" id="lFsUp" aria-label="Bigger text"${dis(isB)}>A+</button><button type="button" class="btn small ghost" id="lFsAuto"${dis(!(isP && +p.fsz > 0))}>Auto</button>
+        <span class="sb-gap"></span>${['left', 'center', 'right'].map((a) => `<button type="button" class="btn small" data-ta="${a}" aria-pressed="${!isB && ta === a}"${dis(isB)}>${a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right'}</button>`).join('')}
+        <span class="sb-gap"></span><button type="button" class="btn small" id="lEditSel"${dis(isB)}>Edit text</button></div>
+      <div class="sb-row"><span class="sb-lab">Turn</span>
+        <button type="button" class="btn small sb-turn" id="lTurn" title="Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)">Turn 90° <span class="hint">(${TURNS.find(([a]) => a === angleOf(p))[1]})</span></button>
+        <button type="button" class="btn small" id="lFlip" aria-pressed="${angleOf(p) === 180}">Upside down</button></div>
+      <div class="sb-row"><span class="sb-lab">Plate</span>
+        <button type="button" class="btn small sb-w1" id="lDims"${dis(isT)}>${p.nodim ? 'Show distances' : 'Hide distances'}</button>
+        <button type="button" class="btn small sb-w1" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
+        <label class="btn small sb-w2${isP ? '' : ' is-off'}">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden id="lSelImg"${dis(!isP)}></label>
+        <button type="button" class="btn small" id="lKeep" aria-pressed="${!!p.keepShape}"${dis(!keepOk)} title="Off: the logo fills the plate Width × Length. On: the logo keeps its own shape inside the box.">Keep logo shape</button></div>
+      <div class="sb-row sb-end"><button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></div>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
     $('#lMvP').onchange = (e) => { p.panel = +e.target.value; p.dy = 0; paintPlates(); update(); };
     $('#lMvL').onclick = () => nudge(-0.5);

@@ -196,7 +196,7 @@ export const ES = {
   'Take this picture off the sheet': 'Quitar esta imagen de la hoja', 'Remove picture': 'Quitar imagen',
   'Keep logo shape': 'Mantener forma del logo', 'Off: the logo fills the plate Width × Length. On: the logo keeps its own shape inside the box.': 'Apagado: el logo llena el Ancho × Largo del grabado. Encendido: el logo mantiene su forma dentro del cuadro.',
   Joint: 'Unión', Glue: 'Pegado', Stitch: 'Grapado', Tape: 'Cinta',
-  'Space (in):': 'Espacio (pulg):', Left: 'Izquierda', Right: 'Derecha', Top: 'Arriba', Bottom: 'Abajo',
+  'Space (in):': 'Espacio (pulg):', 'Space (in)': 'Espacio (pulg)', Move: 'Mover', Plate: 'Grabado', Text: 'Texto', Left: 'Izquierda', Right: 'Derecha', Top: 'Arriba', Bottom: 'Abajo',
   'Type the inches (3:05, 3 5/16 or 3.31) and press Enter': 'Escriba las pulgadas (3:05, 3 5/16 o 3.31) y presione Enter',
   Turn: 'Girar', 'Turn 90°': 'Girar 90°', Upright: 'Derecho', 'Sideways ↓': 'De lado ↓', 'Sideways ↑': 'De lado ↑',
   '(Upright)': '(Derecho)', '(Sideways ↓)': '(De lado ↓)', '(Upside down)': '(Al revés)', '(Sideways ↑)': '(De lado ↑)',

@@ -505,3 +505,21 @@ details.fold[open]{padding-bottom:16px}
 /* Space boxes in the selection bar: type the inches left / right / top / bottom */
 .sel-space label{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700}
 .sel-space input{width:58px;padding:3px 5px;font-size:13px}
+
+/* Selection bar: fixed rows, same buttons in the same places for every item */
+.sel-bar:has(.sb-row){display:block}
+.sel-bar .sb-title{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}
+.sel-bar .sb-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:3px 0}
+.sel-bar .sb-row+.sb-row{border-top:1px solid color-mix(in srgb,var(--accent) 18%,transparent)}
+.sel-bar .sb-lab{flex:0 0 84px;font-size:12px;font-weight:700;color:var(--muted,#6b7280);text-transform:uppercase;letter-spacing:.03em}
+.sel-bar .sb-gap{width:10px}
+.sel-bar .sb-w1{min-width:150px}
+.sel-bar .sb-w2{min-width:130px;text-align:center;justify-content:center}
+.sel-bar .sb-turn{min-width:205px;justify-content:flex-start}
+.sel-bar .sb-end{justify-content:flex-end}
+.sel-bar .btn:disabled,.sel-bar .btn.is-off{opacity:.38;cursor:not-allowed;pointer-events:none}
+.sel-bar #lKeep[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.sel-bar .sel-space input{width:62px;min-height:34px;padding:4px 6px}
+@media (max-width:600px){.sel-bar .sb-lab{flex-basis:100%}.sel-bar .sb-w1,.sel-bar .sb-w2,.sel-bar .sb-turn{min-width:0}}
+.sel-bar .sb-row.sel-move select{width:auto;flex:0 0 auto}
+.sel-bar .sb-row.sel-move input{width:90px;flex:0 0 auto}
