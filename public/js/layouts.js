@@ -1188,6 +1188,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
       p.dimR = 14;
       // red distances from the plate up to the panel's top score and down to its bottom score (left of the plate, clear of the other arrows)
       const pxPerIn = r.h / rowIn, xv = xa - 8;
+      p.vdim = true;
       [[r.y, y], [y + h, r.y + r.h]].forEach(([ya, yb2]) => {
         const gIn = (yb2 - ya) / pxPerIn;
         if (gIn < 1 / 32 || yb2 - ya < 6) return;
@@ -1208,17 +1209,20 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const row = plates.filter((p) => p.panel === i && !p.skip && !p.nodim).sort((a, b) => a.s - b.s);
     if (!row.length) continue;
     let prevEnd = null, prevDim = 0;
+    const placed = [], botY = R[i - 1].y + R[i - 1].h - 3;
     row.forEach((p, k) => {
       const sc = scores.filter((s) => s <= p.s + 1e-6).pop() ?? 0;
       const fromPlate = prevEnd !== null && prevEnd >= sc - 1e-6;
       const a = fromPlate ? prevEnd : sc;
       const gap = p.s - a;
       const y = p.cy, topY = R[i - 1].y + 10;
-      if (gap > 0.01) gapMark(o, X(a) + (fromPlate ? prevDim : 0), p.xa, y, q(gap), RED, t, arrow, topY);
+      // start past the previous plate's Length dimension when there is room, else at the plate edge itself
+      const xs = X(a) + (fromPlate && p.xa - (X(a) + prevDim) >= 8 ? prevDim : 0);
+      if (gap > 0.01) gapMark(o, xs, p.xa, y, q(gap), RED, t, arrow, topY, p.vdim ? p.xa - 12 : null, placed, botY);
       prevEnd = Math.max(prevEnd ?? -Infinity, p.e); prevDim = p.dimR || 0;
       // gap to the next score, when that score comes before the next plate
       const next = row[k + 1], scR = scores.find((s) => s >= p.e - 1e-6) ?? totL;
-      if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01) { gapMark(o, p.xb, X(scR), y, q(scR - p.e), RED, t, arrow, topY); prevEnd = scR; prevDim = 0; }
+      if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01) { gapMark(o, X(scR) - p.xb >= 8 ? p.xb : p.xb - (p.dimR || 0), X(scR), y, q(scR - p.e), RED, t, arrow, topY, null, placed, botY); prevEnd = scR; prevDim = 0; }
     });
   }
 
@@ -1226,15 +1230,23 @@ function drawing(d, selIdx = -1, drawH = 270) {
   return `<svg class="ls-svg" data-x0="${x0}" data-x1="${x1}" data-totl="${totL}" data-rowsin="${rows.join(',')}" data-rows="${R.map((r) => r.y.toFixed(1) + ',' + r.h.toFixed(1)).join(';')}" viewBox="0 0 1000 ${yb + 36}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif"><defs>${mk(uid + 'lak', INK)}${mk(uid + 'lar', RED)}${mk(uid + 'lab', BLUE)}</defs>${o.join('')}</svg>`;
 }
 
-function gapMark(o, xa, xb, y, label, c, t, arrow, topY = null) {
-  if (xb - xa < 8) return;
-  o.push(arrow(xa + 1, xb - 1, y, c));
+// maxRight: the label must end left of this x (keeps it off the blue top/bottom number beside the plate)
+// placed: labels already put at the top / bottom of this panel row, so a new one never lands on another (it moves to the bottom)
+function gapMark(o, xa, xb, y, label, c, t, arrow, topY = null, maxRight = null, placed = null, botY = null) {
+  if (xb - xa < 1.5) return;
   const w = label.length * 5.4 + 8, cx = (xa + xb) / 2;
+  if (xb - xa >= 8) o.push(arrow(xa + 1, xb - 1, y, c));
+  else o.push(`<line x1="${xa.toFixed(1)}" y1="${y.toFixed(1)}" x2="${xb.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="2"/>`); // too tight for arrowheads
   if (xb - xa < w + 24) { // short gap: label goes at the top of the panel (clear of the plate) so the arrow stays visible
-    const ly = topY !== null ? Math.min(topY, y - 8) : y - 8;
-    o.push(`<rect x="${(cx - w / 2).toFixed(1)}" y="${(ly - 9).toFixed(1)}" width="${w.toFixed(1)}" height="11" fill="#fff" fill-opacity=".85"/>`);
-    o.push(t(cx, ly, label, { size: 9, fill: c, weight: 700 }));
-    if (y - ly > 14) o.push(`<line x1="${cx.toFixed(1)}" y1="${(ly + 2).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(y - 2).toFixed(1)}" stroke="${c}" stroke-width=".6" stroke-dasharray="2 2"/>`);
+    let ly = topY !== null ? Math.min(topY, y - 8) : y - 8;
+    const lx = maxRight != null && cx + w / 2 > maxRight ? maxRight - w / 2 : cx;
+    const hits = (yy) => placed && placed.some((b) => Math.abs(b.y - yy) < 11 && lx - w / 2 < b.x2 + 2 && lx + w / 2 > b.x1 - 2);
+    if (hits(ly) && botY !== null && !hits(botY)) ly = botY;
+    if (placed) placed.push({ x1: lx - w / 2, x2: lx + w / 2, y: ly });
+    o.push(`<rect x="${(lx - w / 2).toFixed(1)}" y="${(ly - 9).toFixed(1)}" width="${w.toFixed(1)}" height="11" fill="#fff" fill-opacity=".85"/>`);
+    o.push(t(lx, ly, label, { size: 9, fill: c, weight: 700 }));
+    const below = ly > y;
+    if (Math.abs(y - ly) > 14 || lx !== cx) o.push(`<line x1="${lx.toFixed(1)}" y1="${(below ? ly - 10 : ly + 2).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(below ? y + 2 : y - 2).toFixed(1)}" stroke="${c}" stroke-width=".6" stroke-dasharray="2 2"/>`);
     return;
   }
   o.push(`<rect x="${(cx - w / 2).toFixed(1)}" y="${(y - 6.5).toFixed(1)}" width="${w.toFixed(1)}" height="13" fill="#fff"/>`);
