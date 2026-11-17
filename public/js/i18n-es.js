@@ -198,6 +198,7 @@ export const ES = {
   Joint: 'Unión', Glue: 'Pegado', Stitch: 'Grapado', Tape: 'Cinta',
   'Space (in):': 'Espacio (pulg):', 'Space (in)': 'Espacio (pulg)', Move: 'Mover', Plate: 'Grabado', Text: 'Texto', Left: 'Izquierda', Right: 'Derecha', Top: 'Arriba', Bottom: 'Abajo',
   'Type the inches (3:05, 3 5/16 or 3.31) and press Enter': 'Escriba las pulgadas (3:05, 3 5/16 o 3.31) y presione Enter',
+  'Plate size': 'Tamaño del grabado', 'Hide plate size': 'Ocultar tamaño', 'Show plate size': 'Mostrar tamaño', 'Plate size measurements': 'Medidas del grabado', Show: 'Mostrar', 'Hide on all plates': 'Ocultar en todos',
   Turn: 'Girar', 'Turn 90°': 'Girar 90°', Upright: 'Derecho', 'Sideways ↓': 'De lado ↓', 'Sideways ↑': 'De lado ↑',
   '(Upright)': '(Derecho)', '(Sideways ↓)': '(De lado ↓)', '(Upside down)': '(Al revés)', '(Sideways ↑)': '(De lado ↑)',
   'Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)': 'Girar el texto un cuarto de vuelta (derecho → de lado ↓ → al revés → de lado ↑)',

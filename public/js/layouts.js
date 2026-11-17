@@ -7,7 +7,7 @@ import { pageCanvas } from './dieline.js';
 const today = () => { const d = new Date(); return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`; };
 const EMPTY = () => ({
   id: '', customer: '', shipTo: '', fileNo: '', specNo: '', design: '', ident: '', style: '', size: '', board: '',
-  joint: '', blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
+  joint: '', plateSizes: '', blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
   printPanels: [], plates: [], notes: '', changes: '', detailTexts: [], details: [], detailLogos: true, origDate: '', revDate: today(), sales: '', designer: '', approved: '', orig: null,
 });
 const INFO = [
@@ -130,6 +130,8 @@ function setSpace(p, side, v) {
   } else return false;
   return true;
 }
+
+
 const angleOf = (p) => (((+p.turn || 0) + (p.flip ? 180 : 0)) % 360 + 360) % 360;
 function setAngle(p, a) { p.turn = ((+a % 360) + 360) % 360; p.flip = false; }
 const TURNS = [[0, 'Upright'], [90, 'Sideways ↓'], [180, 'Upside down'], [270, 'Sideways ↑']];
@@ -230,6 +232,7 @@ export function render(v) {
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Measurements on the sheet</label><select data-l="units"><option value="">10:05 (inches:sixteenths)</option><option value="frac">10 5/16 (fractions)</option></select></div>
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Glue tab and slots</label><select data-l="glueTab"><option value="">Auto (RSC-type: small 1st length panel)</option><option value="on">Show</option><option value="off">Don't show</option></select></div>
           <div class="field" style="max-width:200px;margin-bottom:10px"><label>Joint</label><select data-l="joint"><option value="">Glue</option><option value="stitch">Stitch</option><option value="tape">Tape</option></select></div>
+          <div class="field" style="max-width:200px;margin-bottom:10px"><label>Plate size measurements</label><select data-l="plateSizes"><option value="">Show</option><option value="off">Hide on all plates</option></select></div>
           <div class="lbl" style="margin:4px 0 6px">Printed panels <span class="hint" style="font-weight:500">only the panels with a plate, BMC or text get shaded; a row picked here with nothing on it is shaded whole</span></div>
           <div class="seg" id="lPP"></div>
           <div class="lbl" style="margin:14px 0 6px">Print, BMC and text on the sheet <span class="hint" style="font-weight:500">start = inches from the left edge of the blank</span></div>
@@ -377,6 +380,7 @@ function paintSelBar() {
         <button type="button" class="btn small" id="lFlip" aria-pressed="${angleOf(p) === 180}">Upside down</button></div>
       <div class="sb-row"><span class="sb-lab">Plate</span>
         <button type="button" class="btn small sb-w1" id="lDims"${dis(isT)}>${p.nodim ? 'Show distances' : 'Hide distances'}</button>
+        <button type="button" class="btn small sb-w1" id="lSize"${dis(!isP)}>${p.nosize ? 'Show plate size' : 'Hide plate size'}</button>
         <button type="button" class="btn small sb-w1" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
         <label class="btn small sb-w2${isP ? '' : ' is-off'}">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden id="lSelImg"${dis(!isP)}></label>
         <button type="button" class="btn small" id="lKeep" aria-pressed="${!!p.keepShape}"${dis(!keepOk)} title="Off: the logo fills the plate Width × Length. On: the logo keeps its own shape inside the box.">Keep logo shape</button></div>
@@ -394,6 +398,7 @@ function paintSelBar() {
     $('#lCtrV').onclick = () => { p.dy = 0; paintPlates(); update(); };
     $('#lMvD').onclick = () => movePanel(1);
     $('#lMvS').onchange = (e) => { const v = pin(e.target.value); if (isFinite(v)) { p.start = e.target.value.trim(); nudge(0); } };
+    $('#lSize').onclick = () => { p.nosize = !p.nosize; paintPlates(); update(); };
     if ($('#lDims')) $('#lDims').onclick = () => { p.nodim = !p.nodim; paintPlates(); update(); };
     if ($('#lEditSel')) $('#lEditSel').onclick = () => { const g = $(`#lSheet [data-pi="${sel}"]`); openEditor('item:' + sel, g || $('#lSheet')); };
     // fill the space boxes after the sheet is drawn (heights come from the drawing)
@@ -444,6 +449,7 @@ function onInput(e) {
     const k = t.dataset.p;
     if (!p || !k) return;
     if (k === 'dims') { p.nodim = !t.checked; update(); return; }
+    if (k === 'size') { p.nosize = !t.checked; update(); return; }
     if (k === 'turn') { setAngle(p, +t.value); update(); return; }
     if (k === 'fsz') { p.fsz = t.value === '' ? '' : clampFs(t.value); update(); return; }
     p[k] = k === 'flip' || k === 'hl' ? t.checked : k === 'panel' ? +t.value : t.value;
@@ -600,6 +606,7 @@ function paintPlates() {
         <label class="chk">Turn <select data-p="turn">${TURNS.map(([a, n]) => `<option value="${a}" ${angleOf(p) === a ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
         <label class="chk"><input type="checkbox" data-p="hl" ${p.hl ? 'checked' : ''}> Highlight</label>
         ${kind !== 'text' ? `<label class="chk"><input type="checkbox" data-p="dims" ${p.nodim ? '' : 'checked'}> Distances</label>` : ''}
+        ${kind === 'plate' ? `<label class="chk"><input type="checkbox" data-p="size" ${p.nosize ? '' : 'checked'}> Plate size</label>` : ''}
         <button type="button" class="btn small ghost" data-dup="${i}">Duplicate</button>
         <button type="button" class="btn small ghost danger" data-del="${i}" aria-label="Remove">✕</button>
       </div>
@@ -1169,7 +1176,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
     selBox(xa, y, xb - xa, h);
     // plate length (its width along the sheet): arrow across the plate, under it (or over it when there is no room)
     const pw = pin(p.width);
-    if (!p.nodim && isFinite(pw) && pw > 0 && xb - xa >= 14) {
+    if (!p.nodim && !p.nosize && d.plateSizes !== 'off' && isFinite(pw) && pw > 0 && xb - xa >= 14) {
       const below = y + h + 13 <= r.y + r.h - 2, yd = below ? y + h + 7 : y - 7;
       const lab = q(pw), lw = lab.length * 5.4 + 8, ccx = (xa + xb) / 2;
       o.push(`<line x1="${xa.toFixed(1)}" y1="${(below ? y + h + 2 : y - 2).toFixed(1)}" x2="${xa.toFixed(1)}" y2="${(yd + (below ? 3 : -3)).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
@@ -1179,7 +1186,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
       else o.push(t(xb + 3, yd + 3.2, lab, { size: 9, weight: 700, anchor: 'start' })); // narrow plate: number beside the arrow
     }
     // plate length top to bottom: arrow on the right side of the plate (gap arrows on that side start past it)
-    if (!p.nodim && isFinite(plIn) && plIn > 0 && h >= 12) {
+    if (!p.nodim && !p.nosize && d.plateSizes !== 'off' && isFinite(plIn) && plIn > 0 && h >= 12) {
       const xd = xb + 6;
       o.push(`<line x1="${(xb + 1).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(xd + 3).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${INK}" stroke-width=".6"/><line x1="${(xb + 1).toFixed(1)}" y1="${(y + h).toFixed(1)}" x2="${(xd + 3).toFixed(1)}" y2="${(y + h).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
       o.push(`<line x1="${xd.toFixed(1)}" y1="${(y + 0.5).toFixed(1)}" x2="${xd.toFixed(1)}" y2="${(y + h - 0.5).toFixed(1)}" stroke="${INK}" stroke-width="1" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
