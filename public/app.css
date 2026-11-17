@@ -544,3 +544,6 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .ls-szx.in{position:static;width:16px;height:16px;font-size:11px;line-height:13px}
 .lsheet .ls-szx:hover,.lsheet .ls-szx:focus-visible{opacity:1;background:#c0392b;color:#fff}
 @media print{.lsheet .ls-szx{display:none}}
+
+.lsheet .ls-addsz{display:block;margin:2px auto 0;font-size:11px}
+@media print{.lsheet .ls-addsz{display:none}}

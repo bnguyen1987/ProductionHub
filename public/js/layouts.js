@@ -285,6 +285,14 @@ export function render(v) {
       else if (k[0] === 'd') { L.details.splice(n, 1); paintDetails(); }
       update(); return;
     }
+    const asz = e.target.closest('[data-addsz]');
+    if (asz) {
+      const n = +asz.dataset.addsz; select(n);
+      const row = document.querySelector(`.plate-row[data-plate="${n}"]`), wI = row && row.querySelector('[data-p="width"]');
+      const inp = wI && !wI.value.trim() ? wI : row && row.querySelector('[data-p="plen"]');
+      if (inp) { inp.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => inp.focus(), 300); }
+      return;
+    }
     const szx = e.target.closest('[data-szx]');
     if (szx) {
       const ids = szx.dataset.szx.split(',').map(Number), img = (L.plates[ids[0]] || {}).img;
@@ -1026,8 +1034,9 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
   const dimFig = (x) => {
     const dm = picDims(x);
     const img = `<img src="${x.img}" alt="">`;
-    if (!dm) return img;
-    return `<div class="pd">${img}${dm.v ? `<span class="pd-v"><i></i><b>${q(dm.v)}</b><i></i></span>` : '<span></span>'}${dm.h ? `<span class="pd-h"><i></i><b>${q(dm.h)}</b><i></i></span>` : ''}${opt.print ? '' : `<button type="button" class="ls-szx" data-szx="${dm.i}" title="Hide this size" aria-label="Hide size">×</button>`}</div>`;
+    // a logo plate with no Width / Length typed yet: a reminder on screen (never printed)
+    if (!dm) { const pl = x.x[0] === 'l' ? PL[+x.x.slice(1)] : null; return img + (pl && !pl.nosize && !opt.print ? `<button type="button" class="linklike ls-addsz" data-addsz="${x.x.slice(1)}">+ Add plate size</button>` : ''); }
+    return `<div class="pd">${img}${dm.v ? `<span class="pd-v"><i></i><b>${q(dm.v)}</b><i></i></span>` : '<span></span>'}${dm.h ? `<span class="pd-h"><i></i><b>${q(dm.h)}</b><i></i></span>` : ''}${opt.print ? '' : `<button type="button" class="ls-szx" data-szx="${dm.i}" title="Hide this size" aria-label="Hide size">×</button>`}</div>${!opt.print && (!dm.h || !dm.v) ? `<button type="button" class="linklike ls-addsz" data-addsz="${dm.i}">+ Add ${dm.h ? 'length' : 'width'}</button>` : ''}`;
   };
   const allT = Array.isArray(d.detailTexts) ? d.detailTexts : d.detailText ? [d.detailText] : [];
   const dtexts = allT.map((x, k) => ({ x: String(x || ''), k })).filter((o) => o.x.trim()).slice(0, 4);
@@ -1189,6 +1198,18 @@ function drawing(d, selIdx = -1, drawH = 270) {
       o.push(`<g class="ls-plate" data-pi="${p.i}"><g${rot(cx)}><circle cx="${cx.toFixed(1)}" cy="${m.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" stroke="${INK}" stroke-width="1.2"/><circle cx="${cx.toFixed(1)}" cy="${m.toFixed(1)}" r="${(rr - 2).toFixed(1)}" fill="none" stroke="${INK}" stroke-width=".5"/>${big ? t(cx, m - 1, 'BMC', { size: 7.5, weight: 700 }) + t(cx, m + 7, `${b.v} ${b.tst === 'ECT' ? 'ECT' : 'LB'}`, { size: 6 }) : t(cx, m + 2.2, 'BMC', { size: 6, weight: 700 })}</g></g>`);
       selBox(xa, m - rr, rr * 2, rr * 2);
       p.xa = Math.min(xa, X(p.s)); p.xb = Math.max(cx + rr, X(p.s + D)); p.e = p.s + D;
+      // blue up / down distances to the panel's scores, worked out for a true 1" circle (the drawn circle may be bigger)
+      const rowIn = rows[p.panel - 1];
+      if (!p.nodim && rowIn > 0) {
+        const dy = Math.max(-0.45, Math.min(0.45, +p.dy || 0));
+        [[r.y, m - rr, (0.5 + dy) * rowIn - D / 2], [m + rr, r.y + r.h, (0.5 - dy) * rowIn - D / 2]].forEach(([ya, yb2, gIn]) => {
+          if (!(gIn > 1 / 32) || yb2 - ya < 6) return;
+          o.push(`<line x1="${cx.toFixed(1)}" y1="${(ya + 0.5).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(yb2 - 0.5).toFixed(1)}" stroke="${BLUE}" stroke-width="1" marker-start="url(#${uid}lab)" marker-end="url(#${uid}lab)"/>`);
+          const lab = q(gIn), lw = lab.length * 5.4 + 8, ly = (ya + yb2) / 2;
+          (blueLabs[p.panel] = blueLabs[p.panel] || []).push({ x1: cx + 3, x2: cx + 3 + lw, y: ly + 3.4 });
+          o.push(`<rect x="${(cx + 3).toFixed(1)}" y="${(ly - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="12" fill="#fff" fill-opacity=".9"/>` + t(cx + 3 + lw / 2, ly + 3.4, lab, { size: 9.5, fill: BLUE, weight: 700 }));
+        });
+      }
       return;
     }
     const w = isFinite(p.w) && p.w > 0 ? p.w : totL * 0.1;
