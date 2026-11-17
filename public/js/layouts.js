@@ -7,7 +7,7 @@ import { pageCanvas } from './dieline.js';
 const today = () => { const d = new Date(); return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`; };
 const EMPTY = () => ({
   id: '', customer: '', shipTo: '', fileNo: '', specNo: '', plateNo: '', design: '', ident: '', style: '', size: '', board: '',
-  joint: '', plateSizes: '', blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
+  joint: '', slots: '', plateSizes: '', blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
   printPanels: [], plates: [], notes: '', changes: '', detailTexts: [], details: [], detailLogos: true, origDate: '', revDate: today(), sales: '', designer: '', approved: '', orig: null,
 });
 const INFO = [
@@ -234,7 +234,8 @@ export function render(v) {
           <div class="field"><label>Scores along the length, left to right</label><input type="text" data-l="lengthPanels" placeholder="4 3/4, 123 1/16, 4 3/4"></div>
           <div id="lLChk" class="hint" style="margin:4px 0 10px"></div>
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Measurements on the sheet</label><select data-l="units"><option value="">10:05 (inches:sixteenths)</option><option value="frac">10 5/16 (fractions)</option></select></div>
-          <div class="field" style="max-width:260px;margin-bottom:10px"><label>Glue tab and slots</label><select data-l="glueTab"><option value="">Auto (RSC-type: small 1st length panel)</option><option value="on">Show</option><option value="off">Don't show</option></select></div>
+          <div class="field" style="max-width:260px;margin-bottom:10px"><label>Glue tab</label><select data-l="glueTab"><option value="">Auto (RSC-type: small 1st length panel)</option><option value="on">Show</option><option value="off">Don't show</option></select></div>
+          <div class="field" style="max-width:220px;margin-bottom:10px"><label>Slots</label><select data-l="slots"><option value="">Auto (with the glue tab)</option><option value="on">Show</option><option value="off">Don't show</option></select></div>
           <div class="field" style="max-width:200px;margin-bottom:10px"><label>Joint</label><select data-l="joint"><option value="">Glue</option><option value="stitch">Stitch</option><option value="tape">Tape</option></select></div>
           <div class="field" style="max-width:200px;margin-bottom:10px"><label>Plate sizes</label><select data-l="plateSizes"><option value="">In Print Detail</option><option value="show">Print Detail + drawing</option></select></div>
           <div class="lbl" style="margin:4px 0 6px">Printed panels <span class="hint" style="font-weight:500">only the panels with a plate, BMC or text get shaded; a row picked here with nothing on it is shaded whole</span></div>
@@ -507,9 +508,11 @@ function geom(d = L) {
   const totL = lp.length ? sum(lp) : (isFinite(bl) && bl > 0 ? bl : 100);
   const scores = [0]; lp.forEach((v) => scores.push(scores[scores.length - 1] + v));
   const tab = rows.length >= 2 && lp.length >= 4 && (d.glueTab === 'on' || (d.glueTab !== 'off' && lp[0] > 0 && lp[0] <= 2.5));
-  const flap = new Set(!tab ? [] : rows.length >= 3 ? [0, rows.length - 1] : [rows[0] <= rows[1] ? 0 : 1]);
+  // slots: cut at each score in the top and bottom flap rows (on with the glue tab, or set on / off by hand)
+  const slotsOn = rows.length >= 2 && (d.slots === 'on' || (d.slots !== 'off' && tab));
+  const flap = new Set(!tab && !slotsOn ? [] : rows.length >= 3 ? [0, rows.length - 1] : [rows[0] <= rows[1] ? 0 : 1]);
   const pxIn = 786 / totL; // drawing scale (x1 - x0 = 786)
-  return { wp, lp, rows, totL, scores, tab, flap, pxIn };
+  return { wp, lp, rows, totL, scores, tab, flap, slotsOn, pxIn };
 }
 // Inches an item covers along the length: [start, end]
 function span(p, g) {
@@ -535,7 +538,7 @@ function placementWarnings() {
     if (g.tab && g.flap.has(p.panel - 1) && a < g.lp[0] - tol) out.push({ i, msg: `${who} is beside the ${jointName(L).toLowerCase()} tab, where there is no flap.` });
     else if (g.tab && a < g.lp[0] - tol && p.kind !== 'text') out.push({ i, msg: `${who} sits on the ${jointName(L).toLowerCase()} tab.` });
     const sc = g.scores.slice(1, -1).find((x) => x > a + tol && x < b - tol);
-    if (sc !== undefined && !(g.tab && sc === g.lp[0] && a < g.lp[0] - tol)) out.push({ i, msg: `${who} crosses the ${g.flap.has(p.panel - 1) ? 'slot' : 'score'} at ${f(sc)}".` });
+    if (sc !== undefined && !(g.tab && sc === g.lp[0] && a < g.lp[0] - tol)) out.push({ i, msg: `${who} crosses the ${g.slotsOn && g.flap.has(p.panel - 1) ? 'slot' : 'score'} at ${f(sc)}".` });
   });
   for (let x = 0; x < items.length; x++) for (let y = x + 1; y < items.length; y++) {
     const A = items[x], B = items[y];
@@ -953,7 +956,7 @@ async function readLayout(input) {
       ...EMPTY(),
       customer: str(r.customer), shipTo: str(r.ship_to), fileNo: str(r.file_no), specNo: str(r.spec_no), plateNo: str(r.plate_no), design: str(r.design_no),
       ident: str(r.ident), style: str(r.style), size: str(r.size), board: str(r.board),
-      joint: ['stitch', 'tape'].includes(String(r.joint || '').toLowerCase()) ? String(r.joint).toLowerCase() : '', blankW: show(r.blank_width), blankL: show(r.blank_length), print: str(r.print), routing: str(r.routing),
+      slots: r.slots === true ? 'on' : '', joint: ['stitch', 'tape'].includes(String(r.joint || '').toLowerCase()) ? String(r.joint).toLowerCase() : '', blankW: show(r.blank_width), blankL: show(r.blank_length), print: str(r.print), routing: str(r.routing),
       view: r.view === 'Inside' ? 'Inside' : 'Outside',
       widthPanels: arr(r.width_panels).map(show).join(', '), lengthPanels: arr(r.length_panels).map(show).join(', '),
       printPanels: pp, plates: [...plates, ...texts, ...holes], notes: arr(r.notes).map(str).filter(Boolean).join('\n'), changes: arr(r.changes).map(str).filter(Boolean).join('\n'),
@@ -1088,7 +1091,9 @@ function drawing(d, selIdx = -1, drawH = 270) {
   // printed rows, outline, scores
   // RSC-type blank: the 1st length panel is a glue tab (no flaps above/below it, tapered ends) and the flap rows are slotted at each score.
   const tab = rows.length >= 2 && lp.length >= 4 && (d.glueTab === 'on' || (d.glueTab !== 'off' && lp[0] > 0 && lp[0] <= 2.5));
-  const flap = new Set(!tab ? [] : rows.length >= 3 ? [0, rows.length - 1] : [rows[0] <= rows[1] ? 0 : 1]);
+  // slots: cut at each score in the top and bottom flap rows (on with the glue tab, or set on / off by hand)
+  const slotsOn = rows.length >= 2 && (d.slots === 'on' || (d.slots !== 'off' && tab));
+  const flap = new Set(!tab && !slotsOn ? [] : rows.length >= 3 ? [0, rows.length - 1] : [rows[0] <= rows[1] ? 0 : 1]);
   const body = R.filter((r, i) => !flap.has(i));
   const yE = y0 + H, xg = tab ? X(lp[0]) : x0;
   const bT = body.length ? body[0].y : y0, bB = body.length ? body[body.length - 1].y + body[body.length - 1].h : yE;
@@ -1119,9 +1124,9 @@ function drawing(d, selIdx = -1, drawH = 270) {
   R.slice(1).forEach((r) => o.push(`<line x1="${xg.toFixed(1)}" y1="${r.y.toFixed(1)}" x2="${x1}" y2="${r.y.toFixed(1)}" stroke="${INK}" ${DASH}/>`));
   scores.slice(1, -1).forEach((sc) => {
     const x = X(sc).toFixed(1);
-    if (!tab) { o.push(`<line x1="${x}" y1="${y0}" x2="${x}" y2="${yE}" stroke="${INK}" ${DASH}/>`); return; }
-    R.forEach((r, i) => o.push(flap.has(i)
-      ? `<line x1="${x}" y1="${r.y.toFixed(1)}" x2="${x}" y2="${(r.y + r.h).toFixed(1)}" stroke="${INK}" stroke-width="1.4"/>` // slot (cut)
+    if (!tab && !slotsOn) { o.push(`<line x1="${x}" y1="${y0}" x2="${x}" y2="${yE}" stroke="${INK}" ${DASH}/>`); return; }
+    R.forEach((r, i) => o.push(flap.has(i) && slotsOn
+      ? `<rect x="${(+x - 2.2).toFixed(1)}" y="${r.y.toFixed(1)}" width="4.4" height="${r.h.toFixed(1)}" fill="#fff" stroke="${INK}" stroke-width="1"/>` // slot (cut out)
       : `<line x1="${x}" y1="${r.y.toFixed(1)}" x2="${x}" y2="${(r.y + r.h).toFixed(1)}" stroke="${INK}" ${DASH}/>`));
   });
 
