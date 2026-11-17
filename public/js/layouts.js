@@ -102,6 +102,34 @@ function ratioOf(src) {
 const fillLogo = (p) => !!p.img && !p.keepShape && pin(p.width) > 0 && pin(p.plen) > 0;
 // How the manufacturer's joint is closed: glue (default), stitch or tape
 const jointName = (d) => (d.joint === 'stitch' ? 'STITCH' : d.joint === 'tape' ? 'TAPE' : 'GLUE');
+// Height of each item as a share of its panel's height (from the last drawing), for the Top / Bottom spaces
+const itemHs = {};
+// Inches typed in the space boxes: 3:05 (plant style), 3 5/16, 3.31
+const inOf = (v) => { const t = String(v ?? '').trim(), c = t.match(/^(\d+):(\d{1,2})$/); return c ? +c[1] + +c[2] / 16 : pin(t); };
+// Space around the selected item, in inches: left / right to the scores of its length panel, top / bottom to its width panel's scores
+function spaces(p) {
+  const g = geom(), sp = span(p, g), rowIn = g.rows[p.panel - 1], out = {};
+  if (sp) {
+    let k = g.scores.findIndex((x, j) => j < g.scores.length - 1 && sp[0] >= x - 1e-6 && sp[0] < g.scores[j + 1] - 1e-6);
+    if (k < 0) k = sp[0] < 0 ? 0 : g.scores.length - 2;
+    if (k >= 0 && g.scores.length > 1) { out.k = k; out.left = sp[0] - g.scores[k]; out.right = g.scores[k + 1] - sp[1]; out.w = sp[1] - sp[0]; }
+  }
+  const hs = itemHs[sel];
+  if (rowIn > 0 && hs >= 0) { const dy = Math.max(-0.45, Math.min(0.45, +p.dy || 0)); out.rowIn = rowIn; out.hs = hs; out.top = (0.5 + dy - hs / 2) * rowIn; out.bottom = (0.5 - dy - hs / 2) * rowIn; }
+  return out;
+}
+function setSpace(p, side, v) {
+  const sp = spaces(p), g = geom();
+  if (!isFinite(v) || v < 0) return false;
+  if ((side === 'left' || side === 'right') && sp.k != null) {
+    const st = side === 'left' ? g.scores[sp.k] + v : g.scores[sp.k + 1] - v - sp.w;
+    p.start = f(Math.round(Math.max(0, st) * 16) / 16);
+  } else if ((side === 'top' || side === 'bottom') && sp.rowIn > 0) {
+    const dy = side === 'top' ? v / sp.rowIn + sp.hs / 2 - 0.5 : 0.5 - v / sp.rowIn - sp.hs / 2;
+    p.dy = Math.round(Math.max(-0.45, Math.min(0.45, dy)) * 10000) / 10000;
+  } else return false;
+  return true;
+}
 const angleOf = (p) => (((+p.turn || 0) + (p.flip ? 180 : 0)) % 360 + 360) % 360;
 function setAngle(p, a) { p.turn = ((+a % 360) + 360) % 360; p.flip = false; }
 const TURNS = [[0, 'Upright'], [90, 'Sideways ↓'], [180, 'Upside down'], [270, 'Sideways ↑']];
@@ -333,6 +361,7 @@ function paintSelBar() {
         <button type="button" class="btn small" id="lMvR" aria-label="Move right">▶</button>
         <button type="button" class="btn small" id="lMvU" aria-label="Move up">▲</button><button type="button" class="btn small" id="lMvD" aria-label="Move down">▼</button>
         <button type="button" class="btn small" id="lCtrH" title="Center left-right in its panel">Center ↔</button><button type="button" class="btn small" id="lCtrV" title="Center top-to-bottom in its panel">Center ↕</button></span>
+      <span class="btn-row sel-move sel-space"><span class="hint">Space (in):</span>${[['left', 'Left', '#c0392b'], ['right', 'Right', '#c0392b'], ['top', 'Top', '#1565c0'], ['bottom', 'Bottom', '#1565c0']].map(([k, n, c]) => `<label style="color:${c}">${n} <input type="text" data-space="${k}" aria-label="${n} space in inches" title="Type the inches (3:05, 3 5/16 or 3.31) and press Enter"></label>`).join('')}</span>
       ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Font:</span><button type="button" class="btn small" id="lFsDn" aria-label="Smaller text">A−</button><span class="fs-val">${p.kind === 'text' ? textFs(p) : +p.fsz > 0 ? p.fsz : 'Auto'}</span><button type="button" class="btn small" id="lFsUp" aria-label="Bigger text">A+</button>${p.kind === 'plate' && +p.fsz > 0 ? '<button type="button" class="btn small ghost" id="lFsAuto">Auto</button>' : ''}</span>` : ''}
       ${p.kind !== 'bmc' ? `<span class="btn-row sel-move"><span class="hint">Text:</span>${['left', 'center', 'right'].map((a) => `<button type="button" class="btn small" data-ta="${a}" aria-pressed="${(p.ta || (p.kind === 'text' ? 'left' : 'center')) === a}">${a === 'left' ? 'Left' : a === 'center' ? 'Center' : 'Right'}</button>`).join('')}</span>` : ''}
       <span class="btn-row">${p.kind !== 'bmc' ? '<button type="button" class="btn small" id="lEditSel">Edit text</button>' : ''}${p.kind !== 'text' ? `<button type="button" class="btn small" id="lDims">${p.nodim ? 'Show distances' : 'Hide distances'}</button>` : ''}<button type="button" class="btn small" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
@@ -356,6 +385,13 @@ function paintSelBar() {
     $('#lMvS').onchange = (e) => { const v = pin(e.target.value); if (isFinite(v)) { p.start = e.target.value.trim(); nudge(0); } };
     if ($('#lDims')) $('#lDims').onclick = () => { p.nodim = !p.nodim; paintPlates(); update(); };
     if ($('#lEditSel')) $('#lEditSel').onclick = () => { const g = $(`#lSheet [data-pi="${sel}"]`); openEditor('item:' + sel, g || $('#lSheet')); };
+    // fill the space boxes after the sheet is drawn (heights come from the drawing)
+    const fillSpaces = () => { const sp = spaces(p), q = fmtFor(L).q; $$('[data-space]', bar).forEach((i) => { if (document.activeElement !== i) i.value = isFinite(sp[i.dataset.space]) ? q(Math.max(0, sp[i.dataset.space])) : ''; }); };
+    requestAnimationFrame(fillSpaces);
+    $$('[data-space]', bar).forEach((i) => {
+      i.onchange = () => { if (setSpace(p, i.dataset.space, inOf(i.value))) { paintPlates(); update(); } else fillSpaces(); };
+      i.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); i.blur(); } e.stopPropagation(); };
+    });
     $('#lDelSel').onclick = () => delPlate(sel);
     $('#lDup').onclick = () => duplicate(sel);
     $('#lFlip').onclick = () => { setAngle(p, angleOf(p) === 180 ? 0 : 180); paintPlates(); update(); };
@@ -1053,7 +1089,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
     const r = R[p.panel - 1];
     const m = r.m + Math.max(-0.45, Math.min(0.45, +p.dy || 0)) * r.h; // up/down inside the panel
     p.cy = m;
-    const selBox = (x, y, w, h) => { if (p.i === selIdx) o.push(`<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="3" fill="none" stroke="#1a73e8" stroke-width="2.5" stroke-dasharray="5 3" pointer-events="none"/>`); };
+    const selBox = (x, y, w, h) => { itemHs[p.i] = h / r.h; if (p.i === selIdx) o.push(`<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="3" fill="none" stroke="#1a73e8" stroke-width="2.5" stroke-dasharray="5 3" pointer-events="none"/>`); };
     const ang = angleOf(p), side = ang % 180 === 90;
     const rot = (cx) => (ang ? ` transform="rotate(${ang} ${cx.toFixed(1)} ${m.toFixed(1)})"` : '');
     if (p.kind === 'text') {
