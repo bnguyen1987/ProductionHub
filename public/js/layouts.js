@@ -6,12 +6,12 @@ import { pageCanvas } from './dieline.js';
 
 const today = () => { const d = new Date(); return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`; };
 const EMPTY = () => ({
-  id: '', customer: '', shipTo: '', fileNo: '', specNo: '', design: '', ident: '', style: '', size: '', board: '',
+  id: '', customer: '', shipTo: '', fileNo: '', specNo: '', plateNo: '', design: '', ident: '', style: '', size: '', board: '',
   joint: '', plateSizes: '', blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
   printPanels: [], plates: [], notes: '', changes: '', detailTexts: [], details: [], detailLogos: true, origDate: '', revDate: today(), sales: '', designer: '', approved: '', orig: null,
 });
 const INFO = [
-  ['customer', 'Customer'], ['shipTo', 'Ship to'], ['fileNo', 'File #'], ['specNo', 'Spec #'],
+  ['customer', 'Customer'], ['shipTo', 'Ship to'], ['fileNo', 'File #'], ['specNo', 'Spec #'], ['plateNo', 'Plate #'],
   ['style', 'Style'], ['size', 'Size (L × W × D)'],
   ['board', 'Board / flute'], ['print', 'Print / ink'], ['routing', 'Routing'], ['revDate', 'Revision date'],
 ];
@@ -729,7 +729,7 @@ async function cutLogos(files, aiPlates) {
 }
 
 // ---- edit text right on the sheet ----
-const LABELS = { customer: 'Customer', shipTo: 'Ship to', fileNo: 'File #', design: 'Design no.', ident: 'Ident', style: 'Style', size: 'Size (L × W × D)', board: 'Board / flute',
+const LABELS = { customer: 'Customer', shipTo: 'Ship to', fileNo: 'File #', plateNo: 'Plate #', design: 'Design no.', ident: 'Ident', style: 'Style', size: 'Size (L × W × D)', board: 'Board / flute',
   blank: 'Blank size (width x length)',  print: 'Print / ink', routing: 'Routing', view: 'View', origDate: 'Original date', revDate: 'Revision date', sales: 'Sales', designer: 'Designer', approved: 'Approved by' };
 function editValue(key) {
   if (key === 'blank') return L.blankW || L.blankL ? `${show(L.blankW)} x ${show(L.blankL)}` : '';
@@ -920,7 +920,7 @@ async function readLayout(input) {
     if (!pp.length) pp = [...new Set(plates.map((p) => p.panel))].sort((a, b) => a - b);
     L = {
       ...EMPTY(),
-      customer: str(r.customer), shipTo: str(r.ship_to), fileNo: str(r.file_no), specNo: str(r.spec_no), design: str(r.design_no),
+      customer: str(r.customer), shipTo: str(r.ship_to), fileNo: str(r.file_no), specNo: str(r.spec_no), plateNo: str(r.plate_no), design: str(r.design_no),
       ident: str(r.ident), style: str(r.style), size: str(r.size), board: str(r.board),
       joint: ['stitch', 'tape'].includes(String(r.joint || '').toLowerCase()) ? String(r.joint).toLowerCase() : '', blankW: show(r.blank_width), blankL: show(r.blank_length), print: str(r.print), routing: str(r.routing),
       view: r.view === 'Inside' ? 'Inside' : 'Outside',
@@ -1013,7 +1013,7 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
   return `<div class="lsheet${opt.print ? ' ls-print' : ''}">
     <div class="ls-top"><div class="ls-title">PRINT LAYOUT SHEET</div><div class="ls-co">GoldenWest Packaging Group&nbsp; | &nbsp;Ontario, CA${head2 ? `<br>${head2}` : ''}</div></div>
     <div class="ls-grid">
-      ${cell('CUSTOMER', d.customer, 'customer', 2)}${cell('SHIP TO', d.shipTo, 'shipTo', 3)}${cell('FILE #', d.fileNo, 'fileNo')}${cell('STYLE', d.style, 'style')}${cell('VIEW', d.view, 'view')}
+      ${cell('CUSTOMER', d.customer, 'customer', 2)}${cell('SHIP TO', d.shipTo, 'shipTo', 3)}${cell('PLATE #', d.plateNo, 'plateNo')}${cell('STYLE', d.style, 'style')}${cell('VIEW', d.view, 'view')}
       ${cell('SIZE (L X W X D)', d.size, 'size', 2)}${cell('BOARD / FLUTE', d.board, 'board')}${cell('BLANK SIZE', blank, 'blank', 2)}${cell('PRINT', d.print, 'print', 2)}${cell('ROUTING', d.routing, 'routing')}
     </div>
     <div class="ls-h">BOX LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>

@@ -13,7 +13,7 @@ const s = (v: any, n = 200) => (typeof v === "string" ? v.trim().slice(0, n) : "
 const okId = (id: string) => /^[A-Za-z0-9_-]{4,40}$/.test(id);
 const KEEP_VERSIONS = 10;
 const delPrefix = async (blobs: any, prefix: string) => { const { blobs: list } = await blobs.list({ prefix }); await Promise.all(list.map((b: any) => blobs.delete(b.key))); };
-const FIELDS = ["customer", "shipTo", "fileNo", "specNo", "design", "ident", "style", "size", "board", "blankW", "blankL",
+const FIELDS = ["customer", "shipTo", "fileNo", "specNo", "plateNo", "design", "ident", "style", "size", "board", "blankW", "blankL",
   "print", "routing", "view", "widthPanels", "lengthPanels", "origDate", "revDate", "sales", "designer", "approved", "glueTab", "joint", "plateSizes", "units"];
 
 function clean(b: any) {
