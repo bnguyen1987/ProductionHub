@@ -993,7 +993,7 @@ async function readLayout(input) {
     msg.innerHTML = done(plates.some((p, k) => r.plates[k] && r.plates[k].source) ? ' <br><span class="spinner"></span> Cutting the logos out of the layout…' : '');
     const got = await cutLogos(files, arr(r.plates));
     if (got) { paintPlates(); update(); }
-    msg.innerHTML = done(got ? ` <br>Copied ${got} logo${got > 1 ? 's' : ''} from the layout. If one looks wrong, use Change image or Remove image on that plate.` : plates.length ? ' <br>Logos were not copied. Use Add image on a plate to put the real logo in.' : '');
+    msg.innerHTML = done(got ? ` <br>Copied ${got} logo${got > 1 ? 's' : ''} from the layout. If one looks wrong, use Change image or Remove image on that plate.` : plates.length ? ' <br>Logos were not copied. Use Add image on a plate to put the real logo in.' : (L.printPanels || []).length ? ` <br>The AI marked panel${L.printPanels.length > 1 ? 's' : ''} ${L.printPanels.join(', ')} for print but found no plate copy. Use + Add plate to put the print in.` : '');
   } catch (e) {
     msg.innerHTML = `<div class="alert err">${esc(e.message)}</div>`;
   }

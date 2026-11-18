@@ -655,6 +655,7 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^The AI marked panels? ([\d, ]+) for print but found no plate copy\. Use \+ Add plate to put the print in\.$/, 'La IA marcó el panel $1 para impresión pero no encontró el texto del grabado. Use + Agregar grabado para ponerlo.'],
   [/^Show all (\d+) saved layouts$/, 'Mostrar los $1 diseños guardados'],
   [/^Show only the last (\d+)$/, 'Mostrar solo los últimos $1'],
   [/^Saved as Spec # (.+?)( \(replaced the saved sheet with that Spec #; the old one is under Versions\))?\. Anyone can open it from Saved layouts\.$/, (m, n, r) => `Guardado como Spec # ${n}${r ? ' (reemplazó la hoja guardada con ese Spec #; la anterior está en Versiones)' : ''}. Cualquiera lo puede abrir en Diseños guardados.`],
