@@ -116,7 +116,7 @@ function spaces(p) {
     if (k >= 0 && g.scores.length > 1) { out.k = k; out.left = sp[0] - g.scores[k]; out.right = g.scores[k + 1] - sp[1]; out.w = sp[1] - sp[0]; }
   }
   const hs = itemHs[sel];
-  if (rowIn > 0 && hs >= 0) { const dy = Math.max(-0.45, Math.min(0.45, +p.dy || 0)); out.rowIn = rowIn; out.hs = hs; out.top = (0.5 + dy - hs / 2) * rowIn; out.bottom = (0.5 - dy - hs / 2) * rowIn; }
+  if (rowIn > 0 && hs >= 0) { const dy = Math.max(-0.5, Math.min(0.5, +p.dy || 0)); out.rowIn = rowIn; out.hs = hs; out.top = (0.5 + dy - hs / 2) * rowIn; out.bottom = (0.5 - dy - hs / 2) * rowIn; }
   return out;
 }
 function setSpace(p, side, v) {
@@ -127,7 +127,7 @@ function setSpace(p, side, v) {
     p.start = f(Math.round(Math.max(0, st) * 16) / 16);
   } else if ((side === 'top' || side === 'bottom') && sp.rowIn > 0) {
     const dy = side === 'top' ? v / sp.rowIn + sp.hs / 2 - 0.5 : 0.5 - v / sp.rowIn - sp.hs / 2;
-    p.dy = Math.round(Math.max(-0.45, Math.min(0.45, dy)) * 10000) / 10000;
+    p.dy = Math.round(Math.max(-0.5, Math.min(0.5, dy)) * 10000) / 10000;
   } else return false;
   return true;
 }
@@ -356,9 +356,9 @@ function movePanel(d) {
   const n = Math.max(1, nums(L.widthPanels).length);
   const rowIn = nums(L.widthPanels)[p.panel - 1];
   let dy = (+p.dy || 0) + d * (rowIn > 0 ? 0.25 / rowIn : 0.15); // 1/4" a step when the panel size is known
-  if (dy < -0.451 && p.panel > 1) { p.panel--; dy = 0.45; }
-  else if (dy > 0.451 && p.panel < n) { p.panel++; dy = -0.45; }
-  p.dy = Math.round(Math.max(-0.45, Math.min(0.45, dy)) * 10000) / 10000;
+  if (dy < -0.501 && p.panel > 1) { p.panel--; dy = 0.45; }
+  else if (dy > 0.501 && p.panel < n) { p.panel++; dy = -0.45; }
+  p.dy = Math.round(Math.max(-0.5, Math.min(0.5, dy)) * 10000) / 10000;
   paintPlates(); update();
 }
 function select(i, repaintRows = true) {
@@ -874,7 +874,7 @@ function startDrag(e) {
     let k = rows.findIndex(([ry, rh]) => y >= ry && y < ry + rh);
     if (k < 0) k = y < rows[0][0] ? 0 : rows.length - 1;
     const rk = rows[k];
-    p.dy = Math.round(Math.max(-0.45, Math.min(0.45, (y - (rk[0] + rk[1] / 2)) / rk[1])) * 100) / 100;
+    p.dy = Math.round(Math.max(-0.5, Math.min(0.5, (y - (rk[0] + rk[1] / 2)) / rk[1])) * 100) / 100;
     const w = hasW(p) && isFinite(pin(p.width)) ? pin(p.width) : 0;
     let s = (isFinite(pin(p.start)) ? pin(p.start) : 0) + dx / pxIn;
     s = Math.max(0, Math.min(totL - w, Math.round(s * 16) / 16));
@@ -947,7 +947,7 @@ async function readLayout(input) {
     const rowsIn = arr(r.width_panels).map((v) => pin(show(v)));
     const holes = arr(r.hand_holes).slice(0, 6).filter((x) => x && typeof x === 'object').map((x) => {
       const wIn = +x.width_in > 0 ? +x.width_in : 3.75, hIn = +x.height_in > 0 ? +x.height_in : 1.25, panel = Math.max(1, parseInt(x.panel, 10) || 1), rowIn = rowsIn[panel - 1];
-      const dy = +x.top_in >= 0 && x.top_in !== null && rowIn > 0 ? Math.max(-0.45, Math.min(0.45, (+x.top_in + hIn / 2) / rowIn - 0.5)) : -0.2;
+      const dy = +x.top_in >= 0 && x.top_in !== null && rowIn > 0 ? Math.max(-0.5, Math.min(0.5, (+x.top_in + hIn / 2) / rowIn - 0.5)) : -0.2;
       return { kind: 'hole', hole: x.type === 'hinge' ? 'hinge' : 'cut', panel, start: startOf(x, wIn), width: fx(wIn), plen: fx(hIn), dy: Math.round(dy * 10000) / 10000, text: '', turn: x.type === 'hinge' && x.hinge === 'bottom' ? 180 : 0, flip: false };
     });
     let pp = arr(r.printed_panels).map((x) => parseInt(x, 10)).filter((x) => x >= 1 && (!n || x <= n));
@@ -1179,7 +1179,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
   const blueLabs = {}; // blue up/down numbers per panel row
   plates.forEach((p) => {
     const r = R[p.panel - 1];
-    const m = r.m + Math.max(-0.45, Math.min(0.45, +p.dy || 0)) * r.h; // up/down inside the panel
+    const m = r.m + Math.max(-0.5, Math.min(0.5, +p.dy || 0)) * r.h; // up/down inside the panel
     p.cy = m;
     const selBox = (x, y, w, h) => { itemHs[p.i] = h / r.h; if (p.i === selIdx) o.push(`<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="3" fill="none" stroke="#1a73e8" stroke-width="2.5" stroke-dasharray="5 3" pointer-events="none"/>`); };
     const ang = angleOf(p), side = ang % 180 === 90;
@@ -1206,7 +1206,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
       // blue up / down distances to the panel's scores, worked out for a true 1" circle (the drawn circle may be bigger)
       const rowIn = rows[p.panel - 1];
       if (!p.nodim && rowIn > 0) {
-        const dy = Math.max(-0.45, Math.min(0.45, +p.dy || 0));
+        const dy = Math.max(-0.5, Math.min(0.5, +p.dy || 0));
         [[r.y, m - rr, (0.5 + dy) * rowIn - D / 2], [m + rr, r.y + r.h, (0.5 - dy) * rowIn - D / 2]].forEach(([ya, yb2, gIn]) => {
           if (!(gIn > 1 / 32) || yb2 - ya < 6) return;
           o.push(`<line x1="${cx.toFixed(1)}" y1="${(ya + 0.5).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(yb2 - 0.5).toFixed(1)}" stroke="${BLUE}" stroke-width="1" marker-start="url(#${uid}lab)" marker-end="url(#${uid}lab)"/>`);
@@ -1293,12 +1293,20 @@ function drawing(d, selIdx = -1, drawH = 270) {
     // blue distances from the plate up to the panel's top score and down to its bottom score (left of the plate, clear of the other arrows).
     // They belong to "distances", not to the plate size, so hiding the plate size keeps them.
     const isHole = p.kind === 'hole', VC = isHole ? GREEN : BLUE, vm = isHole ? 'lag' : 'lab';
-    if (!p.nodim && isFinite(plIn) && plIn > 0 && (h >= 12 || isHole)) {
+    if (!p.nodim && isFinite(plIn) && plIn > 0) {
       // in the middle of the plate (just right of the plate-size number when it is shown); a hand hole only from the top score down
       const pxPerIn = r.h / rowIn, xv = (xa + xb) / 2 + (wLab && !isHole ? wLab / 2 + 6 : 0);
       (isHole ? [[r.y, y]] : [[r.y, y], [y + h, r.y + r.h]]).forEach(([ya, yb2]) => {
         const gIn = (yb2 - ya) / pxPerIn;
-        if (gIn < 1 / 32 || yb2 - ya < (isHole ? 2 : 6)) return;
+        if (gIn < 1 / 32 || yb2 - ya < 0.5) return;
+        if (yb2 - ya < 10) {
+          // too tight for an arrow (e.g. 1/8" off a score): a short bar across the gap, the number just outside it with a leader
+          const top = ya <= r.y + 0.5, lab = q(gIn), lw = lab.length * 5.4 + 8, ly = top ? ya - 9 : yb2 + 9;
+          o.push(`<line x1="${(xv - 4).toFixed(1)}" y1="${ya.toFixed(1)}" x2="${(xv + 4).toFixed(1)}" y2="${ya.toFixed(1)}" stroke="${VC}" stroke-width="1.2"/><line x1="${(xv - 4).toFixed(1)}" y1="${yb2.toFixed(1)}" x2="${(xv + 4).toFixed(1)}" y2="${yb2.toFixed(1)}" stroke="${VC}" stroke-width="1.2"/><line x1="${xv.toFixed(1)}" y1="${ya.toFixed(1)}" x2="${xv.toFixed(1)}" y2="${yb2.toFixed(1)}" stroke="${VC}" stroke-width="1.6"/>`);
+          o.push(`<line x1="${xv.toFixed(1)}" y1="${(top ? ya : yb2).toFixed(1)}" x2="${(xv + 4).toFixed(1)}" y2="${(top ? ly + 3 : ly - 3).toFixed(1)}" stroke="${VC}" stroke-width=".7"/>`);
+          o.push(`<rect x="${(xv + 4).toFixed(1)}" y="${(ly - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="12" fill="#fff" fill-opacity=".95"/>` + t(xv + 4 + lw / 2, ly + 3.4, lab, { size: 9.5, fill: VC, weight: 700 }));
+          return;
+        }
         o.push(`<line x1="${xv.toFixed(1)}" y1="${(ya + 0.5).toFixed(1)}" x2="${xv.toFixed(1)}" y2="${(yb2 - 0.5).toFixed(1)}" stroke="${VC}" stroke-width="1" marker-start="url(#${uid}${vm})" marker-end="url(#${uid}${vm})"/>`);
         const lab = q(gIn), lw = lab.length * 5.4 + 8, ly = (ya + yb2) / 2;
         // number to the right of the arrow (remembered so the red numbers keep clear of it)
