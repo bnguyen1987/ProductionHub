@@ -205,6 +205,7 @@ export const ES = {
   '+ Add hand hole': '+ Agregar agarradera', 'Hand hole on': 'Agarradera en', Type: 'Tipo', 'Cut-out': 'Recortada', Hinged: 'Con bisagra', 'Hinge (fold line) on': 'Bisagra (doblez) en', 'Top edge': 'Borde de arriba', 'Bottom edge': 'Borde de abajo', 'Hinge on bottom': 'Bisagra abajo',
   '+ Add plate size': '+ Agregar tamaño', '+ Add length': '+ Agregar largo', '+ Add width': '+ Agregar ancho',
   Slots: 'Ranuras', 'Glue tab': 'Ceja de pegue', 'Auto (with the glue tab)': 'Auto (con la ceja de pegue)',
+  'Top & bottom flaps (at each score)': 'Solapas de arriba y abajo (en cada marca)', 'End flaps (between the rows)': 'Solapas de los extremos (entre filas)',
   Turn: 'Girar', 'Turn 90°': 'Girar 90°', Upright: 'Derecho', 'Sideways ↓': 'De lado ↓', 'Sideways ↑': 'De lado ↑',
   '(Upright)': '(Derecho)', '(Sideways ↓)': '(De lado ↓)', '(Upside down)': '(Al revés)', '(Sideways ↑)': '(De lado ↑)',
   'Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)': 'Girar el texto un cuarto de vuelta (derecho → de lado ↓ → al revés → de lado ↑)',
