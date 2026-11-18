@@ -758,18 +758,27 @@ async function cutLogos(files, aiPlates) {
 // ---- edit text right on the sheet ----
 const LABELS = { customer: 'Customer', shipTo: 'Ship to', fileNo: 'File #', plateNo: 'Plate #', design: 'Design no.', ident: 'Ident', style: 'Style', size: 'Size (L × W × D)', board: 'Board / flute',
   blank: 'Blank size (width x length)',  print: 'Print / ink', routing: 'Routing', view: 'View', origDate: 'Original date', revDate: 'Revision date', sales: 'Sales', designer: 'Designer', approved: 'Approved by' };
+const panelList = (k) => String(L[k === 'lp' ? 'lengthPanels' : 'widthPanels'] || '').split(/[,;|]+/).map((x) => x.trim()).filter(Boolean);
 function editValue(key) {
   if (key === 'blank') return L.blankW || L.blankL ? `${show(L.blankW)} x ${show(L.blankL)}` : '';
   const [k, i] = key.split(':');
   if (k === 'notes' || k === 'changes') return i === 'new' ? '' : L[k].split('\n').map((x) => x.trim()).filter(Boolean)[+i] || '';
   if (k === 'item') return (L.plates[+i] || {}).text || '';
   if (k === 'dtext') return i === 'new' ? '' : L.detailTexts[+i] || '';
+  if (k === 'lp' || k === 'wp') return panelList(k)[+i] || '';
   return L[key] ?? '';
 }
 function setValue(key, v) {
   v = v.trim();
   if (key === 'blank') { const m = v.split(/\s*[x×X]\s*/); L.blankW = m[0] || ''; L.blankL = m[1] || ''; return; }
   const [k, i] = key.split(':');
+  if (k === 'lp' || k === 'wp') { // one panel size typed on the sheet (3:05, 3 5/16 or 3.31)
+    const arr = panelList(k), n = inOf(v);
+    if (!(n > 0) || !arr.length) return;
+    arr[+i] = fx(Math.round(n * 16) / 16);
+    L[k === 'lp' ? 'lengthPanels' : 'widthPanels'] = arr.join(', ');
+    return;
+  }
   if (k === 'notes' || k === 'changes') {
     const arr = L[k].split('\n').map((x) => x.trim()).filter(Boolean);
     if (i === 'new') { if (v) arr.push(v); } else if (v) arr[+i] = v; else arr.splice(+i, 1);
@@ -783,7 +792,7 @@ function openEditor(key, anchor) {
   closeEditor();
   const card = $('.lay-preview'), cr = card.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
   const [k, i] = key.split(':');
-  const label = k === 'dtext' ? (i === 'new' ? 'New text box' : 'Text box ' + (+i + 1)) : k === 'notes' ? (i === 'new' ? 'New note' : 'Note ' + (+i + 1)) : k === 'changes' ? (i === 'new' ? 'New change' : 'Change line') : k === 'item' ? ((L.plates[+i] || {}).kind === 'text' ? 'Text' : 'Copy on the plate') : LABELS[key] || key;
+  const label = k === 'dtext' ? (i === 'new' ? 'New text box' : 'Text box ' + (+i + 1)) : k === 'notes' ? (i === 'new' ? 'New note' : 'Note ' + (+i + 1)) : k === 'changes' ? (i === 'new' ? 'New change' : 'Change line') : k === 'item' ? ((L.plates[+i] || {}).kind === 'text' ? 'Text' : 'Copy on the plate') : k === 'lp' ? `Length panel ${+i + 1} (inches)` : k === 'wp' ? `Width panel ${+i + 1} (inches)` : LABELS[key] || key;
   const multi = k === 'item' || k === 'dtext'; // text items and plate copy can have several lines
   const long = multi || k === 'notes' || k === 'changes' || key === 'customer' || key === 'shipTo';
   const box = document.createElement('div');
@@ -1136,7 +1145,7 @@ function drawing(d, selIdx = -1, drawH = 270) {
   R.forEach((r, i) => {
     cumW += rows[i];
     if (wp.length) {
-      o.push(t(x0 - 14, r.m + 3.5, f(rows[i]), { anchor: 'end', size: 10, weight: 700 }));
+      o.push(`<g class="ls-dimedit" data-edit="wp:${i}"><rect x="${x0 - 52}" y="${(r.m - 7).toFixed(1)}" width="40" height="14" fill="#fff" fill-opacity="0"/>${t(x0 - 14, r.m + 3.5, f(rows[i]), { anchor: 'end', size: 10, weight: 700 })}</g>`);
       o.push(`<line x1="${x0 - 7}" y1="${(r.y + 1.5).toFixed(1)}" x2="${x0 - 7}" y2="${(r.y + r.h - 1.5).toFixed(1)}" stroke="${INK}" stroke-width=".8" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
       o.push(`<line x1="${x0 - 11}" y1="${r.y.toFixed(1)}" x2="${x0 - 3}" y2="${r.y.toFixed(1)}" stroke="${INK}" stroke-width=".8"/>`);
     }
@@ -1158,14 +1167,15 @@ function drawing(d, selIdx = -1, drawH = 270) {
   const yb = y0 + H + 18;
   if (lp.length) {
     // top: size of each length panel
-    const dimRow = (yl, label) => lp.forEach((v, i) => {
+    const dimRow = (yl, label, edit = false) => lp.forEach((v, i) => {
       const a = X(scores[i]), b = X(scores[i + 1]), lab = label(i), w = lab.length * 6.2 + 6, narrow = b - a < w + 4;
       o.push(arrow(a + 0.5, b - 0.5, yl, INK));
-      if (narrow) o.push(t(i === 0 ? a - 3 : b + 3, yl + 3.5, lab, { size: 10, weight: 700, anchor: i === 0 ? 'end' : 'start' }));
-      else o.push(`<rect x="${((a + b) / 2 - w / 2).toFixed(1)}" y="${(yl - 7).toFixed(1)}" width="${w.toFixed(1)}" height="13" fill="#fff"/>` + t((a + b) / 2, yl + 3.5, lab, { size: 10, weight: 700 }));
+      const g0 = edit ? `<g class="ls-dimedit" data-edit="lp:${i}">` : '', g1 = edit ? '</g>' : '';
+      if (narrow) o.push(g0 + t(i === 0 ? a - 3 : b + 3, yl + 3.5, lab, { size: 10, weight: 700, anchor: i === 0 ? 'end' : 'start' }) + g1);
+      else o.push(g0 + `<rect x="${((a + b) / 2 - w / 2).toFixed(1)}" y="${(yl - 7).toFixed(1)}" width="${w.toFixed(1)}" height="13" fill="#fff"/>` + t((a + b) / 2, yl + 3.5, lab, { size: 10, weight: 700 }) + g1);
     });
     scores.forEach((sc) => o.push(`<line x1="${X(sc).toFixed(1)}" y1="${y0 - 18}" x2="${X(sc).toFixed(1)}" y2="${y0 - 3}" stroke="${INK}" stroke-width=".8"/>`));
-    dimRow(y0 - 10, (i) => f(lp[i]));
+    dimRow(y0 - 10, (i) => f(lp[i]), true); // the top row can be clicked to change a panel
     // bottom: running total at the end of each panel, centered under that panel (same layout as the top row)
     scores.forEach((sc) => o.push(`<line x1="${X(sc).toFixed(1)}" y1="${y0 + H + 3}" x2="${X(sc).toFixed(1)}" y2="${y0 + H + 18}" stroke="${INK}" stroke-width=".8"/>`));
     dimRow(y0 + H + 11, (i) => f(scores[i + 1]));

@@ -655,6 +655,8 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^Length panel (\d+) \(inches\)$/, 'Panel de largo $1 (pulgadas)'],
+  [/^Width panel (\d+) \(inches\)$/, 'Panel de ancho $1 (pulgadas)'],
   [/^The AI marked panels? ([\d, ]+) for print but found no plate copy\. Use \+ Add plate to put the print in\.$/, 'La IA marcó el panel $1 para impresión pero no encontró el texto del grabado. Use + Agregar grabado para ponerlo.'],
   [/^Show all (\d+) saved layouts$/, 'Mostrar los $1 diseños guardados'],
   [/^Show only the last (\d+)$/, 'Mostrar solo los últimos $1'],
