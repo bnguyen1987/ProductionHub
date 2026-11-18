@@ -136,6 +136,9 @@ function setSpace(p, side, v) {
 // plates and hand holes both have a typed Width and Length
 const hasW = (p) => p.kind === 'plate' || p.kind === 'hole';
 const isHinge = (p) => p.kind === 'hole' && p.hole === 'hinge';
+// Stretch a logo to its plate box only when that changes its shape a little; a big stretch (e.g. a wide logo
+// turned sideways into a tall box) smears it, so then it keeps its own shape
+const fitsShape = (ir, w, h) => { if (!ir || !(w > 0) || !(h > 0)) return false; const k = (h / w) / ir; return k > 0.6 && k < 1.67; };
 const angleOf = (p) => (((+p.turn || 0) + (p.flip ? 180 : 0)) % 360 + 360) % 360;
 function setAngle(p, a) { p.turn = ((+a % 360) + 360) % 360; p.flip = false; }
 const TURNS = [[0, 'Upright'], [90, 'Sideways ↓'], [180, 'Upside down'], [270, 'Sideways ↑']];
@@ -1306,7 +1309,7 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
     const vw = side ? h : bw, vh = side ? bw : h, vxa = cx - vw / 2, vxb = cx + vw / 2, vya = m - vh / 2;
     const y1 = m - ((lines.length - 1) * lh) / 2 + fs * 0.35;
     const txt = p.img
-      ? `<image href="${p.img}" x="${(vxa + 2).toFixed(1)}" y="${(vya + 2).toFixed(1)}" width="${Math.max(1, vw - 4).toFixed(1)}" height="${Math.max(1, vh - 4).toFixed(1)}" preserveAspectRatio="${fillLogo(p) ? 'none' : 'xMidYMid meet'}" style="mix-blend-mode:multiply"/>`
+      ? `<image href="${p.img}" x="${(vxa + 2).toFixed(1)}" y="${(vya + 2).toFixed(1)}" width="${Math.max(1, vw - 4).toFixed(1)}" height="${Math.max(1, vh - 4).toFixed(1)}" preserveAspectRatio="${fillLogo(p) && fitsShape(ir, vw, vh) ? 'none' : 'xMidYMid meet'}" style="mix-blend-mode:multiply"/>`
       : lines.map((ln, k) => t(p.ta === 'left' ? vxa + 4 : p.ta === 'right' ? vxb - 4 : cx, y1 + k * lh, ln, { size: fs, weight: 600, anchor: p.ta === 'left' ? 'start' : p.ta === 'right' ? 'end' : 'middle' })).join('');
     if (p.kind === 'hole') o.push(`<g class="ls-plate" data-pi="${p.i}">${holeSvg(p, xa, y, bw, h)}</g>`); else
     o.push(`<g class="ls-plate" data-pi="${p.i}"><rect class="ls-pbox" x="${xa.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${p.hl ? '#ffeb3b' : '#fff'}" fill-opacity="${p.hl ? 1 : 0}" stroke="#8a96a3" stroke-width=".8" stroke-dasharray="3 3"/><g${rot(cx)}>${txt}</g></g>`);
