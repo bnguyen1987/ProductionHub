@@ -7,7 +7,7 @@ import { pageCanvas } from './dieline.js';
 const today = () => { const d = new Date(); return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`; };
 const EMPTY = () => ({
   id: '', customer: '', shipTo: '', fileNo: '', specNo: '', plateNo: '', design: '', ident: '', style: '', size: '', board: '',
-  joint: '', slots: '', plateSizes: '', blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
+  joint: '', slots: '', flapEnds: '', plateSizes: '', blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
   printPanels: [], plates: [], notes: '', changes: '', detailTexts: [], details: [], detailLogos: true, origDate: '', revDate: today(), sales: '', designer: '', approved: '', orig: null,
 });
 const INFO = [
@@ -766,12 +766,19 @@ function editValue(key) {
   if (k === 'item') return (L.plates[+i] || {}).text || '';
   if (k === 'dtext') return i === 'new' ? '' : L.detailTexts[+i] || '';
   if (k === 'lp' || k === 'wp') return panelList(k)[+i] || '';
+  if (k === 'flap') { const sd = key.split(':')[2], v = parseEnds(L.flapEnds)[(+i + 1) + sd], lp = nums(L.lengthPanels); return isFinite(v) ? f(v) : f(sd === 'L' ? lp[0] : lp[lp.length - 1]); }
   return L[key] ?? '';
 }
 function setValue(key, v) {
   v = v.trim();
   if (key === 'blank') { const m = v.split(/\s*[x×X]\s*/); L.blankW = m[0] || ''; L.blankL = m[1] || ''; return; }
   const [k, i] = key.split(':');
+  if (k === 'flap') { // one row's end flap; blank or the full size = same as the other rows
+    const sd = key.split(':')[2], lp = nums(L.lengthPanels), full = sd === 'L' ? lp[0] : lp[lp.length - 1], m = parseEnds(L.flapEnds), n = inOf(v);
+    if (v && isFinite(n) && n >= 0 && n < full - 1e-6) m[(+i + 1) + sd] = Math.round(n * 16) / 16; else delete m[(+i + 1) + sd];
+    L.flapEnds = Object.entries(m).map(([kk, vv]) => `${kk}=${fx(vv)}`).join('; ');
+    return;
+  }
   if (k === 'lp' || k === 'wp') { // one panel size typed on the sheet (3:05, 3 5/16 or 3.31)
     const arr = panelList(k), n = inOf(v);
     if (!(n > 0) || !arr.length) return;
@@ -792,7 +799,7 @@ function openEditor(key, anchor) {
   closeEditor();
   const card = $('.lay-preview'), cr = card.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
   const [k, i] = key.split(':');
-  const label = k === 'dtext' ? (i === 'new' ? 'New text box' : 'Text box ' + (+i + 1)) : k === 'notes' ? (i === 'new' ? 'New note' : 'Note ' + (+i + 1)) : k === 'changes' ? (i === 'new' ? 'New change' : 'Change line') : k === 'item' ? ((L.plates[+i] || {}).kind === 'text' ? 'Text' : 'Copy on the plate') : k === 'lp' ? `Length panel ${+i + 1} (inches)` : k === 'wp' ? `Width panel ${+i + 1} (inches)` : LABELS[key] || key;
+  const label = k === 'dtext' ? (i === 'new' ? 'New text box' : 'Text box ' + (+i + 1)) : k === 'notes' ? (i === 'new' ? 'New note' : 'Note ' + (+i + 1)) : k === 'changes' ? (i === 'new' ? 'New change' : 'Change line') : k === 'item' ? ((L.plates[+i] || {}).kind === 'text' ? 'Text' : 'Copy on the plate') : k === 'lp' ? `Length panel ${+i + 1} (inches)` : k === 'flap' ? `${key.split(':')[2] === 'L' ? 'Left' : 'Right'} end flap, row ${+i + 1} only (inches; blank = same as the others)` : k === 'wp' ? `Width panel ${+i + 1} (inches)` : LABELS[key] || key;
   const multi = k === 'item' || k === 'dtext'; // text items and plate copy can have several lines
   const long = multi || k === 'notes' || k === 'changes' || key === 'customer' || key === 'shipTo';
   const box = document.createElement('div');
@@ -1061,7 +1068,7 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
       ${cell('SIZE (L X W X D)', d.size, 'size', 2)}${cell('BOARD / FLUTE', d.board, 'board')}${cell('BLANK SIZE', blank, 'blank', 2)}${cell('PRINT', d.print, 'print', 2)}${cell('ROUTING', d.routing, 'routing')}
     </div>
     <div class="ls-h">BOX LAYOUT &amp; PRINT PLACEMENT <i>${esc(d.view)} view - not to scale (height exaggerated for readability). Dimensions in inches.</i></div>
-    ${drawing(d, selIdx, opt.H)}
+    ${drawing(d, selIdx, opt.H, !opt.print)}
     <div class="ls-boxes"${opt.boxesH ? ` style="min-height:${opt.boxesH}px"` : ''}>
       <div class="ls-box"><div class="ls-bh">PRINT &amp; PRODUCTION NOTES</div><ol>${notes.map((x, k) => `<li data-edit="notes:${k}">${esc(x)}</li>`).join('')}<li class="ls-add" data-edit="notes:new">+ add note</li></ol></div>
       <div class="ls-box ls-detail"><div class="ls-bh">PRINT DETAIL (ZOOMED IN)</div>
@@ -1076,7 +1083,7 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
 
 // SVG of the blank: width panels as rows (height exaggerated), length scores as columns, plates and the gaps between them.
 let mkSeq = 0;
-function drawing(d, selIdx = -1, drawH = 270) {
+function drawing(d, selIdx = -1, drawH = 270, editable = false) {
   const { f, q } = fmtFor(d); // q = with inch mark in fractions mode
   const uid = 'm' + (++mkSeq) + '-'; // own arrowhead ids per copy (the hidden preview's ids would not print)
   const x0 = 64, x1 = 850, y0 = 30, H = drawH || 270;
@@ -1126,11 +1133,39 @@ function drawing(d, selIdx = -1, drawH = 270) {
       shadedRows.add(i);
     });
   });
+  const ends = rowEnds(d, rows.length, lp, X, x0, x1, tab);
   if (tab) {
     o.push(`<path d="M${xg.toFixed(1)} ${y0}H${x1}V${yE}H${xg.toFixed(1)}V${bB.toFixed(1)}L${x0} ${(bB - tp).toFixed(1)}V${(bT + tp).toFixed(1)}L${xg.toFixed(1)} ${bT.toFixed(1)}Z" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`);
     if (xg - x0 >= 9 && bB - bT > 40) o.push(t((x0 + xg) / 2 + 2.5, (bT + bB) / 2, jointName(d) + ' TAB', { size: 6.5, weight: 700, fill: '#555', tr: `rotate(-90 ${((x0 + xg) / 2 + 2.5).toFixed(1)} ${((bT + bB) / 2).toFixed(1)})` }));
-  } else o.push(`<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${H}" fill="none" stroke="${INK}" stroke-width="1.6"/>`);
-  R.slice(1).forEach((r) => o.push(`<line x1="${xg.toFixed(1)}" y1="${r.y.toFixed(1)}" x2="${x1}" y2="${r.y.toFixed(1)}" stroke="${INK}" ${DASH}/>`));
+  } else if (!ends.any) o.push(`<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${H}" fill="none" stroke="${INK}" stroke-width="1.6"/>`);
+  else {
+    // one row's end flap set smaller: blank the cut-away part and step the outline around it
+    R.forEach((r, i) => {
+      if (ends.L[i] > x0) o.push(`<rect x="${x0}" y="${r.y.toFixed(1)}" width="${(ends.L[i] - x0).toFixed(1)}" height="${r.h.toFixed(1)}" fill="#fff"/>`);
+      if (ends.R[i] < x1) o.push(`<rect x="${ends.R[i].toFixed(1)}" y="${r.y.toFixed(1)}" width="${(x1 - ends.R[i]).toFixed(1)}" height="${r.h.toFixed(1)}" fill="#fff"/>`);
+    });
+    const pts = [];
+    R.forEach((r, i) => { pts.push([ends.L[i], r.y], [ends.L[i], r.y + r.h]); });
+    for (let i = R.length - 1; i >= 0; i--) pts.push([ends.R[i], R[i].y + R[i].h], [ends.R[i], R[i].y]);
+    o.push(`<path d="M${pts.map(([x, y]) => x.toFixed(1) + ' ' + y.toFixed(1)).join(' L')} Z" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linejoin="miter"/>`);
+  }
+  R.slice(1).forEach((r, i) => { // fold between two rows, only where both rows are there (the rest is the outline)
+    const a = Math.max(xg, ends.L[i], ends.L[i + 1]), b = Math.min(x1, ends.R[i], ends.R[i + 1]);
+    o.push(`<line x1="${a.toFixed(1)}" y1="${r.y.toFixed(1)}" x2="${b.toFixed(1)}" y2="${r.y.toFixed(1)}" stroke="${INK}" ${DASH}/>`);
+  });
+  // size of each changed end flap, in the row; and (on screen) every end flap can be clicked to change it for that row only
+  if (lp.length >= 2 && !tab) R.forEach((r, i) => {
+    [['L', X(scores[1]), ends.L[i]], ['R', X(scores[scores.length - 2]), ends.R[i]]].forEach(([sd, sc, edge]) => {
+      const a = Math.min(sc, edge), b = Math.max(sc, edge), sz = ends.in[sd][i];
+      if (sz != null && b - a >= 4) {
+        o.push(arrow(a + 0.5, b - 0.5, r.m, INK));
+        const lab = f(sz), w = lab.length * 6.2 + 6;
+        const lx = b - a >= w + 4 ? (a + b) / 2 : sd === 'L' ? (x0 + a) / 2 : (b + x1) / 2;
+        o.push(`<rect x="${(lx - w / 2).toFixed(1)}" y="${(r.m - 7).toFixed(1)}" width="${w.toFixed(1)}" height="13" fill="#fff"/>` + t(lx, r.m + 3.5, lab, { size: 10, weight: 700 }));
+      }
+      if (editable) o.push(`<rect class="ls-flapedit" data-edit="flap:${i}:${sd}" x="${(sd === 'L' ? x0 : sc).toFixed(1)}" y="${r.y.toFixed(1)}" width="${(sd === 'L' ? sc - x0 : x1 - sc).toFixed(1)}" height="${r.h.toFixed(1)}" fill="transparent"><title>Change this end flap for this row only</title></rect>`);
+    });
+  });
   scores.slice(1, -1).forEach((sc) => {
     const x = X(sc).toFixed(1);
     if (!tab && !slotsOn) { o.push(`<line x1="${x}" y1="${y0}" x2="${x}" y2="${yE}" stroke="${INK}" ${DASH}/>`); return; }
@@ -1373,6 +1408,21 @@ function holeSvg(p, x, y, w, h) {
   return `<path d="${cut} Z" fill="${hl || '#eef1f4'}" stroke="none"/><path d="${cut}" fill="none" stroke="#111" stroke-width="1.3"/>`
     + `<line x1="${f1(x)}" y1="${f1(yH)}" x2="${f1(x + w)}" y2="${f1(yH)}" stroke="#111" stroke-width="1" stroke-dasharray="4 3"/>`
     + (w >= 46 && h >= 9 ? `<text x="${f1(x + w / 2)}" y="${f1(y + h / 2 + 2.6)}" text-anchor="middle" font-size="7" font-weight="700" fill="#333" font-family="Arial,sans-serif">HINGED H.H.</text>` : '');
+}
+// End flaps changed for one row only: d.flapEnds = "5L=2; 5R=2" (row number, side, flap size in inches)
+function parseEnds(v) { const m = {}; String(v || '').split(/[;,]/).forEach((x) => { const r = x.trim().match(/^(\d+)([LR])\s*=\s*(.+)$/i); if (r) m[r[1] + r[2].toUpperCase()] = pin(r[3]); }); return m; }
+function rowEnds(d, n, lp, X, x0, x1, tab) {
+  const m = parseEnds(d.flapEnds), out = { L: [], R: [], in: { L: [], R: [] }, any: false };
+  for (let i = 0; i < n; i++) {
+    ['L', 'R'].forEach((sd) => {
+      const v = m[(i + 1) + sd], full = sd === 'L' ? lp[0] : lp[lp.length - 1];
+      const ok = lp.length >= 2 && !tab && isFinite(v) && v >= 0 && v < full;
+      if (sd === 'L') out.L[i] = ok ? X(lp[0] - v) : x0; else out.R[i] = ok ? X(lp.slice(0, -1).reduce((a, b) => a + b, 0) + v) : x1;
+      out.in[sd][i] = ok ? v : null;
+      if (ok) out.any = true;
+    });
+  }
+  return out;
 }
 function gapMark(o, xa, xb, y, label, c, t, arrow, topY = null, maxRight = null, placed = null, botY = null) {
   if (xb - xa < 1.5) return;

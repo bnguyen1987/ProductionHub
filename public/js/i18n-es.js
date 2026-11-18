@@ -655,6 +655,7 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^(Left|Right) end flap, row (\d+) only \(inches; blank = same as the others\)$/, (m, sd, r) => `Solapa ${sd === 'Left' ? 'izquierda' : 'derecha'} de la fila ${r} (pulgadas; vacío = igual que las otras)`],
   [/^Length panel (\d+) \(inches\)$/, 'Panel de largo $1 (pulgadas)'],
   [/^Width panel (\d+) \(inches\)$/, 'Panel de ancho $1 (pulgadas)'],
   [/^The AI marked panels? ([\d, ]+) for print but found no plate copy\. Use \+ Add plate to put the print in\.$/, 'La IA marcó el panel $1 para impresión pero no encontró el texto del grabado. Use + Agregar grabado para ponerlo.'],

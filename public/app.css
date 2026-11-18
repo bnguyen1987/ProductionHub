@@ -552,3 +552,5 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .ls-dimedit{cursor:pointer}
 .lsheet .ls-dimedit:hover text{fill:#1a73e8;text-decoration:underline}
 @media print{.lsheet .ls-dimedit:hover text{fill:inherit;text-decoration:none}}
+.lsheet .ls-flapedit{cursor:pointer}
+.lsheet .ls-flapedit:hover{fill:rgba(26,115,232,.12)}
