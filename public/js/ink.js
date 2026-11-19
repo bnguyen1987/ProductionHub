@@ -1,4 +1,4 @@
-import { $, $$, esc, api, fileToPayload, setupDrop, parseInches, fmtNum, saveForm, loadForm } from './common.js';
+import { $, $$, esc, api, fileToPayload, setupDrop, parseInches, fmtNum, saveForm, loadForm, aiRead } from './common.js';
 
 // Anilox line counts per press station (from the ink calculator built earlier).
 export const PRESSES = {
@@ -169,7 +169,7 @@ async function analyzePhoto(file) {
   msg.innerHTML = '<div class="alert info"><span class="spinner"></span> Looking at the sample…</div>';
   try {
     const payload = await fileToPayload(file);
-    const { result } = await api('/api/ai', { method: 'POST', body: JSON.stringify({ task: 'ink', ...payload }) });
+    const result = await aiRead('ink', payload);
     const found = (result.colors || []).filter((c) => isFinite(+c.coverage_pct)).slice(0, 4);
     if (!found.length) throw new Error('No ink colors found. Enter coverage by hand.');
     const n = PRESSES[state.press].stations.length;

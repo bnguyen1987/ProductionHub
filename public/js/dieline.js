@@ -1,6 +1,6 @@
 // Read a die line for the pallet calculator.
 // DXF: read in the browser (outer size of the cut/crease lines). PDF or photo: read by the AI (/api/ai task "dieline").
-import { api, fileToPayload } from './common.js';
+import { api, fileToPayload, aiRead } from './common.js';
 import { GRADES_BY_FLUTE } from './palletcalc.js';
 
 const SKIP_LAYER = /dim|text|anno|title|border|frame|note|logo|print|graphic/i;
@@ -90,7 +90,7 @@ export async function readDieline(file) {
   }
   if (/\.(ard|ai|dwg|cf2|mfg)$/i.test(name)) throw new Error('That CAD format can\'t be read here. Export a PDF or DXF from ArtiosCAD (or your CAD program) and upload that.');
   const payload = await fileToPayload(file);
-  const { result: r } = await api('/api/ai', { method: 'POST', body: JSON.stringify({ task: 'dieline', ...payload }) });
+  const r = await aiRead('dieline', payload);
   const n = (v) => (v === null || v === undefined || v === '' || !isFinite(+v) || +v <= 0 ? null : +v);
   const flute = ['E', 'B', 'C', 'BC'].includes(r.flute) ? r.flute : null;
   const bw = n(r.blank_width_in), bl = n(r.blank_length_in);

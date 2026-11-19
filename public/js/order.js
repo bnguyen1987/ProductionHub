@@ -1,4 +1,4 @@
-import { $, $$, esc, api, fileToPayload, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm } from './common.js';
+import { $, $$, esc, api, fileToPayload, setupDrop, parseInches, fmtIn, fmtNum, saveForm, loadForm, aiRead } from './common.js';
 import { checkAll, estimateBlank, runHours, slitterCheck, SPEC_REV } from './ordercalc.js';
 
 const STYLES = ['RSC', 'HSC', 'FOL', 'DST', 'Tube', 'Die Cut', 'Sheet', 'Other'];
@@ -157,7 +157,7 @@ async function readQuote(file) {
   msg.innerHTML = '<div class="alert info"><span class="spinner"></span> Reading the quote…</div>';
   try {
     const payload = await fileToPayload(file);
-    const { result: r } = await api('/api/ai', { method: 'POST', body: JSON.stringify({ task: 'quote', ...payload }) });
+    const r = await aiRead('quote', payload);
     const num = (v) => (v === null || v === undefined || v === '' || !isFinite(+v) ? '' : String(+v));
     o = {
       ...EMPTY,

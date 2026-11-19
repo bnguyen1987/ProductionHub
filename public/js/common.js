@@ -60,6 +60,22 @@ export async function api(path, opts = {}) {
   return data;
 }
 
+// ---- AI reads ----
+// Every AI read (ink photo, quote, die line, print layout) runs as a background job and the page checks back,
+// so a slow read is never cut off at the 26-second limit of a normal request. Returns the AI's result.
+export async function aiRead(task, payload, { maxMs = 4 * 60 * 1000 } = {}) {
+  const { id } = await api('/api/aijob', { method: 'POST', body: JSON.stringify({ task, ...payload }) });
+  const t0 = Date.now();
+  for (let n = 0; Date.now() - t0 < maxMs; n++) {
+    await new Promise((z) => setTimeout(z, n < 8 ? 1200 : 3000)); // quick reads finish in a few seconds
+    let j;
+    try { j = await api('/api/aijob?id=' + encodeURIComponent(id)); } catch (e) { if (/not found|Bad id|Access code/i.test(e.message)) throw e; continue; }
+    if (j.status === 'done') return j.result;
+    if (j.status === 'error') throw new Error(j.error || 'AI request failed. Try again, or enter values by hand.');
+  }
+  throw new Error('The AI took too long. Try again.');
+}
+
 // ---- DOM ----
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
