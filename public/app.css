@@ -554,3 +554,12 @@ details.fold[open]{padding-bottom:16px}
 @media print{.lsheet .ls-dimedit:hover text{fill:inherit;text-decoration:none}}
 .lsheet .ls-flapedit{cursor:pointer}
 .lsheet .ls-flapedit:hover{fill:rgba(26,115,232,.12)}
+/* Print Detail plate size: width (left to right) red, length (up and down) blue, like the drawing */
+.lsheet .pd-h::before{border-top-color:#c0392b}
+.lsheet .pd-h i:first-child{border-right-color:#c0392b}
+.lsheet .pd-h i:last-child{border-left-color:#c0392b}
+.lsheet .pd-h b{color:#c0392b}
+.lsheet .pd-v::before{border-left-color:#1565c0}
+.lsheet .pd-v i:first-child{border-bottom-color:#1565c0}
+.lsheet .pd-v i:last-child{border-top-color:#1565c0}
+.lsheet .pd-v b{color:#1565c0}
