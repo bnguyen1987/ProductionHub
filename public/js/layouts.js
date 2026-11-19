@@ -71,7 +71,8 @@ function undoLast() {
 const pin = (s) => parseInches(String(s ?? '').replace(/["”]/g, '').trim());
 const f = (x) => fmtIn(x, '');
 // Plant style: inches:sixteenths (10:05 = 10 5/16"). Used on the sheet unless "fractions" is picked.
-const c16 = (x) => { if (!isFinite(x)) return '–'; let w = Math.floor(x + 1e-9), n = Math.round((x - w) * 16); if (n === 16) { w++; n = 0; } return `${w}:${String(n).padStart(2, '0')}`; };
+// plant style 10:05 = 10 5/16; a half sixteenth (from centering) shows as 10:05½
+const c16 = (x) => { if (!isFinite(x)) return '–'; let w = Math.floor(x + 1e-9), n = Math.round((x - w) * 32); if (n === 32) { w++; n = 0; } return `${w}:${String(n >> 1).padStart(2, '0')}${n % 2 ? '½' : ''}`; };
 const fmtFor = (d) => (d && d.units === 'frac' ? { f: (x) => fmtIn(x, ''), q: (x) => fmtIn(x, '"') } : { f: c16, q: c16 });
 const fx = (x) => (Math.abs(x * 16 - Math.round(x * 16)) < 0.02 ? f(x) : String(+x.toFixed(3)));
 const show = (s) => { const v = pin(s); return isFinite(v) ? f(v) : String(s ?? '').trim(); };
@@ -569,7 +570,9 @@ function centerItem(i) {
   const w = sp[1] - sp[0], mid = (sp[0] + sp[1]) / 2;
   let a = 0, b = g.totL;
   if (g.lp.length) { const k = Math.max(0, g.scores.findIndex((x, j) => j < g.lp.length && mid >= x - 1e-6 && mid < g.scores[j + 1] + 1e-6)); a = g.scores[k]; b = g.scores[k + 1]; }
-  p.start = f(Math.round(Math.max(a, a + (b - a - w) / 2) * 16) / 16);
+  // to the 1/32": an odd number of sixteenths left over splits evenly (7:15½ each side)
+  const st = Math.round(Math.max(a, a + (b - a - w) / 2) * 32) / 32;
+  p.start = Number.isInteger(st * 16) ? f(st) : String(st);
   paintPlates(); update();
 }
 
