@@ -115,7 +115,8 @@ function spaces(p) {
     if (k < 0) k = sp[0] < 0 ? 0 : g.scores.length - 2;
     if (k >= 0 && g.scores.length > 1) { out.k = k; out.left = sp[0] - g.scores[k]; out.right = g.scores[k + 1] - sp[1]; out.w = sp[1] - sp[0]; }
   }
-  const hs = itemHs[sel];
+  // a BMC is a true 1" circle (it is drawn bigger); a plate / hand hole with a Length typed uses that Length
+  const plIn = pin(p.plen), hs = rowIn > 0 && p.kind === 'bmc' ? 1 / rowIn : rowIn > 0 && hasW(p) && plIn > 0 ? Math.min(plIn / rowIn, 0.98) : itemHs[sel];
   if (rowIn > 0 && hs >= 0) { const dy = Math.max(-0.5, Math.min(0.5, +p.dy || 0)); out.rowIn = rowIn; out.hs = hs; out.top = (0.5 + dy - hs / 2) * rowIn; out.bottom = (0.5 - dy - hs / 2) * rowIn; }
   return out;
 }
@@ -1353,8 +1354,10 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
     if (!p.nodim && isFinite(plIn) && plIn > 0) {
       // in the middle of the plate (just right of the plate-size number when it is shown); a hand hole only from the top score down
       const pxPerIn = r.h / rowIn, xv = (xa + xb) / 2 + (wLab && !isHole ? wLab / 2 + 6 : 0);
-      (isHole ? [[r.y, y]] : [[r.y, y], [y + h, r.y + r.h]]).forEach(([ya, yb2]) => {
-        const gIn = (yb2 - ya) / pxPerIn;
+      // worked out from the typed Length and the position (not from the drawing, which keeps very thin plates at least 6 px tall)
+      const dyc = Math.max(-0.5, Math.min(0.5, +p.dy || 0)), gTop = (0.5 + dyc) * rowIn - plIn / 2, gBot = (0.5 - dyc) * rowIn - plIn / 2;
+      (isHole ? [[r.y, y, gTop]] : [[r.y, y, gTop], [y + h, r.y + r.h, gBot]]).forEach(([ya, yb2, gExact]) => {
+        const gIn = plIn < rowIn ? gExact : (yb2 - ya) / pxPerIn;
         if (gIn < 1 / 32 || yb2 - ya < 0.5) return;
         if (yb2 - ya < 10) {
           // too tight for an arrow (e.g. 1/8" off a score): a short bar across the gap, the number just outside it with a leader
