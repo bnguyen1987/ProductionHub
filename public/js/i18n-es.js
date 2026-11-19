@@ -207,6 +207,11 @@ export const ES = {
   Slots: 'Ranuras', 'Glue tab': 'Ceja de pegue', 'Auto (with the glue tab)': 'Auto (con la ceja de pegue)',
   'Top & bottom flaps (at each score)': 'Solapas de arriba y abajo (en cada marca)', 'End flaps (between the rows)': 'Solapas de los extremos (entre filas)',
   'Millimeters on panel sizes': 'Milímetros en los paneles', "Don't show": 'No mostrar', 'Show, e.g. 7:02 (180)': 'Mostrar, ej. 7:02 (180)',
+  "Give the same plate everywhere else on the sheet this one's size, turn and spot in its panel": 'Dar al mismo grabado en el resto de la hoja este tamaño, giro y lugar en su panel',
+  '+ From library': '+ De la biblioteca', 'Save to library': 'Guardar en biblioteca', 'Show all customers': 'Mostrar todos los clientes', 'Just this customer': 'Solo este cliente', 'Plate library: all customers': 'Biblioteca: todos los clientes', 'No size': 'Sin tamaño', Add: 'Agregar', 'Remove from library': 'Quitar de la biblioteca', 'Loading…': 'Cargando…', 'The library is empty.': 'La biblioteca está vacía.',
+  'Keep this plate (picture, copy, size, turn) under this customer for the next spec': 'Guardar este grabado (imagen, texto, tamaño, giro) con este cliente para la próxima especificación',
+  'Added from the library. Move it into place.': 'Agregado de la biblioteca. Muévalo a su lugar.', 'Fill in Customer first, so the plate is kept under that customer.': 'Primero llene Cliente, para guardar el grabado con ese cliente.',
+  'Before you print': 'Antes de imprimir', 'Go back and fix': 'Regresar y corregir', 'Print anyway': 'Imprimir así', 'No Spec # on the sheet.': 'La hoja no tiene Spec #.', 'No Plate # on the sheet.': 'La hoja no tiene Grabado #.',
   Turn: 'Girar', 'Turn 90°': 'Girar 90°', Upright: 'Derecho', 'Sideways ↓': 'De lado ↓', 'Sideways ↑': 'De lado ↑',
   '(Upright)': '(Derecho)', '(Sideways ↓)': '(De lado ↓)', '(Upside down)': '(Al revés)', '(Sideways ↑)': '(De lado ↑)',
   'Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)': 'Girar el texto un cuarto de vuelta (derecho → de lado ↓ → al revés → de lado ↑)',
@@ -657,6 +662,14 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^(\d+) things? to look at\. Click one to go to it\.$/, '$1 cosa(s) por revisar. Haga clic para ir a ella.'],
+  [/^(.+) on P(\d+) has no length \(top to bottom\)\.$/, '$1 en P$2 no tiene largo (de arriba a abajo).'],
+  [/^Plate library: (.+)$/, 'Biblioteca de grabados: $1'],
+  [/^Saved to the library under (.+)\.$/, 'Guardado en la biblioteca con $1.'],
+  [/^Nothing saved for (.+) yet\.$/, 'Nada guardado para $1 todavía.'],
+  [/^Copy to matching \((\d+)\)$/, 'Copiar a iguales ($1)'],
+  [/^Copied to (\d+) matching items?\.$/, 'Copiado a $1 elemento(s) igual(es).'],
+  [/^(Length|Width) panels add up to (.+)" but the blank (?:length|width) is (.+)" \((.+)" (short|over)\)\. Check the panel sizes\.$/, (m, k, a, b, d, so) => `Los paneles de ${k === 'Length' ? 'largo' : 'ancho'} suman ${a}" pero la lámina mide ${b}" (${d}" ${so === 'short' ? 'menos' : 'de más'}). Revise los tamaños.`],
   [/^(Left|Right) end flap, row (\d+) only \(inches; blank = same as the others\)$/, (m, sd, r) => `Solapa ${sd === 'Left' ? 'izquierda' : 'derecha'} de la fila ${r} (pulgadas; vacío = igual que las otras)`],
   [/^Length panel (\d+) \(inches\)$/, 'Panel de largo $1 (pulgadas)'],
   [/^Width panel (\d+) \(inches\)$/, 'Panel de ancho $1 (pulgadas)'],

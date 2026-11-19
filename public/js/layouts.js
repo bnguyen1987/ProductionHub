@@ -108,7 +108,7 @@ const itemHs = {};
 // Inches typed in the space boxes: 3:05 (plant style), 3 5/16, 3.31
 const inOf = (v) => { const t = String(v ?? '').trim(), c = t.match(/^(\d+):(\d{1,2})$/); return c ? +c[1] + +c[2] / 16 : pin(t); };
 // Space around the selected item, in inches: left / right to the scores of its length panel, top / bottom to its width panel's scores
-function spaces(p) {
+function spaces(p, idx = sel) {
   const g = geom(), sp = span(p, g), rowIn = g.rows[p.panel - 1], out = {};
   if (sp) {
     let k = g.scores.findIndex((x, j) => j < g.scores.length - 1 && sp[0] >= x - 1e-6 && sp[0] < g.scores[j + 1] - 1e-6);
@@ -116,12 +116,44 @@ function spaces(p) {
     if (k >= 0 && g.scores.length > 1) { out.k = k; out.left = sp[0] - g.scores[k]; out.right = g.scores[k + 1] - sp[1]; out.w = sp[1] - sp[0]; }
   }
   // a BMC is a true 1" circle (it is drawn bigger); a plate / hand hole with a Length typed uses that Length
-  const plIn = pin(p.plen), hs = rowIn > 0 && p.kind === 'bmc' ? 1 / rowIn : rowIn > 0 && hasW(p) && plIn > 0 ? Math.min(plIn / rowIn, 0.98) : itemHs[sel];
+  const plIn = pin(p.plen), hs = rowIn > 0 && p.kind === 'bmc' ? 1 / rowIn : rowIn > 0 && hasW(p) && plIn > 0 ? Math.min(plIn / rowIn, 0.98) : itemHs[idx];
   if (rowIn > 0 && hs >= 0) { const dy = Math.max(-0.5, Math.min(0.5, +p.dy || 0)); out.rowIn = rowIn; out.hs = hs; out.top = (0.5 + dy - hs / 2) * rowIn; out.bottom = (0.5 - dy - hs / 2) * rowIn; }
   return out;
 }
-function setSpace(p, side, v) {
-  const sp = spaces(p), g = geom();
+// a short note at the bottom of the screen (e.g. "Copied to 3 matching items.")
+function flashMsg(text) {
+  let el = document.getElementById('layToast');
+  if (!el) { el = document.createElement('div'); el.id = 'layToast'; el.className = 'lay-toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.textContent = text; el.classList.add('on');
+  clearTimeout(flashMsg.t); flashMsg.t = setTimeout(() => el.classList.remove('on'), 2600);
+}
+// ---- copy to matching: the same plate (same logo or same copy), hand hole or BMC elsewhere on the sheet ----
+const normTxt = (t) => String(t || '').replace(/\s+/g, ' ').trim().toUpperCase();
+function matchesOf(i) {
+  const a = L.plates[i]; if (!a) return [];
+  return L.plates.map((b, j) => j).filter((j) => {
+    const b = L.plates[j]; if (j === i || b.kind !== a.kind) return false;
+    if (a.kind === 'hole' || a.kind === 'bmc') return true;
+    return a.img ? b.img === a.img : !b.img && normTxt(a.text) && normTxt(b.text) === normTxt(a.text);
+  });
+}
+// Size, turn and look are copied; each copy keeps its own panel. Up/down: the same distance from the top score.
+// Left/right: centred if the original is centred in its panel, else the same distance from the left score.
+function copyToMatching(i) {
+  const a = L.plates[i], js = matchesOf(i); if (!a || !js.length) return 0;
+  const sa = spaces(a, i), centred = sa.left != null && Math.abs(sa.left - sa.right) <= 1 / 16 + 1e-6;
+  const keys = ['width', 'plen', 'turn', 'flip', 'fsz', 'ta', 'keepShape', 'nosize', 'nodim', 'hole'];
+  js.forEach((j) => {
+    const b = L.plates[j];
+    keys.forEach((k) => { if (a[k] === undefined) delete b[k]; else b[k] = a[k]; });
+    if (geom().rows[b.panel - 1] === geom().rows[a.panel - 1] || !(sa.top >= 0)) b.dy = a.dy; else setSpace(b, 'top', sa.top, j);
+    const sb = spaces(b, j);
+    if (sb.left != null) setSpace(b, 'left', centred ? Math.floor(((sb.left + sb.right) / 2) * 16 + 1e-6) / 16 : sa.left, j);
+  });
+  return js.length;
+}
+function setSpace(p, side, v, idx = sel) {
+  const sp = spaces(p, idx), g = geom();
   if (!isFinite(v) || v < 0) return false;
   if ((side === 'left' || side === 'right') && sp.k != null) {
     const st = side === 'left' ? g.scores[sp.k] + v : g.scores[sp.k + 1] - v - sp.w;
@@ -247,7 +279,8 @@ export function render(v) {
           <div class="seg" id="lPP"></div>
           <div class="lbl" style="margin:14px 0 6px">Print, BMC and text on the sheet <span class="hint" style="font-weight:500">start = inches from the left edge of the blank</span></div>
           <div id="lPlates"></div>
-          <div class="btn-row" style="margin-top:8px"><button type="button" class="btn small" id="lAddPlate">+ Add plate</button><button type="button" class="btn small" id="lAddBmc">+ Add BMC</button><button type="button" class="btn small" id="lAddText">+ Add text</button><button type="button" class="btn small" id="lAddHole">+ Add hand hole</button></div>
+          <div class="btn-row" style="margin-top:8px"><button type="button" class="btn small" id="lAddPlate">+ Add plate</button><button type="button" class="btn small" id="lAddBmc">+ Add BMC</button><button type="button" class="btn small" id="lAddText">+ Add text</button><button type="button" class="btn small" id="lAddHole">+ Add hand hole</button><button type="button" class="btn small" id="lLibBtn" aria-expanded="false">+ From library</button></div>
+          <div id="lLib" class="lay-lib" hidden></div>
         </section>
         </div>
       </div>
@@ -271,10 +304,41 @@ export function render(v) {
     const k = g.lp.length >= 3 ? 1 : 0, a = g.scores[k] || 0, b = g.scores[k + 1] || g.totL || 12;
     addItem({ kind: 'hole', hole: 'cut', panel: row, width: '3 3/4', plen: '1 1/4', start: fx(Math.max(0, Math.round((a + (b - a - 3.75) / 2) * 16) / 16)), dy: -0.2, text: '', flip: false });
   };
+  // ---- customer plate library ----
+  let libAll = false;
+  const libAdd = (x) => {
+    const g = geom(), k = g.lp.length >= 3 ? 1 : 0, a = g.scores[k] || 0, b = g.scores[k + 1] || g.totL || 12, w = pin(x.width);
+    const start = isFinite(w) && w > 0 ? fx(Math.max(0, Math.round((a + (b - a - w) / 2) * 16) / 16)) : mid();
+    addItem({ kind: x.kind === 'hole' ? 'hole' : 'plate', panel: L.printPanels[0] || 1, start, width: x.width || '', plen: x.plen || '', text: x.text || '', img: x.img || '', turn: +x.turn || 0, flip: false, keepShape: !!x.keepShape, fsz: x.fsz || '', ta: x.ta || '', dy: 0 });
+    flashMsg('Added from the library. Move it into place.');
+  };
+  async function paintLib() {
+    const box = $('#lLib'); if (!box) return;
+    const cust = String(L.customer || '').trim();
+    box.innerHTML = `<div class="hint">Loading…</div>`;
+    let plates = [];
+    try { plates = (await api('/api/platelib' + (libAll || !cust ? '' : '?customer=' + encodeURIComponent(cust)))).plates || []; }
+    catch (e) { box.innerHTML = `<div class="alert warn">${esc(e.message)}</div>`; return; }
+    box.innerHTML = `<div class="lay-lib-head"><b>${libAll || !cust ? 'Plate library: all customers' : 'Plate library: ' + esc(cust)}</b>
+        ${cust ? `<button type="button" class="linklike" id="lLibAll">${libAll ? 'Just this customer' : 'Show all customers'}</button>` : ''}</div>
+      ${plates.length ? `<div class="lay-lib-grid">${plates.map((x) => `<div class="lay-lib-card">
+          <div class="lay-lib-pic">${x.img ? `<img src="${x.img}" alt="">` : `<span>${esc(x.text || '')}</span>`}</div>
+          <div class="lay-lib-txt"><b>${esc(x.name || (x.text || 'Plate').split('\n')[0])}</b><span class="hint">${[x.width && show(x.width) + ' wide', x.plen && show(x.plen) + ' long'].filter(Boolean).join(' × ') || 'No size'}${libAll ? ' · ' + esc(x.customer) : ''}</span></div>
+          <div class="btn-row"><button type="button" class="btn small" data-libadd="${esc(x.id)}">Add</button><button type="button" class="btn small ghost danger" data-libdel="${esc(x.id)}" aria-label="Remove from library">✕</button></div></div>`).join('')}</div>`
+        : `<div class="hint">${cust && !libAll ? `Nothing saved for ${esc(cust)} yet.` : 'The library is empty.'} Click a plate on the sheet and press <b>Save to library</b> to keep it for next time.</div>`}`;
+    if ($('#lLibAll')) $('#lLibAll').onclick = () => { libAll = !libAll; paintLib(); };
+    $$('[data-libadd]', box).forEach((bt) => bt.onclick = () => { const x = plates.find((y) => y.id === bt.dataset.libadd); if (x) libAdd(x); });
+    $$('[data-libdel]', box).forEach((bt) => bt.onclick = async () => {
+      if (!confirm('Remove this plate from the library? Sheets that already use it keep it.')) return;
+      try { await api('/api/platelib?id=' + encodeURIComponent(bt.dataset.libdel), { method: 'DELETE' }); paintLib(); } catch (e) { alert(e.message); }
+    });
+  }
+  window.__layPaintLib = paintLib;
+  $('#lLibBtn').onclick = () => { const box = $('#lLib'), open = box.hidden; box.hidden = !open; $('#lLibBtn').setAttribute('aria-expanded', String(open)); if (open) paintLib(); };
   $('#lDetTextAdd').onclick = () => { if (L.detailTexts.length >= 4) return alert('The detail box holds up to 4 text boxes.'); L.detailTexts.push(''); paintDetails(); update(); const t = $$('#lDetTexts textarea').pop(); if (t) t.focus(); };
   $('#lDetLogos').onchange = (e) => { L.detailLogos = e.target.checked; update(); };
   $('#lDetAdd').onchange = (e) => { const f0 = e.target.files[0]; e.target.value = ''; if (f0) addDetail(f0); };
-  $('#lPrint').onclick = printSheet;
+  $('#lPrint').onclick = () => printCheck(printSheet);
   $('#lSave').onclick = save;
   $('#lUndoAll').onclick = undoLast;
   hist = []; histT = 0; imgPool.length = 0;
@@ -414,8 +478,9 @@ function paintSelBar() {
         <button type="button" class="btn small sb-w1" id="lSize"${dis(!hasW(p))}>${p.nosize ? 'Show size' : 'Hide size'}</button>
         <button type="button" class="btn small sb-w1" id="lHl">${p.hl ? 'Remove highlight' : 'Highlight'}</button>
         <label class="btn small sb-w2${isP ? '' : ' is-off'}">${p.img ? 'Change image' : 'Add image'}<input type="file" accept="image/*" hidden id="lSelImg"${dis(!isP)}></label>
+        <button type="button" class="btn small" id="lLibSave"${dis(!hasW(p) || !(p.img || String(p.text || '').trim()))} title="Keep this plate (picture, copy, size, turn) under this customer for the next spec">Save to library</button>
         <button type="button" class="btn small" id="lKeep" aria-pressed="${!!p.keepShape}"${dis(!keepOk)} title="Off: the logo fills the plate Width × Length. On: the logo keeps its own shape inside the box.">Keep logo shape</button></div>
-      <div class="sb-row sb-end"><button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></div>`;
+      <div class="sb-row sb-end"><button type="button" class="btn small" id="lCopyM"${dis(!matchesOf(sel).length)} title="Give the same plate everywhere else on the sheet this one's size, turn and spot in its panel">Copy to matching (${matchesOf(sel).length})</button><button type="button" class="btn small" id="lDup">Duplicate</button><button type="button" class="btn small danger" id="lDelSel">Delete</button><button type="button" class="btn small ghost" id="lDone">Done</button></div>`;
     $('#lHl').onclick = () => { p.hl = !p.hl; paintPlates(); update(); };
     $('#lMvP').onchange = (e) => { p.panel = +e.target.value; p.dy = 0; paintPlates(); update(); };
     $('#lMvL').onclick = () => nudge(-0.5);
@@ -441,6 +506,19 @@ function paintSelBar() {
     });
     $('#lDelSel').onclick = () => delPlate(sel);
     $('#lDup').onclick = () => duplicate(sel);
+    $('#lLibSave').onclick = async () => {
+      const cust = String(L.customer || '').trim();
+      if (!cust) { flashMsg('Fill in Customer first, so the plate is kept under that customer.'); $('[data-l="customer"]')?.focus(); return; }
+      const name = prompt('Name for this plate in the library:', (String(p.text || '').split('\n')[0] || (p.img ? cust + ' logo' : 'Plate')).slice(0, 80));
+      if (name === null) return;
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      try {
+        await api('/api/platelib?id=' + id, { method: 'PUT', body: JSON.stringify({ customer: cust, name, kind: p.kind, text: p.text || '', img: p.img || '', width: p.width || '', plen: p.plen || '', turn: angleOf(p), keepShape: !!p.keepShape, fsz: p.fsz || '', ta: p.ta || '', savedBy: ($('#lName') && $('#lName').value.trim()) || '' }) });
+        flashMsg(`Saved to the library under ${cust}.`);
+        if ($('#lLib') && !$('#lLib').hidden && window.__layPaintLib) window.__layPaintLib();
+      } catch (e) { flashMsg(e.message); }
+    };
+    $('#lCopyM').onclick = () => { const n = copyToMatching(sel); paintPlates(); update(); flashMsg(`Copied to ${n} matching item${n === 1 ? '' : 's'}.`); };
     $('#lFlip').onclick = () => { setAngle(p, angleOf(p) === 180 ? 0 : 180); paintPlates(); update(); };
     $('#lTurn').onclick = () => { setAngle(p, angleOf(p) + 90); paintPlates(); update(); };
     if ($('#lKeep')) $('#lKeep').onclick = () => { p.keepShape = !p.keepShape; paintPlates(); update(); };
@@ -532,8 +610,17 @@ function span(p, g) {
 const itemName = (p) => (p.kind === 'bmc' ? 'BMC' : p.kind === 'hole' ? (isHinge(p) ? 'Hinged hand hole' : 'Hand hole') : p.kind === 'text' ? `Text "${String(p.text || '').split('\n')[0].slice(0, 22)}"` : `Plate${p.text ? ` "${String(p.text).split('\n')[0].slice(0, 22)}"` : ''}`);
 
 // ---- placement warnings: crossing a score, off the blank, on the glue tab, overlapping, no width ----
+// Panel sizes should add up to the blank size: the length may run up to about 1" short (trim), the width must match
+function totalsCheck(g = geom()) {
+  const out = [], bl = pin(L.blankL), bw = pin(L.blankW), sumW = g.rows.reduce((a, b) => a + b, 0);
+  const say = (d) => `${f(Math.abs(d))}" ${d > 0 ? 'short' : 'over'}`;
+  if (g.lp.length && bl > 0) { const d = bl - g.totL; if (d > 1 + 1e-6 || d < -1 / 16) out.push({ i: null, msg: `Length panels add up to ${f(g.totL)}" but the blank length is ${f(bl)}" (${say(d)}). Check the panel sizes.` }); }
+  if (g.rows.length && bw > 0) { const d = bw - sumW; if (Math.abs(d) > 1 / 4) out.push({ i: null, msg: `Width panels add up to ${f(sumW)}" but the blank width is ${f(bw)}" (${say(d)}). Check the panel sizes.` }); }
+  return out;
+}
 function placementWarnings() {
   const g = geom(), out = [], tol = 1 / 32;
+  out.push(...totalsCheck(g));
   const items = L.plates.map((p, i) => ({ p, i, sp: span(p, g) }));
   items.forEach(({ p, i, sp }) => {
     if (!sp) return;
@@ -557,7 +644,7 @@ function paintWarn() {
   const box = $('#lWarn');
   if (!box) return;
   const w = placementWarnings();
-  box.innerHTML = w.length ? `<div class="alert warn lay-warn"><b>Check placement</b> <span class="hint">(not printed)</span><ul>${w.slice(0, 8).map((x) => `<li><a href="#" data-wsel="${x.i}">${esc(x.msg)}</a></li>`).join('')}</ul></div>` : '';
+  box.innerHTML = w.length ? `<div class="alert warn lay-warn"><b>Check placement</b> <span class="hint">(not printed)</span><ul>${w.slice(0, 8).map((x) => `<li>${x.i == null ? esc(x.msg) : `<a href="#" data-wsel="${x.i}">${esc(x.msg)}</a>`}</li>`).join('')}</ul></div>` : '';
   $$('[data-wsel]', box).forEach((a) => a.onclick = (e) => { e.preventDefault(); select(+a.dataset.wsel); });
 }
 
@@ -1483,6 +1570,39 @@ function wrap(s, n) {
 // Fill one landscape letter page (about 998 × 758 px printable at 0.3" margins):
 // measure the sheet as it prints, then give the spare height to the drawing (and the rest to the bottom boxes).
 // A sheet that is too tall is scaled down instead.
+// ---- quick check before printing: anything unfinished, with "Print anyway" ----
+function printIssues() {
+  const out = [];
+  if (!String(L.specNo || '').trim()) out.push({ i: null, msg: 'No Spec # on the sheet.' });
+  if (L.plates.some((p) => p.kind === 'plate') && !String(L.plateNo || '').trim()) out.push({ i: null, msg: 'No Plate # on the sheet.' });
+  L.plates.forEach((p, i) => {
+    if (!hasW(p)) return;
+    if (!(pin(p.plen) > 0)) out.push({ i, msg: `${itemName(p)} on P${p.panel} has no length (top to bottom).` });
+  });
+  placementWarnings().forEach((w) => out.push(w));
+  return out;
+}
+function printCheck(go) {
+  const list = printIssues();
+  if (!list.length) return go();
+  document.getElementById('lPrintChk')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'lPrintChk'; ov.className = 'lay-chk';
+  ov.innerHTML = `<div class="lay-chk-box" role="dialog" aria-modal="true" aria-labelledby="lChkT">
+      <h3 id="lChkT">Before you print</h3>
+      <p class="hint">${list.length} thing${list.length > 1 ? 's' : ''} to look at. Click one to go to it.</p>
+      <ul>${list.slice(0, 12).map((x, k) => `<li>${x.i == null ? esc(x.msg) : `<a href="#" data-chk="${k}">${esc(x.msg)}</a>`}</li>`).join('')}${list.length > 12 ? `<li class="hint">… and ${list.length - 12} more</li>` : ''}</ul>
+      <div class="btn-row"><button type="button" class="btn" id="lChkFix">Go back and fix</button><button type="button" class="btn ghost" id="lChkGo">Print anyway</button></div></div>`;
+  document.body.appendChild(ov);
+  const close = () => { ov.remove(); document.removeEventListener('keydown', esc1); };
+  const esc1 = (e) => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', esc1);
+  ov.onclick = (e) => { if (e.target === ov) close(); };
+  $('#lChkFix').onclick = close;
+  $('#lChkGo').onclick = () => { close(); go(); };
+  $$('[data-chk]', ov).forEach((a) => a.onclick = (e) => { e.preventDefault(); const x = list[+a.dataset.chk]; close(); select(x.i); document.getElementById('lSheet')?.scrollIntoView({ block: 'center', behavior: 'smooth' }); });
+  $('#lChkFix').focus();
+}
 function printSheet() {
   const AVAIL = 740;
   const measure = (o) => {

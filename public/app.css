@@ -563,3 +563,25 @@ details.fold[open]{padding-bottom:16px}
 .lsheet .pd-v i:first-child{border-bottom-color:#1565c0}
 .lsheet .pd-v i:last-child{border-top-color:#1565c0}
 .lsheet .pd-v b{color:#1565c0}
+
+.lay-toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#1f2937;color:#fff;padding:9px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:1000}
+.lay-toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+@media print{.lay-toast{display:none}}
+
+/* Plate library */
+.lay-lib{margin-top:10px;border:1px solid var(--line,#d7dde3);border-radius:10px;padding:10px;background:var(--card,#fff)}
+.lay-lib-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.lay-lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.lay-lib-card{border:1px solid var(--line,#d7dde3);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.lay-lib-pic{height:64px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:6px;overflow:hidden}
+.lay-lib-pic img{max-width:100%;max-height:64px;object-fit:contain}
+.lay-lib-pic span{font:700 12px/1.2 system-ui,sans-serif;color:#111;text-align:center;white-space:pre-line;padding:0 4px}
+.lay-lib-txt{display:flex;flex-direction:column;font-size:13px;overflow-wrap:anywhere}
+
+/* Before you print */
+.lay-chk{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:900;padding:16px}
+.lay-chk-box{background:var(--card,#fff);color:var(--ink,#111);border-radius:12px;max-width:560px;width:100%;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.3);max-height:90vh;overflow:auto}
+.lay-chk-box h3{margin:0 0 4px}
+.lay-chk-box ul{margin:8px 0 14px;padding-left:20px;line-height:1.5}
+@media print{.lay-chk{display:none}}
+.lay-lib .linklike{background:none;border:0;padding:0;color:var(--accent,#1565c0);text-decoration:underline;cursor:pointer;font:inherit;font-size:13px}
