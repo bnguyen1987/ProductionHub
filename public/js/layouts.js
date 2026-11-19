@@ -7,7 +7,7 @@ import { pageCanvas } from './dieline.js';
 const today = () => { const d = new Date(); return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`; };
 const EMPTY = () => ({
   id: '', customer: '', shipTo: '', fileNo: '', specNo: '', plateNo: '', design: '', ident: '', style: '', size: '', board: '',
-  joint: '', slots: '', flapEnds: '', plateSizes: '', blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
+  joint: '', slots: '', flapEnds: '', mm: '', plateSizes: '', blankW: '', blankL: '', print: '', routing: '', view: 'Outside', widthPanels: '', lengthPanels: '',
   printPanels: [], plates: [], notes: '', changes: '', detailTexts: [], details: [], detailLogos: true, origDate: '', revDate: today(), sales: '', designer: '', approved: '', orig: null,
 });
 const INFO = [
@@ -237,6 +237,7 @@ export function render(v) {
           <div class="field"><label>Scores along the length, left to right</label><input type="text" data-l="lengthPanels" placeholder="4 3/4, 123 1/16, 4 3/4"></div>
           <div id="lLChk" class="hint" style="margin:4px 0 10px"></div>
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Measurements on the sheet</label><select data-l="units"><option value="">10:05 (inches:sixteenths)</option><option value="frac">10 5/16 (fractions)</option></select></div>
+          <div class="field" style="max-width:220px;margin-bottom:10px"><label>Millimeters on panel sizes</label><select data-l="mm"><option value="">Don't show</option><option value="on">Show, e.g. 7:02 (180)</option></select></div>
           <div class="field" style="max-width:260px;margin-bottom:10px"><label>Glue tab</label><select data-l="glueTab"><option value="">Auto (RSC-type: small 1st length panel)</option><option value="on">Show</option><option value="off">Don't show</option></select></div>
           <div class="field" style="max-width:220px;margin-bottom:10px"><label>Slots</label><select data-l="slots"><option value="">Auto (with the glue tab)</option><option value="on">Top &amp; bottom flaps (at each score)</option><option value="ends">End flaps (between the rows)</option><option value="off">Don't show</option></select></div>
           <div class="field" style="max-width:200px;margin-bottom:10px"><label>Joint</label><select data-l="joint"><option value="">Glue</option><option value="stitch">Stitch</option><option value="tape">Tape</option></select></div>
@@ -975,7 +976,7 @@ async function readLayout(input) {
       ...EMPTY(),
       customer: str(r.customer), shipTo: str(r.ship_to), fileNo: str(r.file_no), specNo: str(r.spec_no), plateNo: str(r.plate_no), design: str(r.design_no),
       ident: str(r.ident), style: str(r.style), size: str(r.size), board: str(r.board),
-      slots: r.slots === true ? (r.slots_at === 'end_panels' ? 'ends' : 'on') : '', joint: ['stitch', 'tape'].includes(String(r.joint || '').toLowerCase()) ? String(r.joint).toLowerCase() : '', blankW: show(r.blank_width), blankL: show(r.blank_length), print: str(r.print), routing: str(r.routing),
+      mm: r.shows_mm === true ? 'on' : '', slots: r.slots === true ? (r.slots_at === 'end_panels' ? 'ends' : 'on') : '', joint: ['stitch', 'tape'].includes(String(r.joint || '').toLowerCase()) ? String(r.joint).toLowerCase() : '', blankW: show(r.blank_width), blankL: show(r.blank_length), print: str(r.print), routing: str(r.routing),
       view: r.view === 'Inside' ? 'Inside' : 'Outside',
       widthPanels: arr(r.width_panels).map(show).join(', '), lengthPanels: arr(r.length_panels).map(show).join(', '),
       printPanels: pp, plates: [...plates, ...texts, ...holes], notes: arr(r.notes).map(str).filter(Boolean).join('\n'), changes: arr(r.changes).map(str).filter(Boolean).join('\n'),
@@ -1087,6 +1088,8 @@ function sheetHtml(d, selIdx = -1, opt = {}) {
 // SVG of the blank: width panels as rows (height exaggerated), length scores as columns, plates and the gaps between them.
 let mkSeq = 0;
 function drawing(d, selIdx = -1, drawH = 270, editable = false) {
+  // panel sizes can also show millimeters, cut down to the whole mm like the plant's sheets: 7:02 (180)
+  const mmOn = d.mm === 'on', mm = (x) => Math.floor(x * 25.4 + 1e-6);
   const { f, q } = fmtFor(d); // q = with inch mark in fractions mode
   const uid = 'm' + (++mkSeq) + '-'; // own arrowhead ids per copy (the hidden preview's ids would not print)
   const x0 = 64, x1 = 850, y0 = 30, H = drawH || 270;
@@ -1188,7 +1191,7 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
   R.forEach((r, i) => {
     cumW += rows[i];
     if (wp.length) {
-      o.push(`<g class="ls-dimedit" data-edit="wp:${i}"><rect x="${x0 - 52}" y="${(r.m - 7).toFixed(1)}" width="40" height="14" fill="#fff" fill-opacity="0"/>${t(x0 - 14, r.m + 3.5, f(rows[i]), { anchor: 'end', size: 10, weight: 700 })}</g>`);
+      o.push(`<g class="ls-dimedit" data-edit="wp:${i}"><rect x="${x0 - 52}" y="${(r.m - 7).toFixed(1)}" width="40" height="14" fill="#fff" fill-opacity="0"/>${t(x0 - 14, r.m + 3.5, f(rows[i]), { anchor: 'end', size: 10, weight: 700 })}${mmOn ? t(x0 - 14, r.m + 15, `(${mm(rows[i])})`, { anchor: 'end', size: 9 }) : ''}</g>`);
       o.push(`<line x1="${x0 - 7}" y1="${(r.y + 1.5).toFixed(1)}" x2="${x0 - 7}" y2="${(r.y + r.h - 1.5).toFixed(1)}" stroke="${INK}" stroke-width=".8" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
       o.push(`<line x1="${x0 - 11}" y1="${r.y.toFixed(1)}" x2="${x0 - 3}" y2="${r.y.toFixed(1)}" stroke="${INK}" stroke-width=".8"/>`);
     }
@@ -1196,6 +1199,7 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
     if (wp.length) {
       o.push(`<line x1="${x1 + 9}" y1="${(r.y + 1.5).toFixed(1)}" x2="${x1 + 9}" y2="${(r.y + r.h - 1.5).toFixed(1)}" stroke="${INK}" stroke-width=".8" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
       o.push(t(x1 + 48, r.m + 3.5, f(cumW), { size: 10.5, weight: 700 }));
+      if (mmOn) o.push(t(x1 + 48, r.m + 15, `(${mm(cumW)})`, { size: 9 }));
     }
   });
   o.push(`<line x1="${x1 + 4}" y1="${y0 + H}" x2="${x1 + 14}" y2="${y0 + H}" stroke="${INK}"/>`);
@@ -1204,7 +1208,7 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
   if (isFinite(W) && W > 0) {
     o.push(`<line x1="${x1 + 84}" y1="${y0}" x2="${x1 + 84}" y2="${y0 + H}" stroke="${INK}" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
     o.push(`<line x1="${x1 + 78}" y1="${y0}" x2="${x1 + 90}" y2="${y0}" stroke="${INK}" stroke-width=".8"/><line x1="${x1 + 78}" y1="${y0 + H}" x2="${x1 + 90}" y2="${y0 + H}" stroke="${INK}" stroke-width=".8"/>`);
-    o.push(t(x1 + 100, y0 + H / 2, f(W), { size: 11, weight: 700, tr: `rotate(90 ${x1 + 100} ${y0 + H / 2})` }));
+    o.push(t(x1 + 100, y0 + H / 2, f(W) + (mmOn ? ` (${mm(W)})` : ''), { size: 11, weight: 700, tr: `rotate(90 ${x1 + 100} ${y0 + H / 2})` }));
   }
 
   const yb = y0 + H + 18;
@@ -1218,10 +1222,10 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
       else o.push(g0 + `<rect x="${((a + b) / 2 - w / 2).toFixed(1)}" y="${(yl - 7).toFixed(1)}" width="${w.toFixed(1)}" height="13" fill="#fff"/>` + t((a + b) / 2, yl + 3.5, lab, { size: 10, weight: 700 }) + g1);
     });
     scores.forEach((sc) => o.push(`<line x1="${X(sc).toFixed(1)}" y1="${y0 - 18}" x2="${X(sc).toFixed(1)}" y2="${y0 - 3}" stroke="${INK}" stroke-width=".8"/>`));
-    dimRow(y0 - 10, (i) => f(lp[i]), true); // the top row can be clicked to change a panel
+    dimRow(y0 - 10, (i) => f(lp[i]) + (mmOn ? ` (${mm(lp[i])})` : ''), true); // the top row can be clicked to change a panel
     // bottom: running total at the end of each panel, centered under that panel (same layout as the top row)
     scores.forEach((sc) => o.push(`<line x1="${X(sc).toFixed(1)}" y1="${y0 + H + 3}" x2="${X(sc).toFixed(1)}" y2="${y0 + H + 18}" stroke="${INK}" stroke-width=".8"/>`));
-    dimRow(y0 + H + 11, (i) => f(scores[i + 1]));
+    dimRow(y0 + H + 11, (i) => f(scores[i + 1]) + (mmOn ? ` (${mm(scores[i + 1])})` : ''));
   }
   const blankNote = isFinite(bl) && bl > 0 && lp.length && !near(bl, totL) ? ` (blank ${f(bl)})` : '';
   o.push(t((x0 + x1) / 2, yb + 24, lp.length ? `${f(totL)} scored length${blankNote}` : isFinite(bl) && bl > 0 ? `${f(bl)} blank length` : '', { size: 10.5, weight: 600 }));
