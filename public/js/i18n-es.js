@@ -201,7 +201,7 @@ export const ES = {
   'Plate size': 'Tamaño del grabado', 'Hide plate size': 'Ocultar tamaño', 'Show plate size': 'Mostrar tamaño', 'Plate size measurements': 'Medidas del grabado', Show: 'Mostrar', 'Hide on all plates': 'Ocultar en todos',
   'Plate sizes': 'Tamaños de grabado', 'In Print Detail': 'En detalle de impresión', 'Print Detail + drawing': 'Detalle + dibujo', 'Hide size': 'Ocultar tamaño', 'Show size': 'Mostrar tamaño', 'Hide this size': 'Ocultar este tamaño',
   'Plate #': 'Grabado #', 'PLATE #': 'GRABADO #',
-  'Add a Spec # or customer first.': 'Primero agregue Spec # o cliente.', 'Search Spec #, customer': 'Buscar Spec #, cliente',
+  'Add a Spec # or customer first.': 'Primero agregue Spec # o cliente.', 'Search Spec #, customer': 'Buscar Spec #, cliente', 'Search Spec #, Plate # or customer': 'Buscar Spec #, Grabado # o cliente',
   '+ Add hand hole': '+ Agregar agarradera', 'Hand hole on': 'Agarradera en', Type: 'Tipo', 'Cut-out': 'Recortada', Hinged: 'Con bisagra', 'Hinge (fold line) on': 'Bisagra (doblez) en', 'Top edge': 'Borde de arriba', 'Bottom edge': 'Borde de abajo', 'Hinge on bottom': 'Bisagra abajo',
   '+ Add plate size': '+ Agregar tamaño', '+ Add length': '+ Agregar largo', '+ Add width': '+ Agregar ancho',
   Slots: 'Ranuras', 'Glue tab': 'Ceja de pegue', 'Auto (with the glue tab)': 'Auto (con la ceja de pegue)',

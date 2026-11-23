@@ -74,7 +74,7 @@ export default async (req: Request) => {
       const { blobs: list } = await blobs.list({ prefix: "l/" });
       const layouts = (await Promise.all(list.map(async (b) => {
         const v: any = await blobs.get(b.key, { type: "json" });
-        return v ? { id: b.key.slice(2), customer: v.customer, fileNo: v.fileNo, specNo: v.specNo, design: v.design, style: v.style, updatedBy: v.updatedBy, updatedAt: v.updatedAt } : null;
+        return v ? { id: b.key.slice(2), customer: v.customer, fileNo: v.fileNo, specNo: v.specNo, plateNo: v.plateNo, design: v.design, style: v.style, updatedBy: v.updatedBy, updatedAt: v.updatedAt } : null;
       }))).filter(Boolean).sort((a: any, b: any) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
       return Response.json({ layouts });
     }

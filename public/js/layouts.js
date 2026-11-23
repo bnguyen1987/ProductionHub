@@ -219,7 +219,7 @@ export function render(v) {
         </section>
         <section class="card">
           <h2>Saved layouts</h2>
-          <input type="search" id="lFind" placeholder="Search Spec #, customer" aria-label="Search saved layouts">
+          <input type="search" id="lFind" placeholder="Search Spec #, Plate # or customer" aria-label="Search saved layouts">
           <div id="lList" style="margin-top:10px"><div class="hint"><span class="spinner"></span> Loading…</div></div>
         </section>
       </div>
@@ -1744,15 +1744,16 @@ async function loadList() {
 function paintList() {
   const box = $('#lList');
   if (!box) return;
-  const q = $('#lFind').value.trim().toLowerCase();
-  const rows = saved.filter((x) => !q || [x.customer, x.fileNo, x.specNo, x.design, x.style].join(' ').toLowerCase().includes(q));
+  // Spec #, Plate # (also an old sheet's design no.), customer; "spec 88857", "#5763" or "plate 5763" work too
+  const q = $('#lFind').value.trim().toLowerCase().replace(/^(spec|plate|print plate)\s*(#|no\.?)?\s*|^#\s*/, '');
+  const rows = saved.filter((x) => !q || [x.specNo, x.plateNo, x.design, x.customer, x.fileNo, x.style].join(' ').toLowerCase().includes(q));
   if (!saved.length) { box.innerHTML = '<p class="hint" style="margin:0">No saved layouts yet.</p>'; return; }
   if (!rows.length) { box.innerHTML = '<p class="hint" style="margin:0">No match.</p>'; return; }
   // only the 3 most recent show; a search looks through all of them
   const SHOW = 3, cut = !q && !listAll && rows.length > SHOW;
   box.innerHTML = rows.slice(0, cut ? SHOW : 100).map((x) => `
     <div class="lay-item">
-      <div><b>${x.specNo ? 'Spec # ' + esc(x.specNo) + ' · ' : ''}${esc(x.customer || 'No customer')}</b><div class="hint">${[!x.specNo && x.fileNo && 'File # ' + x.fileNo, x.design, x.style].filter(Boolean).map(esc).join(' · ')}</div>
+      <div><b>${x.specNo ? 'Spec # ' + esc(x.specNo) + ' · ' : ''}${esc(x.customer || 'No customer')}</b><div class="hint">${[x.plateNo && 'Plate # ' + x.plateNo, !x.specNo && x.fileNo && 'File # ' + x.fileNo, x.design, x.style].filter(Boolean).map(esc).join(' · ')}</div>
         <div class="hint">${esc(x.updatedBy || '')}${x.updatedAt ? ' · ' + new Date(x.updatedAt).toLocaleDateString() : ''}</div></div>
       <div class="btn-row"><button type="button" class="btn small" data-open="${esc(x.id)}">Open</button><button type="button" class="btn small ghost danger" data-rm="${esc(x.id)}" aria-label="Delete">✕</button></div>
     </div>`).join('') + (cut ? `<button type="button" class="btn small ghost" id="lListAll" style="margin-top:6px">Show all ${rows.length} saved layouts</button>`
