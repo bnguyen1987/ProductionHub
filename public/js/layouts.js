@@ -1502,13 +1502,20 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
   });
   // gaps: from the nearest score (or plate) on the left of each plate, and from the last plate to the next score
   for (let i = 1; i <= R.length; i++) {
-    const row = plates.filter((p) => p.panel === i && !p.skip && !p.nodim).sort((a, b) => a.s - b.s);
-    if (!row.length) continue;
+    const all = plates.filter((p) => p.panel === i && !p.skip && !p.nodim);
+    // hand holes are cut, not print: each one is measured on its own, from the score on its left (green)
+    const holes = all.filter((p) => p.kind === 'hole'), row = all.filter((p) => p.kind !== 'hole').sort((a, b) => a.s - b.s);
+    if (!all.length) continue;
     let prevEnd = null, prevDim = 0;
     const placed = (blueLabs[i] || []).slice(), botY = R[i - 1].y + R[i - 1].h - 3;
+    holes.forEach((p) => {
+      const sc = scores.filter((s) => s <= p.s + 1e-6).pop() ?? 0;
+      if (p.s - sc > 0.01) gapMark(o, X(sc), p.xa, p.cy, q(p.s - sc), GREEN, t, arrow, R[i - 1].y + 10, null, placed, botY);
+    });
     row.forEach((p, k) => {
       const sc = scores.filter((s) => s <= p.s + 1e-6).pop() ?? 0;
-      const fromPlate = prevEnd !== null && prevEnd >= sc - 1e-6;
+      // from the item before it, unless that one sits above / below it (overlaps along the length): then from the score
+      const fromPlate = prevEnd !== null && prevEnd >= sc - 1e-6 && prevEnd <= p.s + 1e-6;
       const a = fromPlate ? prevEnd : sc;
       const gap = p.s - a;
       const y = p.cy, topY = R[i - 1].y + 10;
@@ -1517,7 +1524,7 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
       if (gap > 0.01) gapMark(o, xs, p.xa, y, q(gap), p.kind === 'hole' ? GREEN : RED, t, arrow, topY, p.vdim ? p.xa - 12 : null, placed, botY);
       prevEnd = Math.max(prevEnd ?? -Infinity, p.e); prevDim = p.dimR || 0;
       // gap to the next score, when that score comes before the next plate
-      const next = row[k + 1], scR = scores.find((s) => s >= p.e - 1e-6) ?? totL;
+      const next = row.slice(k + 1).find((n) => n.s >= p.e - 1e-6), scR = scores.find((s) => s >= p.e - 1e-6) ?? totL;
       if ((!next || scR <= next.s + 1e-6) && scR - p.e > 0.01 && p.kind !== 'hole') { /* a hand hole is measured from the left only */ gapMark(o, X(scR) - p.xb >= 8 ? p.xb : p.xb - (p.dimR || 0), X(scR), y, q(scR - p.e), p.kind === 'hole' ? GREEN : RED, t, arrow, topY, null, placed, botY); prevEnd = scR; prevDim = 0; }
     });
   }
