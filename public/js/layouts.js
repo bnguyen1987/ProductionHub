@@ -1443,13 +1443,13 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
     const pw = pin(p.width);
     let wLab = 0; // width of the plate-size number in the middle, so the blue arrows can sit just beside it
     // hand hole: its size as one label (Width × Length) just under it, or over it when there is no room
-    if (p.kind === 'hole' && !p.nodim && !p.nosize && (pw > 0 || plIn > 0)) {
+    if (p.kind === 'hole' && !p.nosize && (pw > 0 || plIn > 0)) {
       const lab = [pw > 0 ? q(pw) : '?', plIn > 0 ? q(plIn) : '?'].join(' × '), lw = lab.length * 5.2 + 8, ccx = (xa + xb) / 2;
       const below = y + h + 14 <= r.y + r.h - 2, yl = below ? y + h + 9 : y - 6;
       o.push(`<rect x="${(ccx - lw / 2).toFixed(1)}" y="${(yl - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="11" fill="#fff" fill-opacity=".9"/>` + t(ccx, yl + 3, lab, { size: 9, weight: 700 }));
       wLab = lw;
     }
-    if (!p.nodim && !p.nosize && p.kind !== 'hole' && d.plateSizes === 'show' && isFinite(pw) && pw > 0 && xb - xa >= 14) {
+    if (!p.nosize && p.kind !== 'hole' && d.plateSizes === 'show' && isFinite(pw) && pw > 0 && xb - xa >= 14) {
       const below = y + h + 13 <= r.y + r.h - 2, yd = below ? y + h + 7 : y - 7;
       const lab = q(pw), lw = lab.length * 5.4 + 8, ccx = (xa + xb) / 2;
       o.push(`<line x1="${xa.toFixed(1)}" y1="${(below ? y + h + 2 : y - 2).toFixed(1)}" x2="${xa.toFixed(1)}" y2="${(yd + (below ? 3 : -3)).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
@@ -1460,7 +1460,7 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
       else o.push(t(xb + 3, yd + 3.2, lab, { size: 9, weight: 700, anchor: 'start' })); // narrow plate: number beside the arrow
     }
     // plate length top to bottom: arrow on the right side of the plate (gap arrows on that side start past it)
-    if (!p.nodim && !p.nosize && p.kind !== 'hole' && d.plateSizes === 'show' && isFinite(plIn) && plIn > 0 && h >= 12) {
+    if (!p.nosize && p.kind !== 'hole' && d.plateSizes === 'show' && isFinite(plIn) && plIn > 0 && h >= 12) {
       const xd = xb + 6;
       o.push(`<line x1="${(xb + 1).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(xd + 3).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${INK}" stroke-width=".6"/><line x1="${(xb + 1).toFixed(1)}" y1="${(y + h).toFixed(1)}" x2="${(xd + 3).toFixed(1)}" y2="${(y + h).toFixed(1)}" stroke="${INK}" stroke-width=".6"/>`);
       o.push(`<line x1="${xd.toFixed(1)}" y1="${(y + 0.5).toFixed(1)}" x2="${xd.toFixed(1)}" y2="${(y + h - 0.5).toFixed(1)}" stroke="${INK}" stroke-width="1" marker-start="url(#${uid}lak)" marker-end="url(#${uid}lak)"/>`);
