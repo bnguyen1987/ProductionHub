@@ -1446,7 +1446,7 @@ function drawing(d, selIdx = -1, drawH = 270, editable = false) {
     if (p.kind === 'hole' && !p.nosize && (pw > 0 || plIn > 0)) {
       const lab = [pw > 0 ? q(pw) : '?', plIn > 0 ? q(plIn) : '?'].join(' × '), lw = lab.length * 5.2 + 8, ccx = (xa + xb) / 2;
       const below = y + h + 14 <= r.y + r.h - 2, yl = below ? y + h + 9 : y - 6;
-      o.push(`<rect x="${(ccx - lw / 2).toFixed(1)}" y="${(yl - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="11" fill="#fff" fill-opacity=".9"/>` + t(ccx, yl + 3, lab, { size: 9, weight: 700 }));
+      o.push(`<rect x="${(ccx - lw / 2).toFixed(1)}" y="${(yl - 6).toFixed(1)}" width="${lw.toFixed(1)}" height="11" fill="#fff" fill-opacity=".9"/>` + t(ccx, yl + 3, lab, { size: 9, weight: 700, fill: GREEN }));
       wLab = lw;
     }
     if (!p.nosize && p.kind !== 'hole' && d.plateSizes === 'show' && isFinite(pw) && pw > 0 && xb - xa >= 14) {
