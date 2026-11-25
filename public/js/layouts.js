@@ -279,8 +279,12 @@ export function render(v) {
           <div class="seg" id="lPP"></div>
           <div class="lbl" style="margin:14px 0 6px">Print, BMC and text on the sheet <span class="hint" style="font-weight:500">start = inches from the left edge of the blank</span></div>
           <div id="lPlates"></div>
-          <div class="btn-row" style="margin-top:8px"><button type="button" class="btn small" id="lAddPlate">+ Add plate</button><button type="button" class="btn small" id="lAddBmc">+ Add BMC</button><button type="button" class="btn small" id="lAddText">+ Add text</button><button type="button" class="btn small" id="lAddHole">+ Add hand hole</button><button type="button" class="btn small" id="lLibBtn" aria-expanded="false">+ From library</button></div>
-          <div id="lLib" class="lay-lib" hidden></div>
+          <div class="btn-row" style="margin-top:8px"><button type="button" class="btn small" id="lAddPlate">+ Add plate</button><button type="button" class="btn small" id="lAddBmc">+ Add BMC</button><button type="button" class="btn small" id="lAddText">+ Add text</button><button type="button" class="btn small" id="lAddHole">+ Add hand hole</button><button type="button" class="btn small" id="lLibBtn" aria-expanded="false">+ From library / Plate #</button></div>
+          <div id="lLib" class="lay-lib" hidden>
+            <div class="lay-pfind"><label for="lPFind"><b>Find by Plate #</b></label>
+              <div class="row-inline"><input type="text" id="lPFind" placeholder="e.g. 5763" autocomplete="off"><button type="button" class="btn small" id="lPFindGo">Find</button></div>
+              <div id="lPFindOut"></div></div>
+            <div id="lLibList"></div></div>
         </section>
         </div>
       </div>
@@ -312,8 +316,37 @@ export function render(v) {
     addItem({ kind: x.kind === 'hole' ? 'hole' : 'plate', panel: L.printPanels[0] || 1, start, width: x.width || '', plen: x.plen || '', text: x.text || '', img: x.img || '', turn: +x.turn || 0, flip: false, keepShape: !!x.keepShape, fsz: x.fsz || '', ta: x.ta || '', dy: 0 });
     flashMsg('Added from the library. Move it into place.');
   };
+  // ---- find a print plate by its Plate #: from the saved sheets that use that plate (or an old sheet's design no.) ----
+  async function findPlate() {
+    const out = $('#lPFindOut'), num = $('#lPFind').value.trim().replace(/^(plate|print plate)?\s*#?\s*/i, '');
+    if (!num) { out.innerHTML = ''; return; }
+    out.innerHTML = '<div class="hint">Looking…</div>';
+    try {
+      if (!saved.length) saved = (await api('/api/layouts')).layouts || [];
+      const n = num.toLowerCase(), hits = saved.filter((x) => [x.plateNo, x.design].some((v) => String(v || '').trim().toLowerCase() === n)).slice(0, 5);
+      if (!hits.length) { out.innerHTML = `<div class="hint">No saved sheet has Plate # ${esc(num)}. Check the number, or add the plate by hand.</div>`; return; }
+      const docs = (await Promise.all(hits.map((x) => api('/api/layouts?id=' + encodeURIComponent(x.id)).then((r) => r.layout).catch(() => null)))).filter(Boolean);
+      const groups = docs.map((d) => ({ d, plates: (d.plates || []).filter((p) => p.kind === 'plate' && (p.img || String(p.text || '').trim())) })).filter((g) => g.plates.length);
+      if (!groups.length) { out.innerHTML = `<div class="hint">Found Plate # ${esc(num)} but those sheets have no plates on them yet.</div>`; return; }
+      const sz = (p) => [show(p.width) && show(p.width) + ' wide', show(p.plen) && show(p.plen) + ' long'].filter(Boolean).join(' × ') || 'No size';
+      out.innerHTML = groups.map((g, gi) => `<div class="lay-pf-group"><div class="lay-lib-head"><span><b>Plate # ${esc(num)}</b> <span class="hint">from Spec # ${esc(g.d.specNo || '–')} · ${esc(g.d.customer || '')}</span></span>
+          <button type="button" class="btn small" data-pfall="${gi}" title="Put every plate from that sheet on this one, in the same panels and spots">Add all (same spots)</button></div>
+        <div class="lay-lib-grid">${g.plates.map((p, k) => `<div class="lay-lib-card"><div class="lay-lib-pic">${p.img ? `<img src="${p.img}" alt="">` : `<span>${esc(p.text)}</span>`}</div>
+          <div class="lay-lib-txt"><b>${esc(String(p.text || 'Logo').split('\n')[0].slice(0, 40) || 'Logo')}</b><span class="hint">${esc(sz(p))} · P${p.panel}</span></div>
+          <div class="btn-row"><button type="button" class="btn small" data-pfadd="${gi}:${k}">Add</button></div></div>`).join('')}</div></div>`).join('');
+      const take = (p) => ({ kind: 'plate', panel: p.panel, start: p.start, width: p.width || '', plen: p.plen || '', text: p.text || '', img: p.img || '', turn: +p.turn || 0, flip: !!p.flip, keepShape: !!p.keepShape, fsz: p.fsz || '', ta: p.ta || '', dy: +p.dy || 0, nosize: !!p.nosize });
+      const setNo = () => { if (!String(L.plateNo || '').trim()) { L.plateNo = num; const f = $('[data-l="plateNo"]'); if (f) f.value = num; } };
+      $$('[data-pfadd]', out).forEach((bt) => bt.onclick = () => { const [gi, k] = bt.dataset.pfadd.split(':').map(Number); setNo(); libAdd(take(groups[gi].plates[k])); });
+      $$('[data-pfall]', out).forEach((bt) => bt.onclick = () => {
+        setNo(); groups[+bt.dataset.pfall].plates.forEach((p) => { L.plates.push(take(p)); });
+        paintPlates(); update(); flashMsg(`Added ${groups[+bt.dataset.pfall].plates.length} plate(s) in the same spots. Check them against this sheet's panels.`);
+      });
+    } catch (e) { out.innerHTML = `<div class="alert warn">${esc(e.message)}</div>`; }
+  }
+  $('#lPFindGo').onclick = findPlate;
+  $('#lPFind').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); findPlate(); } };
   async function paintLib() {
-    const box = $('#lLib'); if (!box) return;
+    const box = $('#lLibList'); if (!box) return;
     const cust = String(L.customer || '').trim();
     box.innerHTML = `<div class="hint">Loading…</div>`;
     let plates = [];

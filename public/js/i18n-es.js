@@ -212,6 +212,8 @@ export const ES = {
   'Keep this plate (picture, copy, size, turn) under this customer for the next spec': 'Guardar este grabado (imagen, texto, tamaño, giro) con este cliente para la próxima especificación',
   'Added from the library. Move it into place.': 'Agregado de la biblioteca. Muévalo a su lugar.', 'Fill in Customer first, so the plate is kept under that customer.': 'Primero llene Cliente, para guardar el grabado con ese cliente.',
   'Before you print': 'Antes de imprimir', 'Go back and fix': 'Regresar y corregir', 'Print anyway': 'Imprimir así', 'No Spec # on the sheet.': 'La hoja no tiene Spec #.', 'No Plate # on the sheet.': 'La hoja no tiene Grabado #.',
+  '+ From library / Plate #': '+ De biblioteca / Grabado #', 'Find by Plate #': 'Buscar por Grabado #', Find: 'Buscar', 'Looking…': 'Buscando…', 'Add all (same spots)': 'Agregar todos (mismo lugar)',
+  'Put every plate from that sheet on this one, in the same panels and spots': 'Poner todos los grabados de esa hoja en esta, en los mismos paneles y lugares',
   Turn: 'Girar', 'Turn 90°': 'Girar 90°', Upright: 'Derecho', 'Sideways ↓': 'De lado ↓', 'Sideways ↑': 'De lado ↑',
   '(Upright)': '(Derecho)', '(Sideways ↓)': '(De lado ↓)', '(Upside down)': '(Al revés)', '(Sideways ↑)': '(De lado ↑)',
   'Turn the copy a quarter turn (upright → sideways ↓ → upside down → sideways ↑)': 'Girar el texto un cuarto de vuelta (derecho → de lado ↓ → al revés → de lado ↑)',
@@ -662,6 +664,9 @@ export const ES = {
 
 // Whole lines with numbers or names in them (first match wins).
 export const PATTERNS = [
+  [/^No saved sheet has Plate # (.+)\. Check the number, or add the plate by hand\.$/, 'Ninguna hoja guardada tiene el Grabado # $1. Revise el número o agregue el grabado a mano.'],
+  [/^Found Plate # (.+) but those sheets have no plates on them yet\.$/, 'Se encontró el Grabado # $1 pero esas hojas no tienen grabados todavía.'],
+  [/^Added (\d+) plate\(s\) in the same spots\. Check them against this sheet's panels\.$/, 'Se agregaron $1 grabado(s) en el mismo lugar. Revíselos con los paneles de esta hoja.'],
   [/^(\d+) things? to look at\. Click one to go to it\.$/, '$1 cosa(s) por revisar. Haga clic para ir a ella.'],
   [/^(.+) on P(\d+) has no length \(top to bottom\)\.$/, '$1 en P$2 no tiene largo (de arriba a abajo).'],
   [/^Plate library: (.+)$/, 'Biblioteca de grabados: $1'],

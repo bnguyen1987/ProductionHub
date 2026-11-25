@@ -585,3 +585,8 @@ details.fold[open]{padding-bottom:16px}
 .lay-chk-box ul{margin:8px 0 14px;padding-left:20px;line-height:1.5}
 @media print{.lay-chk{display:none}}
 .lay-lib .linklike{background:none;border:0;padding:0;color:var(--accent,#1565c0);text-decoration:underline;cursor:pointer;font:inherit;font-size:13px}
+.lay-pfind{padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line,#d7dde3)}
+.lay-pfind .row-inline{display:flex;gap:6px;margin:6px 0;max-width:340px}
+.lay-pfind input{flex:1;min-width:0}
+.lay-pf-group{margin-top:8px}
+.lay-pf-group .lay-lib-head .btn{white-space:nowrap;flex:0 0 auto}
